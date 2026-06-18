@@ -1,0 +1,235 @@
+import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '@/context/AuthContext'
+import {
+  Menu,
+  Search,
+  Bell,
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeft,
+  LogOut,
+  User,
+  Settings,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Dropdown, DropdownItem, DropdownLabel, DropdownSeparator } from '@/components/ui/dropdown'
+import { Badge } from '@/components/ui/badge'
+import { pageTitles, pageDescriptions } from '@/config/navigation'
+import { notifications } from '@/data/mockData'
+import { cn } from '@/lib/utils'
+
+export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const pageTitle = pageTitles[location.pathname] || 'Dashboard'
+  const pageDescription = pageDescriptions[location.pathname]
+  const { user, logout } = useAuth()
+  const unreadCount = notifications.filter((n) => !n.read).length
+  const recentNotifications = notifications.slice(0, 4)
+
+  const currentUser = user || {
+    name: 'Hotel Administrator',
+    email: 'admin@hotel.com',
+    role: 'admin',
+  }
+
+  const initials = currentUser.name
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase()
+
+  const handleLogout = () => {
+    logout()
+    navigate('/login', { replace: true })
+  }
+
+  return (
+    <header className="sticky top-0 z-30 shrink-0 border-b border-slate-200 bg-white/90 backdrop-blur-md">
+      <div className="flex h-16 items-center gap-3 px-4 sm:gap-4 lg:px-8">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="shrink-0 lg:hidden"
+          onClick={onMenuClick}
+          aria-label="Open menu"
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon"
+          className="hidden shrink-0 lg:inline-flex"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? (
+            <PanelLeft className="h-5 w-5" />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" />
+          )}
+        </Button>
+
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-sans text-lg font-semibold text-slate-900 sm:text-xl">
+            {pageTitle}
+          </h1>
+          {pageDescription && (
+            <p className="hidden truncate text-xs text-slate-500 sm:block">{pageDescription}</p>
+          )}
+        </div>
+
+        <div className="hidden min-w-0 flex-1 md:block md:max-w-sm lg:max-w-md">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            <Input
+              placeholder="Search bookings, guests, rooms..."
+              className="h-9 border-transparent bg-slate-100/60 pl-9 transition-colors focus-visible:border-slate-200 focus-visible:bg-white"
+            />
+          </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+          <Dropdown
+            align="right"
+            contentClassName="w-80 max-w-[calc(100vw-2rem)]"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="relative"
+                aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
+              >
+                <Bell className="h-5 w-5" />
+                {unreadCount > 0 && (
+                  <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-bold text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </Button>
+            }
+          >
+            {(close) => (
+              <>
+                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-900">Notifications</p>
+                  {unreadCount > 0 && (
+                    <Badge variant="default">{unreadCount} new</Badge>
+                  )}
+                </div>
+                <div className="max-h-72 overflow-y-auto">
+                  {recentNotifications.map((notif) => (
+                    <button
+                      key={notif.id}
+                      type="button"
+                      onClick={() => {
+                        close()
+                        navigate('/notifications')
+                      }}
+                      className={cn(
+                        'flex w-full flex-col gap-0.5 border-b border-slate-200 px-4 py-3 text-left transition-colors last:border-0 hover:bg-slate-100/60',
+                        !notif.read && 'bg-blue-600/5'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium text-slate-900">{notif.title}</p>
+                        {!notif.read && (
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500">{notif.message}</p>
+                      <p className="text-[11px] text-slate-500/80">{notif.time}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-slate-200 p-2">
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-center text-sm text-blue-800 hover:bg-blue-50/5 hover:text-blue-800"
+                    onClick={() => {
+                      close()
+                      navigate('/notifications')
+                    }}
+                  >
+                    View all notifications
+                  </Button>
+                </div>
+              </>
+            )}
+          </Dropdown>
+
+          <Dropdown
+            align="right"
+            contentClassName="w-56"
+            trigger={
+              <button
+                type="button"
+                className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-100/30 px-2 py-1.5 transition-colors hover:border-blue-300/30 hover:bg-slate-100/60 sm:gap-3 sm:px-3"
+                aria-label="Admin profile menu"
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-blue-200">
+                  {initials}
+                </div>
+                <div className="hidden text-left md:block">
+                  <p className="max-w-[120px] truncate text-sm font-medium text-slate-900">
+                    {currentUser.name}
+                  </p>
+                  <p className="text-xs text-slate-500">{currentUser.email}</p>
+                </div>
+                <ChevronDown className="hidden h-4 w-4 text-slate-500 sm:block" />
+              </button>
+            }
+          >
+            {(close) => (
+              <>
+                <div className="border-b border-slate-200 px-4 py-3">
+                  <p className="text-sm font-semibold text-slate-900">{currentUser.name}</p>
+                  <p className="truncate text-xs text-slate-500">{currentUser.email}</p>
+                  <Badge variant="default" className="mt-2 capitalize">{currentUser.role}</Badge>
+                </div>
+                <DropdownLabel>Account</DropdownLabel>
+                <DropdownItem
+                  onClick={() => {
+                    close()
+                    navigate('/website-settings')
+                  }}
+                >
+                  <User className="h-4 w-4 text-slate-500" />
+                  Profile
+                </DropdownItem>
+                <DropdownItem
+                  onClick={() => {
+                    close()
+                    navigate('/website-settings')
+                  }}
+                >
+                  <Settings className="h-4 w-4 text-slate-500" />
+                  Settings
+                </DropdownItem>
+                <DropdownSeparator />
+                <DropdownItem destructive onClick={() => { close(); handleLogout() }}>
+                  <LogOut className="h-4 w-4" />
+                  Logout
+                </DropdownItem>
+              </>
+            )}
+          </Dropdown>
+        </div>
+      </div>
+
+      <div className="border-t border-slate-200 px-4 py-2 md:hidden">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+          <Input
+            placeholder="Search..."
+            className="h-9 border-transparent bg-slate-100/60 pl-9"
+          />
+        </div>
+      </div>
+    </header>
+  )
+}

@@ -1,0 +1,69 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600&display=swap");
+@import "tailwindcss";
+
+/* Typography & color tokens */
+@theme {
+  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: "Montserrat", system-ui, sans-serif;
+
+  --color-ice: #eef4f7;
+  --color-ice-light: #f7fafb;
+  --color-ice-dark: #dce8ee;
+  --color-charcoal: #1c1c1c;
+  --color-charcoal-light: #2a2a2a;
+  --color-gold: #b8956a;
+  --color-gold-light: #d4b896;
+  --color-muted: #6b7280;
+}
+
+/* Base styles */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-charcoal);
+  background-color: #fff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Subtle diamond pattern for intro sections */
+.pattern-diamond {
+  background-color: var(--color-ice-light);
+  background-image: linear-gradient(45deg, #e8eef2 25%, transparent 25%),
+    linear-gradient(-45deg, #e8eef2 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #e8eef2 75%),
+    linear-gradient(-45deg, transparent 75%, #e8eef2 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-ice-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gold);
+  border-radius: 4px;
+}
+
+/* Image hover zoom container */
+.image-zoom {
+  overflow: hidden;
+}
+
+.image-zoom img {
+  transition: transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.image-zoom:hover img {
+  transform: scale(1.08);
+}
