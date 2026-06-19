@@ -13,7 +13,7 @@ export default function Login() {
   const location = useLocation()
   const { initializing, isAuthenticated, login } = useAuth()
 
-  const [email, setEmail] = useState('admin@hotel.com')
+  const [email, setEmail] = useState('admin@jebalhomes.com')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
@@ -60,12 +60,15 @@ export default function Login() {
     setIsSubmitting(true)
     setErrors({})
 
-    window.setTimeout(() => {
-      login({ email: email.trim(), rememberMe })
+    try {
+      await login({ email: email.trim(), password, rememberMe })
       setToast('Login successful. Redirecting...')
       navigate(redirectTo, { replace: true })
+    } catch (error) {
+      setErrors({ form: error.message || 'Invalid login details.' })
+    } finally {
       setIsSubmitting(false)
-    }, 800)
+    }
   }
 
   return (
@@ -133,7 +136,7 @@ export default function Login() {
                       if (errors.email) setErrors((prev) => ({ ...prev, email: '' }))
                     }}
                     className="pl-9"
-                    placeholder="admin@hotel.com"
+                    placeholder="admin@jebalhomes.com"
                     autoComplete="email"
                     aria-invalid={Boolean(errors.email)}
                   />
@@ -196,8 +199,11 @@ export default function Login() {
                 )}
               </Button>
 
+              {errors.form && (
+                <p className="text-center text-xs font-medium text-red-600">{errors.form}</p>
+              )}
               <p className="text-center text-xs text-slate-500">
-                Demo mode — any valid non-empty credentials will login.
+                Use your assigned Jebal Homes admin credentials.
               </p>
             </form>
           </CardContent>

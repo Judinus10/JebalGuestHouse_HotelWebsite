@@ -1,23 +1,9 @@
+import { apiFetch, readJsonResponse } from '@/services/apiClient'
+
 const API_BASE_URL = import.meta.env.VITE_BOOKING_API_BASE_URL || '/api/bookings'
 
-async function readJsonResponse(response) {
-  let payload = null
-
-  try {
-    payload = await response.json()
-  } catch (error) {
-    payload = null
-  }
-
-  if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || 'Request failed. Please try again.')
-  }
-
-  return payload
-}
-
 export async function fetchBookings() {
-  const response = await fetch(`${API_BASE_URL}/list.php`, {
+  const response = await apiFetch(`${API_BASE_URL}/list.php`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -29,7 +15,7 @@ export async function fetchBookings() {
 }
 
 export async function updateBookingStatus(bookingId, status) {
-  const response = await fetch(`${API_BASE_URL}/update-status.php`, {
+  const response = await apiFetch(`${API_BASE_URL}/update-status.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -43,7 +29,7 @@ export async function updateBookingStatus(bookingId, status) {
 }
 
 export async function deleteBooking(bookingId) {
-  const response = await fetch(`${API_BASE_URL}/delete.php`, {
+  const response = await apiFetch(`${API_BASE_URL}/delete.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',

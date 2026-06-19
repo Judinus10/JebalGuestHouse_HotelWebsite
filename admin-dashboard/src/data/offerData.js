@@ -3,9 +3,9 @@ export const discountTypes = ['percentage', 'fixed']
 export const offerStatuses = ['active', 'inactive', 'upcoming', 'expired']
 
 export const packageCategories = [
-  'Honeymoon Package',
-  'Family Package',
-  'Entire Villa Package',
+  'Couple Stay Offer',
+  'Family Stay Offer',
+  'Full Guest House Stay',
   'Long Stay Offer',
   'Weekend Offer',
 ]
@@ -13,9 +13,9 @@ export const packageCategories = [
 export const initialOffers = [
   {
     id: 1,
-    title: 'Honeymoon Package',
+    title: 'Couple Stay Offer',
     description: 'Private stay package for couples including room decoration and flexible check-in support.',
-    package_category: 'Honeymoon Package',
+    package_category: 'Couple Stay Offer',
     discount_type: 'percentage',
     discount_value: 12,
     start_date: '2026-06-01',
@@ -28,9 +28,9 @@ export const initialOffers = [
   },
   {
     id: 2,
-    title: 'Family Stay Package',
+    title: 'Family Stay Offer',
     description: 'Discounted family room stay for guests booking multiple nights with access to shared facilities.',
-    package_category: 'Family Package',
+    package_category: 'Family Stay Offer',
     discount_type: 'fixed',
     discount_value: 35,
     start_date: '2026-06-10',
@@ -43,9 +43,9 @@ export const initialOffers = [
   },
   {
     id: 3,
-    title: 'Entire Villa Package',
-    description: 'Special rate for guests booking the full guest house/villa for family or group accommodation.',
-    package_category: 'Entire Villa Package',
+    title: 'Full Guest House Stay',
+    description: 'Special rate for guests booking multiple rooms for family or group accommodation.',
+    package_category: 'Full Guest House Stay',
     discount_type: 'percentage',
     discount_value: 15,
     start_date: '2026-07-01',

@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   BedDouble,
@@ -30,199 +31,58 @@ import {
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { fetchDashboardStats } from '@/services/dashboardApi'
 
-const rooms = [
-  {
-    id: 'R-001',
-    name: 'Ground Floor Room 1',
-    propertyType: 'Ground Floor',
-    category: 'Standard',
-    status: 'Available',
-    price: 45,
+const defaultDashboardData = {
+  cards: {
+    totalBookings: 0,
+    pendingBookings: 0,
+    confirmedBookings: 0,
+    cancelledBookings: 0,
+    totalEnquiries: 0,
+    totalRevenue: 0,
+    paidBookings: 0,
+    paymentPendingBookings: 0,
   },
-  {
-    id: 'R-002',
-    name: 'Ground Floor Room 2',
-    propertyType: 'Ground Floor',
-    category: 'Deluxe',
-    status: 'Available',
-    price: 50,
+  revenue: {
+    today: 0,
+    currentMonth: 0,
+    currentYear: 0,
+    lifetime: 0,
   },
-  {
-    id: 'R-003',
-    name: 'First Floor Room 1',
-    propertyType: 'First Floor',
-    category: 'Deluxe',
-    status: 'Occupied',
-    price: 55,
+  rooms: {
+    totalRooms: 6,
+    availableRooms: 6,
+    groundFloorRooms: 2,
+    firstFloorRooms: 2,
+    cottageUnits: 1,
+    mostBookedRoom: 'No confirmed bookings yet',
+    occupancyRate: 0,
   },
-  {
-    id: 'R-004',
-    name: 'First Floor Room 2',
-    propertyType: 'First Floor',
-    category: 'Standard',
-    status: 'Available',
-    price: 50,
+  charts: {
+    monthlyBookingTrend: [],
+    revenueTrend: [],
+    bookingStatusDistribution: [],
+    paymentStatusDistribution: [],
   },
-  {
-    id: 'R-005',
-    name: 'Family Room',
-    propertyType: 'First Floor',
-    category: 'Family',
-    status: 'Occupied',
-    price: 75,
+  enquiries: {
+    new: 0,
+    read: 0,
+    replied: 0,
   },
-  {
-    id: 'R-006',
-    name: 'Private Cottage',
-    propertyType: 'Cottage',
-    category: 'Cottage',
-    status: 'Available',
-    price: 95,
+  payments: {
+    paid: 0,
+    failed: 0,
+    refunded: 0,
+    pending: 0,
   },
-]
-
-const bookings = [
-  {
-    bookingNo: 'BK-1048',
-    guest: 'Sarah Williams',
-    room: 'Private Cottage',
-    checkIn: '2026-06-18',
-    nights: 3,
-    amount: 285,
-    status: 'Confirmed',
-    createdAt: '2026-06-15T10:30:00Z',
+  lists: {
+    recentBookings: [],
+    upcomingCheckIns: [],
+    recentPayments: [],
+    latestMessages: [],
   },
-  {
-    bookingNo: 'BK-1047',
-    guest: 'Kavindu Perera',
-    room: 'Family Room',
-    checkIn: '2026-06-17',
-    nights: 2,
-    amount: 150,
-    status: 'Pending',
-    createdAt: '2026-06-15T08:10:00Z',
-  },
-  {
-    bookingNo: 'BK-1046',
-    guest: 'Meera Nadarajah',
-    room: 'First Floor Room 1',
-    checkIn: '2026-06-16',
-    nights: 4,
-    amount: 220,
-    status: 'Confirmed',
-    createdAt: '2026-06-14T15:45:00Z',
-  },
-  {
-    bookingNo: 'BK-1045',
-    guest: 'Daniel Joseph',
-    room: 'Ground Floor Room 1',
-    checkIn: '2026-06-14',
-    nights: 2,
-    amount: 90,
-    status: 'Completed',
-    createdAt: '2026-06-13T11:20:00Z',
-  },
-  {
-    bookingNo: 'BK-1044',
-    guest: 'Ayesha Khan',
-    room: 'Ground Floor Room 2',
-    checkIn: '2026-06-20',
-    nights: 1,
-    amount: 50,
-    status: 'Cancelled',
-    createdAt: '2026-06-12T09:00:00Z',
-  },
-  {
-    bookingNo: 'BK-1043',
-    guest: 'Nimal Fernando',
-    room: 'First Floor Room 2',
-    checkIn: '2026-06-21',
-    nights: 5,
-    amount: 250,
-    status: 'Pending',
-    createdAt: '2026-06-11T18:15:00Z',
-  },
-  {
-    bookingNo: 'BK-1042',
-    guest: 'Priya Selvarajah',
-    room: 'Private Cottage',
-    checkIn: '2026-06-22',
-    nights: 2,
-    amount: 190,
-    status: 'Confirmed',
-    createdAt: '2026-06-10T13:30:00Z',
-  },
-]
-
-const payments = [
-  { transaction: 'TXN-9021', guest: 'Sarah Williams', amount: 285, status: 'Paid', createdAt: '2026-06-15T11:15:00Z' },
-  { transaction: 'TXN-9020', guest: 'Kavindu Perera', amount: 150, status: 'Pending', createdAt: '2026-06-15T08:20:00Z' },
-  { transaction: 'TXN-9019', guest: 'Meera Nadarajah', amount: 220, status: 'Paid', createdAt: '2026-06-14T16:10:00Z' },
-  { transaction: 'TXN-9018', guest: 'Daniel Joseph', amount: 90, status: 'Paid', createdAt: '2026-06-13T12:00:00Z' },
-  { transaction: 'TXN-9017', guest: 'Ayesha Khan', amount: 50, status: 'Refunded', createdAt: '2026-06-12T09:30:00Z' },
-  { transaction: 'TXN-9016', guest: 'Nimal Fernando', amount: 250, status: 'Failed', createdAt: '2026-06-11T18:40:00Z' },
-]
-
-const messages = [
-  {
-    id: 'M-301',
-    from: 'Sarah Williams',
-    subject: 'Cottage availability question',
-    message: 'Is the private cottage available for a quiet family stay next weekend?',
-    status: 'Unread',
-    createdAt: '2026-06-15T08:35:00Z',
-  },
-  {
-    id: 'M-300',
-    from: 'Meera Nadarajah',
-    subject: 'Kitchen access details',
-    message: 'Can guests use the common kitchen and refrigerator during the stay?',
-    status: 'Read',
-    createdAt: '2026-06-14T13:20:00Z',
-  },
-  {
-    id: 'M-299',
-    from: 'Kavindu Perera',
-    subject: 'Family room inquiry',
-    message: 'Please confirm if the family room has an attached bathroom and WiFi.',
-    status: 'Unread',
-    createdAt: '2026-06-13T17:05:00Z',
-  },
-]
-
-const galleryItems = [
-  { title: 'Ground Floor Room', category: 'Rooms', status: 'Active' },
-  { title: 'First Floor Balcony Room', category: 'Rooms', status: 'Active' },
-  { title: 'Private Cottage', category: 'Cottage', status: 'Active' },
-  { title: 'Garden Area', category: 'Garden', status: 'Active' },
-  { title: 'Common Kitchen', category: 'Facilities', status: 'Active' },
-]
-
-const offers = [
-  { title: 'Honeymoon Package', status: 'Active' },
-  { title: 'Family Package', status: 'Active' },
-  { title: 'Entire Villa Package', status: 'Active' },
-  { title: 'Long Stay Offer', status: 'Scheduled' },
-]
-
-const monthlyBookingTrend = [
-  { month: 'Jan', bookings: 12 },
-  { month: 'Feb', bookings: 16 },
-  { month: 'Mar', bookings: 14 },
-  { month: 'Apr', bookings: 20 },
-  { month: 'May', bookings: 22 },
-  { month: 'Jun', bookings: 27 },
-]
-
-const revenueTrend = [
-  { month: 'Jan', revenue: 1450 },
-  { month: 'Feb', revenue: 1680 },
-  { month: 'Mar', revenue: 1520 },
-  { month: 'Apr', revenue: 2110 },
-  { month: 'May', revenue: 2460 },
-  { month: 'Jun', revenue: 2890 },
-]
+}
 
 const chartColors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 
@@ -236,15 +96,17 @@ const statusVariant = {
   Paid: 'success',
   Failed: 'destructive',
   Refunded: 'secondary',
-  Unread: 'warning',
+  'Payment Pending': 'warning',
+  New: 'warning',
   Read: 'secondary',
+  Replied: 'success',
   Active: 'success',
   Scheduled: 'warning',
 }
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'USD',
+  currency: 'LKR',
   maximumFractionDigits: 0,
 })
 
@@ -254,28 +116,24 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
 })
 
 function formatDate(date) {
-  return shortDateFormatter.format(new Date(date))
-}
-
-function getCountByStatus(items, key, status) {
-  return items.filter((item) => item[key] === status).length
+  if (!date) return 'Not set'
+  const parsedDate = new Date(date)
+  if (Number.isNaN(parsedDate.getTime())) return 'Not set'
+  return shortDateFormatter.format(parsedDate)
 }
 
 function getPercentage(value, total) {
   if (!total) return 0
-  return Math.round((value / total) * 100)
+  return Math.round((Number(value || 0) / Number(total || 0)) * 100)
 }
 
-function buildStatusData(items, key, statuses) {
-  const total = items.length
-  return statuses.map((status) => {
-    const count = getCountByStatus(items, key, status)
-    return {
-      name: status,
-      value: count,
-      percentage: getPercentage(count, total),
-    }
-  })
+function normalizeDistribution(items) {
+  const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0)
+
+  return items.map((item) => ({
+    ...item,
+    percentage: item.percentage ?? getPercentage(item.value, total),
+  }))
 }
 
 function KpiCard({ title, value, helper, icon: Icon }) {
@@ -333,6 +191,8 @@ function ChartLegend({ data }) {
 }
 
 function StatusDonut({ title, data }) {
+  const chartData = normalizeDistribution(data)
+
   return (
     <Card>
       <CardHeader>
@@ -341,8 +201,8 @@ function StatusDonut({ title, data }) {
       <CardContent>
         <ResponsiveContainer width="100%" height={210}>
           <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" innerRadius={55} outerRadius={82} paddingAngle={3}>
-              {data.map((entry, index) => (
+            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={82} paddingAngle={3}>
+              {chartData.map((entry, index) => (
                 <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
               ))}
             </Pie>
@@ -352,7 +212,7 @@ function StatusDonut({ title, data }) {
             />
           </PieChart>
         </ResponsiveContainer>
-        <ChartLegend data={data} />
+        <ChartLegend data={chartData} />
       </CardContent>
     </Card>
   )
@@ -396,43 +256,70 @@ function ListRow({ title, subtitle, right, badge }) {
 }
 
 export default function Dashboard() {
-  const availableRooms = rooms.filter((room) => room.status === 'Available').length
-  const totalRevenue = payments
-    .filter((payment) => payment.status === 'Paid')
-    .reduce((sum, payment) => sum + payment.amount, 0)
-  const pendingPaymentAmount = payments
-    .filter((payment) => payment.status === 'Pending')
-    .reduce((sum, payment) => sum + payment.amount, 0)
+  const [dashboardData, setDashboardData] = useState(defaultDashboardData)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  const bookingStatusData = buildStatusData(bookings, 'status', ['Pending', 'Confirmed', 'Cancelled', 'Completed'])
-  const paymentStatusData = buildStatusData(payments, 'status', ['Paid', 'Pending', 'Failed', 'Refunded'])
+  useEffect(() => {
+    let isMounted = true
 
-  const recentBookings = [...bookings]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5)
+    async function loadDashboardStats() {
+      try {
+        setIsLoading(true)
+        setError('')
+        const data = await fetchDashboardStats()
 
-  const upcomingCheckIns = bookings
-    .filter((booking) => booking.status !== 'Cancelled' && new Date(booking.checkIn) >= new Date('2026-06-15'))
-    .sort((a, b) => new Date(a.checkIn) - new Date(b.checkIn))
-    .slice(0, 5)
+        if (isMounted) {
+          setDashboardData({
+            ...defaultDashboardData,
+            ...data,
+            cards: { ...defaultDashboardData.cards, ...(data?.cards || {}) },
+            revenue: { ...defaultDashboardData.revenue, ...(data?.revenue || {}) },
+            rooms: { ...defaultDashboardData.rooms, ...(data?.rooms || {}) },
+            charts: { ...defaultDashboardData.charts, ...(data?.charts || {}) },
+            enquiries: { ...defaultDashboardData.enquiries, ...(data?.enquiries || {}) },
+            payments: { ...defaultDashboardData.payments, ...(data?.payments || {}) },
+            lists: { ...defaultDashboardData.lists, ...(data?.lists || {}) },
+          })
+        }
+      } catch (loadError) {
+        if (isMounted) {
+          setError(loadError.message || 'Unable to load dashboard statistics.')
+          setDashboardData(defaultDashboardData)
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
 
-  const recentPayments = [...payments]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 5)
+    loadDashboardStats()
 
-  const latestMessages = [...messages]
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    .slice(0, 4)
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const bookingStatusData = useMemo(
+    () => normalizeDistribution(dashboardData.charts.bookingStatusDistribution),
+    [dashboardData.charts.bookingStatusDistribution]
+  )
+
+  const paymentStatusData = useMemo(
+    () => normalizeDistribution(dashboardData.charts.paymentStatusDistribution),
+    [dashboardData.charts.paymentStatusDistribution]
+  )
 
   const kpis = [
-    { title: 'Total Rooms', value: rooms.length, helper: 'Small guest house inventory', icon: BedDouble },
-    { title: 'Available Rooms', value: availableRooms, helper: 'Ready for reservation', icon: Home },
-    { title: 'Total Bookings', value: bookings.length, helper: 'Current mock reservations', icon: CalendarCheck },
-    { title: 'Pending Bookings', value: getCountByStatus(bookings, 'status', 'Pending'), helper: 'Need confirmation', icon: TrendingUp },
-    { title: 'Confirmed Bookings', value: getCountByStatus(bookings, 'status', 'Confirmed'), helper: 'Expected arrivals', icon: CalendarCheck },
-    { title: 'Total Revenue', value: currencyFormatter.format(totalRevenue), helper: 'Paid payments only', icon: DollarSign },
-    { title: 'Pending Payments', value: currencyFormatter.format(pendingPaymentAmount), helper: 'Awaiting payment', icon: CreditCard },
-    { title: 'Unread Messages', value: getCountByStatus(messages, 'status', 'Unread'), helper: 'Guest inquiries', icon: Mail },
+    { title: 'Total Bookings', value: dashboardData.cards.totalBookings, helper: 'All booking inquiries', icon: CalendarCheck },
+    { title: 'Pending Bookings', value: dashboardData.cards.pendingBookings, helper: 'Need confirmation', icon: TrendingUp },
+    { title: 'Confirmed Bookings', value: dashboardData.cards.confirmedBookings, helper: 'Confirmed stays', icon: CalendarCheck },
+    { title: 'Cancelled Bookings', value: dashboardData.cards.cancelledBookings, helper: 'Cancelled requests', icon: BedDouble },
+    { title: 'Total Enquiries', value: dashboardData.cards.totalEnquiries, helper: 'Contact form messages', icon: Mail },
+    { title: 'Total Revenue', value: currencyFormatter.format(dashboardData.cards.totalRevenue), helper: 'Paid bookings only', icon: DollarSign },
+    { title: 'Paid Bookings', value: dashboardData.cards.paidBookings, helper: 'Payment completed', icon: CreditCard },
+    { title: 'Payment Pending', value: dashboardData.cards.paymentPendingBookings, helper: 'Awaiting payment', icon: CreditCard },
   ]
 
   const quickActions = [
@@ -450,6 +337,18 @@ export default function Dashboard() {
         description="Guest house overview for rooms, reservations, payments, messages, packages, and website content."
       />
 
+      {error ? (
+        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">
+          Loading real dashboard statistics...
+        </div>
+      ) : null}
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((kpi) => (
           <KpiCard key={kpi.title} {...kpi} />
@@ -458,12 +357,15 @@ export default function Dashboard() {
 
       <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <div className="grid gap-4 sm:grid-cols-3">
-          <MiniSummaryCard title="Gallery Items" value={galleryItems.length} helper="Website media" icon={Image} />
-          <MiniSummaryCard title="Active Packages" value={offers.filter((offer) => offer.status === 'Active').length} helper="Visible offers" icon={Tag} />
-          <MiniSummaryCard title="Open Guest Tasks" value={getCountByStatus(messages, 'status', 'Unread')} helper="Need reply" icon={MessageSquareText} />
-          <MiniSummaryCard title="Ground Floor Rooms" value={rooms.filter((room) => room.propertyType === 'Ground Floor').length} helper="Easy access units" icon={Home} />
-          <MiniSummaryCard title="First Floor Rooms" value={rooms.filter((room) => room.propertyType === 'First Floor').length} helper="Balcony-level units" icon={Building2} />
-          <MiniSummaryCard title="Cottage Units" value={rooms.filter((room) => room.propertyType === 'Cottage').length} helper="Separate cottage" icon={Layers} />
+          <MiniSummaryCard title="Today Revenue" value={currencyFormatter.format(dashboardData.revenue.today)} helper="Paid today" icon={DollarSign} />
+          <MiniSummaryCard title="Month Revenue" value={currencyFormatter.format(dashboardData.revenue.currentMonth)} helper="Paid this month" icon={TrendingUp} />
+          <MiniSummaryCard title="Year Revenue" value={currencyFormatter.format(dashboardData.revenue.currentYear)} helper="Paid this year" icon={CreditCard} />
+          <MiniSummaryCard title="Ground Floor Rooms" value={dashboardData.rooms.groundFloorRooms} helper="Easy access units" icon={Home} />
+          <MiniSummaryCard title="First Floor Rooms" value={dashboardData.rooms.firstFloorRooms} helper="Balcony-level units" icon={Building2} />
+          <MiniSummaryCard title="Cottage Units" value={dashboardData.rooms.cottageUnits} helper="Separate cottage" icon={Layers} />
+          <MiniSummaryCard title="Most Booked Room" value={dashboardData.rooms.mostBookedRoom} helper="Confirmed bookings" icon={BedDouble} />
+          <MiniSummaryCard title="Occupancy Rate" value={`${dashboardData.rooms.occupancyRate}%`} helper="Confirmed active stays" icon={Home} />
+          <MiniSummaryCard title="New Enquiries" value={dashboardData.enquiries.new} helper="Need attention" icon={MessageSquareText} />
         </div>
 
         <Card>
@@ -497,7 +399,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={monthlyBookingTrend}>
+              <AreaChart data={dashboardData.charts.monthlyBookingTrend}>
                 <defs>
                   <linearGradient id="bookingTrend" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#2563EB" stopOpacity={0.32} />
@@ -521,10 +423,10 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={revenueTrend}>
+              <BarChart data={dashboardData.charts.revenueTrend}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                 <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
-                <YAxis tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(value) => `$${Math.round(value / 1000)}k`} />
+                <YAxis tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                 <Tooltip
                   contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px' }}
                   formatter={(value) => [currencyFormatter.format(value), 'Revenue']}
@@ -546,7 +448,7 @@ export default function Dashboard() {
           title="Recent Bookings"
           description="Latest reservations created in the system."
           emptyText="No recent bookings found."
-          items={recentBookings}
+          items={dashboardData.lists.recentBookings}
           renderItem={(booking) => (
             <ListRow
               key={booking.bookingNo}
@@ -562,7 +464,7 @@ export default function Dashboard() {
           title="Upcoming Check-ins"
           description="Arrivals from today onward."
           emptyText="No upcoming check-ins."
-          items={upcomingCheckIns}
+          items={dashboardData.lists.upcomingCheckIns}
           renderItem={(booking) => (
             <ListRow
               key={booking.bookingNo}
@@ -579,7 +481,7 @@ export default function Dashboard() {
           title="Recent Payments"
           description="Latest payment activity."
           emptyText="No payment records found."
-          items={recentPayments}
+          items={dashboardData.lists.recentPayments}
           renderItem={(payment) => (
             <ListRow
               key={payment.transaction}
@@ -595,7 +497,7 @@ export default function Dashboard() {
           title="Latest Messages"
           description="Newest guest inquiries."
           emptyText="No messages found."
-          items={latestMessages}
+          items={dashboardData.lists.latestMessages}
           renderItem={(message) => (
             <ListRow
               key={message.id}

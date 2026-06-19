@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { clearMockSession, createMockSession, getStoredToken, getStoredUser } from '@/utils/auth'
+import { clearStoredSession, getStoredToken, getStoredUser, storeSession } from '@/utils/auth'
+import { loginAdmin, logoutAdmin, verifyAdminSession } from '@/services/authApi'
 
 const AuthContext = createContext(null)
 
@@ -9,31 +10,60 @@ export function AuthProvider({ children }) {
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
-    const storedUser = getStoredUser()
-    const storedToken = getStoredToken()
+    let cancelled = false
 
-    if (storedUser && storedToken) {
-      setUser(storedUser)
-      setToken(storedToken)
+    async function restoreSession() {
+      const storedToken = getStoredToken()
+      const storedUser = getStoredUser()
+
+      if (!storedToken || !storedUser) {
+        clearStoredSession()
+        if (!cancelled) setInitializing(false)
+        return
+      }
+
+      const verifiedUser = await verifyAdminSession(storedToken)
+
+      if (cancelled) return
+
+      if (verifiedUser) {
+        setUser(verifiedUser)
+        setToken(storedToken)
+        storeSession({ user: verifiedUser, token: storedToken, rememberMe: localStorage.getItem('jebal_admin_storage_mode') === 'local' })
+      } else {
+        clearStoredSession()
+        setUser(null)
+        setToken(null)
+      }
+
+      setInitializing(false)
     }
 
-    setInitializing(false)
+    restoreSession()
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
-  const login = () => {
-    const sessionUser = createMockSession()
-    const sessionToken = getStoredToken()
+  const login = async ({ email, password, rememberMe }) => {
+    const payload = await loginAdmin({ email, password })
+    const nextUser = payload.data.user
+    const nextToken = payload.data.token
 
-    setUser(sessionUser)
-    setToken(sessionToken)
+    storeSession({ user: nextUser, token: nextToken, rememberMe })
+    setUser(nextUser)
+    setToken(nextToken)
 
-    return sessionUser
+    return nextUser
   }
 
-  const logout = () => {
-    clearMockSession()
+  const logout = async () => {
+    const currentToken = token || getStoredToken()
+    clearStoredSession()
     setUser(null)
     setToken(null)
+    await logoutAdmin(currentToken)
   }
 
   const value = useMemo(

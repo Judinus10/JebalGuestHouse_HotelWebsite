@@ -24,7 +24,7 @@ import { discountTypes, initialOffers, offerStatuses, packageCategories } from '
 const emptyForm = {
   title: '',
   description: '',
-  package_category: 'Honeymoon Package',
+  package_category: 'Family Stay Offer',
   discount_type: 'percentage',
   discount_value: '',
   start_date: '',

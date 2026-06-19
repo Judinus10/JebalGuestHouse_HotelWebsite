@@ -84,13 +84,13 @@ export function Sidebar({ mobileOpen, collapsed, onCloseMobile, onToggleCollapse
         >
           <div className={cn('flex items-center gap-3', collapsed && 'justify-center')}>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm shadow-blue-950/30 ring-1 ring-white/10">
-              <span className="text-sm font-bold text-white">GA</span>
+              <span className="text-sm font-bold text-white">JH</span>
             </div>
             {!collapsed && (
               <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-white">Grand Aurelia</p>
+                <p className="truncate text-base font-semibold text-white">Jebal Homes</p>
                 <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-blue-200">
-                  Hotel PMS
+                  Guest House PMS
                 </p>
               </div>
             )}
@@ -143,7 +143,7 @@ export function Sidebar({ mobileOpen, collapsed, onCloseMobile, onToggleCollapse
                 <Headphones className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                 <div>
                   <p className="text-xs font-medium text-white">Need assistance?</p>
-                  <p className="mt-0.5 text-xs text-slate-300">support@grandaurelia.com</p>
+                  <p className="mt-0.5 text-xs text-slate-300">support@jebalhomes.com</p>
                 </div>
               </div>
             </div>

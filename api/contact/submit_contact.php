@@ -1,51 +1,37 @@
 <?php
-/**
- * Public website contact form submission endpoint.
- */
-
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
-require_once __DIR__ . '/../db.php';
 
-handle_preflight_request();
+apply_cors_headers();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    api_json_response(false, 'Only POST requests are allowed.', 405);
+    json_response(false, 'Only POST requests are allowed.', 405);
 }
 
-$input = read_request_data();
+rate_limit_or_fail('submit_contact', 5, 15);
 
-$name = clean_string($input['name'] ?? '');
-$email = clean_string($input['email'] ?? '');
-$phone = clean_string($input['phone'] ?? '');
-$subject = clean_string($input['subject'] ?? 'General Inquiry');
-$message = clean_string($input['message'] ?? '');
+$data = read_request_data();
+$name = clean_string($data['name'] ?? '', 150);
+$email = strtolower(clean_string($data['email'] ?? '', 190));
+$phone = clean_string($data['phone'] ?? '', 50);
+$subject = clean_string($data['subject'] ?? 'General Inquiry', 190);
+$message = clean_string($data['message'] ?? '', 5000);
 
 if ($name === '' || $email === '' || $message === '') {
-    api_json_response(false, 'Name, email, and message are required.', 422);
+    json_response(false, 'Name, email, and message are required.', 422);
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    api_json_response(false, 'Please provide a valid email address.', 422);
-}
-
-if (mb_strlen($name) > 150 || mb_strlen($email) > 190 || mb_strlen($phone) > 50 || mb_strlen($subject) > 190) {
-    api_json_response(false, 'One or more fields are too long.', 422);
-}
-
-if (mb_strlen($message) > 5000) {
-    api_json_response(false, 'Message is too long.', 422);
+    json_response(false, 'Please provide a valid email address.', 422);
 }
 
 try {
     $pdo = get_db_connection();
-
     $stmt = $pdo->prepare(
-        'INSERT INTO enquiries (name, email, phone, subject, message, status, created_at, updated_at)
-         VALUES (:name, :email, :phone, :subject, :message, :status, NOW(), NOW())'
+        'INSERT INTO enquiries (name, email, phone, subject, message, status, ip_address, user_agent, created_at, updated_at)
+         VALUES (:name, :email, :phone, :subject, :message, :status, :ip_address, :user_agent, NOW(), NOW())'
     );
-
     $stmt->execute([
         ':name' => $name,
         ':email' => $email,
@@ -53,36 +39,34 @@ try {
         ':subject' => $subject,
         ':message' => $message,
         ':status' => 'New',
+        ':ip_address' => get_client_ip(),
+        ':user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
     ]);
 
-    $enquiryId = (int) $pdo->lastInsertId();
-    $publicInquiryId = 'INQ-' . str_pad((string) $enquiryId, 5, '0', STR_PAD_LEFT);
+    $id = (int) $pdo->lastInsertId();
+    $ref = 'INQ-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
 
-    $adminSubject = 'New Contact Enquiry - ' . $publicInquiryId;
-    $adminMessage = "New contact enquiry received.\n\n"
-        . "Inquiry ID: {$publicInquiryId}\n"
-        . "Name: {$name}\n"
-        . "Email: {$email}\n"
-        . "Phone: {$phone}\n"
-        . "Subject: {$subject}\n\n"
-        . "Message:\n{$message}\n";
+    send_plain_email(ADMIN_EMAIL, 'New Contact Enquiry - ' . $ref, "New contact enquiry received.
 
-    send_plain_email(ADMIN_EMAIL, $adminSubject, $adminMessage, $email);
+Ref: {$ref}
+Name: {$name}
+Email: {$email}
+Phone: {$phone}
+Subject: {$subject}
 
-    $customerSubject = 'We received your message - Jebal Homes';
-    $customerMessage = "Dear {$name},\n\n"
-        . "Thank you for contacting Jebal Homes. We have received your message and will get back to you as soon as possible.\n\n"
-        . "Your enquiry reference: {$publicInquiryId}\n\n"
-        . "Regards,\nJebal Homes";
+Message:
+{$message}", $email);
+    send_plain_email($email, 'We received your message - Jebal Homes', "Dear {$name},
 
-    send_plain_email($email, $customerSubject, $customerMessage);
+Thank you for contacting Jebal Homes. Your enquiry reference is {$ref}.
 
-    api_json_response(true, 'Your message has been sent successfully.', 200, [
-        'id' => $enquiryId,
-        'inquiry_id' => $publicInquiryId,
+Regards,
+Jebal Homes");
+
+    json_response(true, 'Your message has been sent successfully.', 201, [
+        'data' => ['id' => $id, 'inquiry_id' => $ref],
     ]);
 } catch (Throwable $e) {
     error_log('Contact submit error: ' . $e->getMessage());
-    api_json_response(false, 'Could not save your enquiry. Please try again.', 500);
+    json_response(false, 'Could not save your enquiry. Please try again.', 500);
 }
-

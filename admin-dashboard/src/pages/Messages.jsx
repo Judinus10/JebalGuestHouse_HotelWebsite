@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { apiFetch } from '@/services/apiClient'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -129,7 +130,7 @@ export default function Messages() {
   const loadInquiries = async () => {
     setIsLoading(true)
     try {
-      const response = await fetch(`${API_BASE_URL}/contact/list_enquiries.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/contact/list_enquiries.php`, {
         headers: { Accept: 'application/json' },
       })
       const result = await response.json().catch(() => null)
@@ -152,7 +153,7 @@ export default function Messages() {
 
   const updateStatus = async (id, status) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/contact/update_enquiry_status.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/contact/update_enquiry_status.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -178,7 +179,7 @@ export default function Messages() {
     if (!window.confirm('Delete this enquiry? This action cannot be undone.')) return
 
     try {
-      const response = await fetch(`${API_BASE_URL}/contact/delete_enquiry.php`, {
+      const response = await apiFetch(`${API_BASE_URL}/contact/delete_enquiry.php`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

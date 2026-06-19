@@ -1,10 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Banknote,
   CreditCard,
+  Download,
   Eye,
-  Filter,
-  ReceiptText,
   Search,
   TrendingUp,
   WalletCards,
@@ -15,25 +14,30 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
-import { initialPayments, paymentMethods, paymentStatuses } from '@/data/paymentData'
+import { fetchPayments } from '@/services/paymentsApi'
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'USD',
+  currency: 'LKR',
   maximumFractionDigits: 0,
 })
+
+const paymentStatuses = ['pending', 'paid', 'failed', 'cancelled', 'refunded']
+const paymentMethods = ['PayHere']
 
 const statusVariant = {
   pending: 'warning',
   paid: 'success',
   failed: 'destructive',
+  cancelled: 'secondary',
   refunded: 'purple',
 }
 
 const statusLabel = {
-  pending: 'Pending',
+  pending: 'Payment Pending',
   paid: 'Paid',
   failed: 'Failed',
+  cancelled: 'Cancelled',
   refunded: 'Refunded',
 }
 
@@ -48,16 +52,6 @@ function formatDate(value) {
     day: '2-digit',
     year: 'numeric',
   }).format(new Date(value))
-}
-
-function isSameDay(dateValue, referenceDate = new Date()) {
-  if (!dateValue) return false
-  const date = new Date(dateValue)
-  return (
-    date.getFullYear() === referenceDate.getFullYear() &&
-    date.getMonth() === referenceDate.getMonth() &&
-    date.getDate() === referenceDate.getDate()
-  )
 }
 
 function isInDateRange(value, from, to) {
@@ -108,15 +102,20 @@ function PaymentStatusBadge({ status }) {
 function PaymentDetailsModal({ payment, onClose }) {
   if (!payment) return null
 
+  const invoiceDownloadUrl = payment.invoice_number ? `/api/invoices/download.php?id=${payment.booking_id}` : ''
+
   const details = [
-    ['Payment ID', `PAY-${String(payment.id).padStart(4, '0')}`],
+    ['Payment ID', payment.payment_id || `PAY-${String(payment.id).padStart(4, '0')}`],
     ['Booking ID', payment.booking_id],
     ['Booking Number', payment.booking_no],
     ['Guest Name', payment.guest_name],
+    ['Room Name', payment.room_name || '-'],
     ['Amount', formatCurrency(payment.amount)],
     ['Payment Method', payment.payment_method],
     ['Payment Gateway', payment.payment_gateway],
     ['Transaction ID', payment.transaction_id],
+    ['Invoice Number', payment.invoice_number || 'Not generated yet'],
+    ['Email Status', payment.email_status || 'Not Sent'],
     ['Paid Date', formatDate(payment.paid_at)],
     ['Created Date', formatDate(payment.created_at)],
   ]
@@ -158,6 +157,15 @@ function PaymentDetailsModal({ payment, onClose }) {
               </div>
             ))}
           </div>
+
+          {invoiceDownloadUrl ? (
+            <div className="mt-6 flex justify-end">
+              <Button type="button" onClick={() => window.open(invoiceDownloadUrl, '_blank', 'noopener,noreferrer')}>
+                <Download className="h-4 w-4" />
+                Download Invoice
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -165,7 +173,9 @@ function PaymentDetailsModal({ payment, onClose }) {
 }
 
 export default function Payments() {
-  const [payments] = useState(initialPayments)
+  const [payments, setPayments] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [methodFilter, setMethodFilter] = useState('all')
@@ -173,6 +183,29 @@ export default function Payments() {
   const [dateTo, setDateTo] = useState('')
   const [selectedPayment, setSelectedPayment] = useState(null)
   const [toast, setToast] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    async function loadPayments() {
+      try {
+        setLoading(true)
+        setError('')
+        const data = await fetchPayments()
+        if (active) setPayments(data)
+      } catch (err) {
+        if (active) setError(err.message || 'Unable to load payments.')
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    loadPayments()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const filteredPayments = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -182,7 +215,8 @@ export default function Payments() {
         !query ||
         payment.transaction_id.toLowerCase().includes(query) ||
         payment.booking_no.toLowerCase().includes(query) ||
-        payment.guest_name.toLowerCase().includes(query)
+        payment.guest_name.toLowerCase().includes(query) ||
+        payment.invoice_number.toLowerCase().includes(query)
 
       const matchesStatus = statusFilter === 'all' || payment.payment_status === statusFilter
       const matchesMethod = methodFilter === 'all' || payment.payment_method === methodFilter
@@ -224,7 +258,7 @@ export default function Payments() {
 
       <PageHeader
         title="Payments"
-        description="Track successful payments, pending transactions, and booking refunds."
+        description="Track PayHere payments, invoice details, and payment email delivery."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -281,86 +315,68 @@ export default function Payments() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 md:col-span-2 xl:col-span-1">
-                <div>
-                  <Label htmlFor="date-from">From</Label>
-                  <Input id="date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-2" />
-                </div>
-                <div>
-                  <Label htmlFor="date-to">To</Label>
-                  <Input id="date-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-2" />
-                </div>
+              <div>
+                <Label htmlFor="date-from">From</Label>
+                <Input id="date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-2" />
               </div>
             </div>
 
             <Button type="button" variant="outline" onClick={handleResetFilters}>
-              <Filter className="h-4 w-4" />
-              Reset
+              Reset Filters
             </Button>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-border">
-            <div className="w-full overflow-x-auto">
-              <table className="w-full min-w-[980px] text-left text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-                  <tr>
-                    <th className="px-4 py-3">Transaction ID</th>
-                    <th className="px-4 py-3">Booking Number</th>
-                    <th className="px-4 py-3">Guest Name</th>
-                    <th className="px-4 py-3">Amount</th>
-                    <th className="px-4 py-3">Method</th>
-                    <th className="px-4 py-3">Gateway</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Paid Date</th>
-                    <th className="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-white">
-                  {filteredPayments.length > 0 ? (
-                    filteredPayments.map((payment) => (
-                      <tr key={payment.id} className="transition hover:bg-blue-50/40">
-                        <td className="px-4 py-4 font-semibold text-text-primary">{payment.transaction_id}</td>
-                        <td className="px-4 py-4 text-text-secondary">{payment.booking_no}</td>
-                        <td className="px-4 py-4">
-                          <div className="font-semibold text-text-primary">{payment.guest_name}</div>
-                          <div className="text-xs text-text-secondary">{payment.guest_email}</div>
-                        </td>
-                        <td className="px-4 py-4 font-semibold text-text-primary">{formatCurrency(payment.amount)}</td>
-                        <td className="px-4 py-4 text-text-secondary">{payment.payment_method}</td>
-                        <td className="px-4 py-4 text-text-secondary">{payment.payment_gateway}</td>
-                        <td className="px-4 py-4"><PaymentStatusBadge status={payment.payment_status} /></td>
-                        <td className="px-4 py-4 text-text-secondary">{formatDate(payment.paid_at)}</td>
-                        <td className="px-4 py-4">
-                          <div className="flex justify-end">
-                            <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPayment(payment)}>
-                              <Eye className="h-4 w-4" />
-                              View
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="9" className="px-4 py-12 text-center">
-                        <div className="mx-auto flex max-w-sm flex-col items-center">
-                          <div className="rounded-full bg-blue-50 p-4 text-blue-700">
-                            <ReceiptText className="h-8 w-8" />
-                          </div>
-                          <h3 className="mt-4 text-base font-semibold text-text-primary">No payments found</h3>
-                          <p className="mt-1 text-sm text-text-secondary">Try changing your filters or search keyword.</p>
-                        </div>
+          {error ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{error}</div>
+          ) : null}
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[980px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-border text-xs uppercase tracking-wide text-text-secondary">
+                  <th className="px-3 py-3">Transaction</th>
+                  <th className="px-3 py-3">Booking</th>
+                  <th className="px-3 py-3">Guest</th>
+                  <th className="px-3 py-3">Amount</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Invoice</th>
+                  <th className="px-3 py-3">Email</th>
+                  <th className="px-3 py-3">Date</th>
+                  <th className="px-3 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan="9" className="px-3 py-8 text-center text-text-secondary">Loading payments...</td></tr>
+                ) : filteredPayments.length === 0 ? (
+                  <tr><td colSpan="9" className="px-3 py-8 text-center text-text-secondary">No payments found.</td></tr>
+                ) : (
+                  filteredPayments.map((payment) => (
+                    <tr key={payment.id} className="border-b border-border last:border-0">
+                      <td className="px-3 py-4 font-semibold text-text-primary">{payment.transaction_id}</td>
+                      <td className="px-3 py-4 text-text-secondary">{payment.booking_no}</td>
+                      <td className="px-3 py-4 text-text-secondary">{payment.guest_name}</td>
+                      <td className="px-3 py-4 font-semibold text-text-primary">{formatCurrency(payment.amount)}</td>
+                      <td className="px-3 py-4"><PaymentStatusBadge status={payment.payment_status} /></td>
+                      <td className="px-3 py-4 text-text-secondary">{payment.invoice_number || 'Not generated'}</td>
+                      <td className="px-3 py-4 text-text-secondary">{payment.email_status || 'Not Sent'}</td>
+                      <td className="px-3 py-4 text-text-secondary">{formatDate(payment.paid_at || payment.created_at)}</td>
+                      <td className="px-3 py-4 text-right">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPayment(payment)}>
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
                       </td>
                     </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>
 
-      <PaymentDetailsModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} />
+      {selectedPayment ? <PaymentDetailsModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} /> : null}
     </div>
   )
 }

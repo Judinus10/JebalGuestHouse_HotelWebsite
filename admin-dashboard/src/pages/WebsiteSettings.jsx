@@ -24,8 +24,8 @@ const initialSettings = {
   reception_contact_number: '+94 21 222 4567',
   whatsapp_reservation_number: '+94 77 123 4567',
   email: 'reservations@guesthouse.com',
-  facebook_link: 'https://facebook.com/guesthousevilla',
-  instagram_link: 'https://instagram.com/guesthousevilla',
+  facebook_link: 'https://facebook.com/jebalhomes',
+  instagram_link: 'https://instagram.com/jebalhomes',
 }
 
 const initialAdmin = {
@@ -538,3 +538,4 @@ export default function WebsiteSettings() {
     </div>
   )
 }
+

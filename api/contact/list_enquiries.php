@@ -1,22 +1,17 @@
 <?php
-/**
- * Returns contact enquiries for the admin dashboard messages page.
- */
-
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
-require_once __DIR__ . '/../db.php';
 
-handle_preflight_request();
+apply_cors_headers();
+require_admin_auth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    api_json_response(false, 'Only GET requests are allowed.', 405);
+    json_response(false, 'Only GET requests are allowed.', 405);
 }
 
 try {
     $pdo = get_db_connection();
-
     $stmt = $pdo->query(
         "SELECT
             id,
@@ -33,10 +28,10 @@ try {
          ORDER BY created_at DESC"
     );
 
-    api_json_response(true, 'Enquiries loaded successfully.', 200, [
+    json_response(true, 'Enquiries loaded successfully.', 200, [
         'data' => $stmt->fetchAll(),
     ]);
 } catch (Throwable $e) {
-    error_log('Contact enquiries list error: ' . $e->getMessage());
-    api_json_response(false, 'Could not load enquiries.', 500);
+    error_log('Enquiry list error: ' . $e->getMessage());
+    json_response(false, 'Could not load enquiries.', 500);
 }

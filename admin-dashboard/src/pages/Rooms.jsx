@@ -42,7 +42,7 @@ const emptyForm = {
   amenity_ids: [],
 }
 
-const roomTypes = ['Standard', 'Deluxe', 'Executive', 'Suite', 'Villa']
+const roomTypes = ['Ground Floor', 'First Floor', 'Family Room', 'Private Cottage']
 const roomStatuses = ['Available', 'Occupied', 'Maintenance', 'Inactive']
 
 const statusVariant = {
@@ -254,7 +254,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="room_name">Room name</Label>
-              <Input id="room_name" value={form.room_name} onChange={(e) => updateField('room_name', e.target.value)} placeholder="Ex: Deluxe Ocean Twin" />
+              <Input id="room_name" value={form.room_name} onChange={(e) => updateField('room_name', e.target.value)} placeholder="Ex: Ground Floor Room 1" />
               {errors.room_name && <p className="text-xs font-medium text-red-600">{errors.room_name}</p>}
             </div>
 

@@ -1,24 +1,20 @@
-export const AUTH_USER_KEY = 'hotel_auth_user'
-export const AUTH_TOKEN_KEY = 'hotel_auth_token'
-export const MOCK_AUTH_TOKEN = 'hotel-admin-token'
+export const AUTH_USER_KEY = 'jebal_admin_user'
+export const AUTH_TOKEN_KEY = 'jebal_admin_token'
+export const AUTH_STORAGE_MODE_KEY = 'jebal_admin_storage_mode'
 
-export const MOCK_USER = {
-  id: 1,
-  name: 'Hotel Administrator',
-  email: 'admin@hotel.com',
-  role: 'admin',
+function getStorage() {
+  try {
+    const mode = localStorage.getItem(AUTH_STORAGE_MODE_KEY)
+    return mode === 'local' ? localStorage : sessionStorage
+  } catch {
+    return sessionStorage
+  }
 }
 
 export function getStoredUser() {
   try {
-    const rawUser = localStorage.getItem(AUTH_USER_KEY)
-    const token = localStorage.getItem(AUTH_TOKEN_KEY)
-
-    if (!rawUser || token !== MOCK_AUTH_TOKEN) {
-      return null
-    }
-
-    return JSON.parse(rawUser)
+    const rawUser = getStorage().getItem(AUTH_USER_KEY)
+    return rawUser ? JSON.parse(rawUser) : null
   } catch {
     return null
   }
@@ -26,23 +22,32 @@ export function getStoredUser() {
 
 export function getStoredToken() {
   try {
-    return localStorage.getItem(AUTH_TOKEN_KEY)
+    return getStorage().getItem(AUTH_TOKEN_KEY)
   } catch {
     return null
   }
 }
 
+export function storeSession({ user, token, rememberMe = false }) {
+  clearStoredSession()
+  const storage = rememberMe ? localStorage : sessionStorage
+  storage.setItem(AUTH_USER_KEY, JSON.stringify(user))
+  storage.setItem(AUTH_TOKEN_KEY, token)
+  localStorage.setItem(AUTH_STORAGE_MODE_KEY, rememberMe ? 'local' : 'session')
+}
+
+export function clearStoredSession() {
+  try {
+    localStorage.removeItem(AUTH_USER_KEY)
+    localStorage.removeItem(AUTH_TOKEN_KEY)
+    localStorage.removeItem(AUTH_STORAGE_MODE_KEY)
+    sessionStorage.removeItem(AUTH_USER_KEY)
+    sessionStorage.removeItem(AUTH_TOKEN_KEY)
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 export function isAuthenticated() {
-  return Boolean(getStoredUser() && getStoredToken() === MOCK_AUTH_TOKEN)
-}
-
-export function createMockSession() {
-  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(MOCK_USER))
-  localStorage.setItem(AUTH_TOKEN_KEY, MOCK_AUTH_TOKEN)
-  return MOCK_USER
-}
-
-export function clearMockSession() {
-  localStorage.removeItem(AUTH_USER_KEY)
-  localStorage.removeItem(AUTH_TOKEN_KEY)
+  return Boolean(getStoredUser() && getStoredToken())
 }
