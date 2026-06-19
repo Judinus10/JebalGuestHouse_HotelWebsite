@@ -5,7 +5,8 @@ import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
 import Button from '../components/ui/Button'
 
-const CONTACT_API_URL = import.meta.env.VITE_CONTACT_API_URL || '/api/contact/submit_contact.php'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
 
 /**
  * Contact page with form, info, and map placeholder.

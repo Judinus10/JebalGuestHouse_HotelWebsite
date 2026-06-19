@@ -14,8 +14,8 @@ CLI usage:
 php tools/local-create-admin.php --email=admin@example.com --password="StrongPassword123!" --name="Jebal Homes Admin"
 */
 
-require_once __DIR__ . '/../api/config.php';
-require_once __DIR__ . '/../api/db.php';
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../db.php';
 
 if (APP_ENV !== 'local') {
     fwrite(STDERR, "Refused: this tool only runs when APP_ENV is local.\n");

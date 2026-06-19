@@ -9,8 +9,9 @@ Backend secrets are centralized in api/env.php.
 
 Production rule:
 - Create api/env.php from api/env.example.php on the server.
-- Keep api/env.php out of Git and public uploads.
+- Keep api/env.php out of Git and out of public sharing.
 - Do not put database, SMTP, or PayHere secrets in frontend .env files.
+- Switch local/production behavior using APP_ENV inside api/env.php only.
 */
 
 $envFile = __DIR__ . '/env.php';
@@ -68,15 +69,18 @@ if (!is_array($allowedOrigins)) {
 }
 jebal_define('ALLOWED_ORIGINS', $allowedOrigins);
 
-jebal_define('PAYMENT_CURRENCY', 'LKR');
-jebal_define('INVOICE_PUBLIC_BASE_URL', (API_BASE_URL !== '' ? API_BASE_URL : 'http://localhost/HotelWebsite/api') . '/invoices/download.php');
+jebal_define('PAYMENT_CURRENCY', (string) jebal_env_value($env, 'PAYMENT_CURRENCY', 'LKR'));
+jebal_define(
+    'INVOICE_PUBLIC_BASE_URL',
+    (API_BASE_URL !== '' ? API_BASE_URL : 'http://localhost/HotelWebsite/api') . '/invoices/download.php'
+);
 jebal_define('INVOICE_STORAGE_DIR', __DIR__ . '/storage/invoices');
 
-jebal_define('ADMIN_SESSION_HOURS', 12);
-jebal_define('PUBLIC_RATE_LIMIT_MAX', 8);
-jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15);
+jebal_define('ADMIN_SESSION_HOURS', (int) jebal_env_value($env, 'ADMIN_SESSION_HOURS', 12));
+jebal_define('PUBLIC_RATE_LIMIT_MAX', (int) jebal_env_value($env, 'PUBLIC_RATE_LIMIT_MAX', 8));
+jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', (int) jebal_env_value($env, 'PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15));
 
-jebal_define('ROOM_RATES', [
+$roomRates = jebal_env_value($env, 'ROOM_RATES', [
     'Ground Floor Room 1' => 8500.00,
     'Ground Floor Room 2' => 8500.00,
     'First Floor Room 1' => 9500.00,
@@ -85,12 +89,27 @@ jebal_define('ROOM_RATES', [
     'Private Cottage' => 18000.00,
 ]);
 
+if (!is_array($roomRates) || $roomRates === []) {
+    $roomRates = [
+        'Ground Floor Room 1' => 8500.00,
+        'Ground Floor Room 2' => 8500.00,
+        'First Floor Room 1' => 9500.00,
+        'First Floor Room 2' => 9500.00,
+        'Family Room' => 14000.00,
+        'Private Cottage' => 18000.00,
+    ];
+}
+
+jebal_define('ROOM_RATES', $roomRates);
+
 if (APP_ENV === 'production') {
     ini_set('display_errors', '0');
     ini_set('display_startup_errors', '0');
+    ini_set('log_errors', '1');
     error_reporting(E_ALL);
 } else {
     ini_set('display_errors', '1');
     ini_set('display_startup_errors', '1');
+    ini_set('log_errors', '1');
     error_reporting(E_ALL);
 }

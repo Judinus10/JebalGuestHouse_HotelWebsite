@@ -8,8 +8,9 @@ import Button from '../components/ui/Button'
 import RoomCard from '../components/ui/RoomCard'
 import { getRoomById, rooms } from '../data/rooms'
 
-const BOOKING_API_URL = '/api/submit-booking.php'
-const PAYMENT_INIT_API_URL = '/api/payments/create-checkout-session.php'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
+const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
 
 /**
  * Individual room details page with gallery, amenities, and booking CTA.

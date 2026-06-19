@@ -1,17 +1,35 @@
-# Backend private credentials
+# Dependencies
+node_modules/
+**/node_modules/
+vendor/
+
+# Build outputs
+public-website/dist/
+admin-dashboard/dist/
+
+# Local/private backend credentials
 api/env.php
 
-# Local-only tools must not be deployed or committed
+# Local-only admin/maintenance tools
 tools/local-create-admin.php
 
-# Dependencies and build output
-node_modules/
-dist/
-build/
-
-# Logs and local OS/editor files
+# Logs and temporary files
 *.log
+*.tmp
+*.bak
+*.zip
+*.sql
 .DS_Store
 Thumbs.db
-.env
-.env.local
+
+# Frontend local environment files
+public-website/.env
+public-website/.env.local
+public-website/.env.production
+admin-dashboard/.env
+admin-dashboard/.env.local
+admin-dashboard/.env.production
+
+# Editor/system files
+.vscode/
+.idea/
