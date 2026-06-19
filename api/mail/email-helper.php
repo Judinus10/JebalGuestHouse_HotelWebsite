@@ -23,21 +23,28 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
 
 function track_email(PDO $pdo, string $relatedType, ?int $relatedId, string $to, string $subject, string $emailType, bool $sent, ?string $errorMessage = null): void
 {
-    $stmt = $pdo->prepare(
-        'INSERT INTO email_logs (related_type, related_id, recipient_email, subject, email_type, status, error_message, sent_at)
-         VALUES (:related_type, :related_id, :recipient_email, :subject, :email_type, :status, :error_message, :sent_at)'
-    );
+    $bookingId = $relatedType === 'booking' ? $relatedId : null;
+    $enquiryId = $relatedType === 'enquiry' ? $relatedId : null;
 
-    $stmt->execute([
-        ':related_type' => $relatedType,
-        ':related_id' => $relatedId,
-        ':recipient_email' => $to,
-        ':subject' => $subject,
-        ':email_type' => $emailType,
-        ':status' => $sent ? 'Sent' : 'Failed',
-        ':error_message' => $errorMessage,
-        ':sent_at' => $sent ? date('Y-m-d H:i:s') : null,
-    ]);
+    try {
+        $stmt = $pdo->prepare(
+            'INSERT INTO email_logs (booking_id, enquiry_id, recipient_email, subject, email_type, status, error_message, sent_at)
+             VALUES (:booking_id, :enquiry_id, :recipient_email, :subject, :email_type, :status, :error_message, :sent_at)'
+        );
+
+        $stmt->execute([
+            ':booking_id' => $bookingId,
+            ':enquiry_id' => $enquiryId,
+            ':recipient_email' => $to,
+            ':subject' => $subject,
+            ':email_type' => $emailType,
+            ':status' => $sent ? 'Sent' : 'Failed',
+            ':error_message' => $errorMessage,
+            ':sent_at' => $sent ? date('Y-m-d H:i:s') : null,
+        ]);
+    } catch (Throwable $e) {
+        error_log('Email log insert failed: ' . $e->getMessage());
+    }
 }
 
 function send_tracked_email(PDO $pdo, string $relatedType, ?int $relatedId, string $to, string $subject, string $htmlBody, string $emailType, ?string $replyTo = null): bool
@@ -45,6 +52,19 @@ function send_tracked_email(PDO $pdo, string $relatedType, ?int $relatedId, stri
     $sent = send_html_email($to, $subject, $htmlBody, $replyTo);
     track_email($pdo, $relatedType, $relatedId, $to, $subject, $emailType, $sent, $sent ? null : 'mail() returned false');
     return $sent;
+}
+
+function update_booking_email_status(PDO $pdo, int $bookingId, string $status): void
+{
+    try {
+        $stmt = $pdo->prepare('UPDATE bookings SET email_status = :status, updated_at = NOW() WHERE id = :id');
+        $stmt->execute([
+            ':status' => $status,
+            ':id' => $bookingId,
+        ]);
+    } catch (Throwable $e) {
+        error_log('Booking email status update failed: ' . $e->getMessage());
+    }
 }
 
 function booking_details_html(array $booking): string
@@ -83,8 +103,7 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
     $bodyAdmin = email_shell('New booking received', '<p>A new booking inquiry has been submitted.</p>' . booking_details_html($booking));
     send_tracked_email($pdo, 'booking', (int) $booking['id'], ADMIN_EMAIL, $subjectAdmin, $bodyAdmin, 'admin_new_booking', $booking['email']);
 
-    $stmt = $pdo->prepare('UPDATE bookings SET booking_email_status = :status WHERE id = :id');
-    $stmt->execute([':status' => $sentCustomer ? 'Sent' : 'Failed', ':id' => $booking['id']]);
+    update_booking_email_status($pdo, (int) $booking['id'], $sentCustomer ? 'Sent' : 'Failed');
 }
 
 function send_booking_confirmed_email(PDO $pdo, array $booking): void
@@ -108,14 +127,13 @@ function send_booking_cancelled_emails(PDO $pdo, array $booking): void
     $bodyAdmin = email_shell('Booking cancelled', '<p>A booking was cancelled.</p>' . booking_details_html($booking));
     send_tracked_email($pdo, 'booking', (int) $booking['id'], ADMIN_EMAIL, $subjectAdmin, $bodyAdmin, 'admin_booking_cancelled');
 
-    $stmt = $pdo->prepare('UPDATE bookings SET cancellation_email_status = :status WHERE id = :id');
-    $stmt->execute([':status' => $sentCustomer ? 'Sent' : 'Failed', ':id' => $booking['id']]);
+    update_booking_email_status($pdo, (int) $booking['id'], $sentCustomer ? 'Sent' : 'Failed');
 }
 
 function send_payment_success_emails(PDO $pdo, array $booking, array $payment): void
 {
     $invoiceLink = INVOICE_PUBLIC_BASE_URL . '?id=' . (int) $booking['id'];
-    $amount = email_safe(($payment['currency'] ?? PAYMENT_CURRENCY) . ' ' . format_money_amount((float) ($payment['amount'] ?? 0)));
+    $amount = email_safe(format_money_amount((float) ($payment['amount'] ?? 0))); 
 
     $subjectCustomer = 'Payment successful - Jebal Homes #' . $booking['id'];
     $bodyCustomer = email_shell('Payment successful', '<p>Dear ' . email_safe($booking['full_name']) . ',</p><p>Your PayHere payment was successful.</p><p><strong>Amount Paid:</strong> ' . $amount . '</p><p><a href="' . email_safe($invoiceLink) . '">Download your invoice</a></p>' . booking_details_html($booking));
@@ -125,8 +143,7 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
     $bodyAdmin = email_shell('Payment received', '<p>A PayHere payment was received.</p><p><strong>Amount:</strong> ' . $amount . '</p>' . booking_details_html($booking));
     send_tracked_email($pdo, 'booking', (int) $booking['id'], ADMIN_EMAIL, $subjectAdmin, $bodyAdmin, 'admin_payment_received');
 
-    $stmt = $pdo->prepare('UPDATE bookings SET payment_email_status = :status WHERE id = :id');
-    $stmt->execute([':status' => $sentCustomer ? 'Sent' : 'Failed', ':id' => $booking['id']]);
+    update_booking_email_status($pdo, (int) $booking['id'], $sentCustomer ? 'Sent' : 'Failed');
 }
 
 function send_payment_failed_email(PDO $pdo, array $booking): void
@@ -135,8 +152,7 @@ function send_payment_failed_email(PDO $pdo, array $booking): void
     $body = email_shell('Payment failed', '<p>Dear ' . email_safe($booking['full_name']) . ',</p><p>Your payment could not be completed. Please try again or contact Jebal Homes.</p>' . booking_details_html($booking));
     $sent = send_tracked_email($pdo, 'booking', (int) $booking['id'], $booking['email'], $subject, $body, 'payment_failed');
 
-    $stmt = $pdo->prepare('UPDATE bookings SET payment_email_status = :status WHERE id = :id');
-    $stmt->execute([':status' => $sent ? 'Sent' : 'Failed', ':id' => $booking['id']]);
+    update_booking_email_status($pdo, (int) $booking['id'], $sent ? 'Sent' : 'Failed');
 }
 
 function send_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, string $email, string $phone, string $subject, string $message): void
@@ -147,10 +163,6 @@ function send_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, str
     $customerBody = email_shell('We received your message', '<p>Dear ' . email_safe($name) . ',</p><p>Thank you for contacting Jebal Homes. We received your message and will reply as soon as possible.</p>');
     $customerSent = send_tracked_email($pdo, 'enquiry', $enquiryId, $email, 'We received your message - Jebal Homes', $customerBody, 'contact_auto_reply');
 
-    $stmt = $pdo->prepare('UPDATE enquiries SET admin_email_status = :admin_status, customer_email_status = :customer_status WHERE id = :id');
-    $stmt->execute([
-        ':admin_status' => $adminSent ? 'Sent' : 'Failed',
-        ':customer_status' => $customerSent ? 'Sent' : 'Failed',
-        ':id' => $enquiryId,
-    ]);
+    // email_logs records both admin and customer email results.
+    // The enquiries table has no admin_email_status/customer_email_status columns in the current schema.
 }

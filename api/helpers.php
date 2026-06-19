@@ -153,6 +153,63 @@ function require_admin_auth(): array
     ];
 }
 
+
+function ensure_directory_exists(string $directory): bool
+{
+    $directory = rtrim($directory, DIRECTORY_SEPARATOR);
+
+    if ($directory === '') {
+        return false;
+    }
+
+    if (is_dir($directory)) {
+        return is_writable($directory);
+    }
+
+    if (file_exists($directory) && !is_dir($directory)) {
+        error_log('Directory path exists but is not a directory: ' . $directory);
+        return false;
+    }
+
+    $created = mkdir($directory, 0755, true);
+
+    if (!$created && !is_dir($directory)) {
+        error_log('Unable to create directory: ' . $directory);
+        return false;
+    }
+
+    return is_writable($directory);
+}
+
+function format_money_amount(float|int|string $amount): string
+{
+    $numericAmount = is_numeric($amount) ? (float) $amount : 0.0;
+    return PAYMENT_CURRENCY . ' ' . number_format($numericAmount, 2, '.', ',');
+}
+
+function format_amount_only(float|int|string $amount): string
+{
+    $numericAmount = is_numeric($amount) ? (float) $amount : 0.0;
+    return number_format($numericAmount, 2, '.', ',');
+}
+
+function email_safe(mixed $value): string
+{
+    return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+}
+
+function generate_payhere_notify_hash(
+    string $merchantId,
+    string $orderId,
+    string $payhereAmount,
+    string $payhereCurrency,
+    string $statusCode,
+    string $merchantSecret
+): string {
+    $hashedSecret = strtoupper(md5($merchantSecret));
+    return strtoupper(md5($merchantId . $orderId . $payhereAmount . $payhereCurrency . $statusCode . $hashedSecret));
+}
+
 function send_plain_email(string $to, string $subject, string $message, ?string $replyTo = null): bool
 {
     $headers = [];

@@ -1,0 +1,17 @@
+# Backend private credentials
+api/env.php
+
+# Local-only tools must not be deployed or committed
+tools/local-create-admin.php
+
+# Dependencies and build output
+node_modules/
+dist/
+build/
+
+# Logs and local OS/editor files
+*.log
+.DS_Store
+Thumbs.db
+.env
+.env.local

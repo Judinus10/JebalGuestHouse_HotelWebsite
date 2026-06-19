@@ -1,6 +1,8 @@
 <?php
 /**
- * PayHere notify endpoint.
+ * PayHere server notification endpoint.
+ * Database updates are transactional; email/invoice side effects are isolated so
+ * webhook delivery does not crash because mail() or email logging failed.
  */
 
 declare(strict_types=1);
@@ -11,30 +13,49 @@ require_once __DIR__ . '/../mail/email-helper.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
+    header('Content-Type: text/plain; charset=utf-8');
     exit('Only POST allowed');
 }
 
-$merchantId = clean_string($_POST['merchant_id'] ?? '');
-$orderId = clean_string($_POST['order_id'] ?? '');
-$paymentId = clean_string($_POST['payment_id'] ?? '');
-$payhereAmount = clean_string($_POST['payhere_amount'] ?? '');
-$payhereCurrency = clean_string($_POST['payhere_currency'] ?? '');
-$statusCode = clean_string($_POST['status_code'] ?? '');
-$md5sig = strtoupper(clean_string($_POST['md5sig'] ?? ''));
-$method = clean_string($_POST['method'] ?? 'PayHere');
-$statusMessage = clean_string($_POST['status_message'] ?? '');
-$bookingId = (int) clean_string($_POST['custom_1'] ?? '0');
+function notify_text_response(int $statusCode, string $message): void
+{
+    http_response_code($statusCode);
+    header('Content-Type: text/plain; charset=utf-8');
+    echo $message;
+    exit;
+}
 
-if ($merchantId === '' || $orderId === '' || $payhereAmount === '' || $payhereCurrency === '' || $statusCode === '' || $md5sig === '') {
-    http_response_code(400);
-    exit('Missing required fields');
+function normalize_payhere_amount(string $amount): string
+{
+    return number_format((float) $amount, 2, '.', '');
+}
+
+$merchantId = clean_string($_POST['merchant_id'] ?? '', 100);
+$orderId = clean_string($_POST['order_id'] ?? '', 100);
+$paymentId = clean_string($_POST['payment_id'] ?? '', 100);
+$payhereAmountRaw = clean_string($_POST['payhere_amount'] ?? '', 50);
+$payhereAmount = normalize_payhere_amount($payhereAmountRaw);
+$payhereCurrency = clean_string($_POST['payhere_currency'] ?? '', 10);
+$statusCode = clean_string($_POST['status_code'] ?? '', 10);
+$md5sig = strtoupper(clean_string($_POST['md5sig'] ?? '', 100));
+$method = clean_string($_POST['method'] ?? 'PayHere', 60);
+$statusMessage = clean_string($_POST['status_message'] ?? '', 500);
+$bookingId = (int) clean_string($_POST['custom_1'] ?? '0', 20);
+
+if ($merchantId === '' || $orderId === '' || $payhereAmountRaw === '' || $payhereCurrency === '' || $statusCode === '' || $md5sig === '') {
+    notify_text_response(400, 'Missing required fields');
+}
+
+if (PAYHERE_MERCHANT_ID === '' || PAYHERE_MERCHANT_SECRET === '') {
+    error_log('PayHere notify rejected: backend PayHere credentials are missing.');
+    notify_text_response(500, 'Payment gateway is not configured');
 }
 
 $localHash = generate_payhere_notify_hash($merchantId, $orderId, $payhereAmount, $payhereCurrency, $statusCode, PAYHERE_MERCHANT_SECRET);
 
-if (!hash_equals($localHash, $md5sig) || $merchantId !== PAYHERE_MERCHANT_ID) {
-    http_response_code(403);
-    exit('Invalid PayHere signature');
+if (!hash_equals($localHash, $md5sig) || !hash_equals(PAYHERE_MERCHANT_ID, $merchantId)) {
+    error_log('PayHere notify rejected: invalid signature for order ' . $orderId);
+    notify_text_response(403, 'Invalid PayHere signature');
 }
 
 $statusMap = [
@@ -47,26 +68,53 @@ $statusMap = [
 
 $paymentStatus = $statusMap[$statusCode] ?? 'Failed';
 $bookingStatus = $paymentStatus === 'Paid' ? 'Confirmed' : null;
+$booking = null;
 
 try {
     $pdo = get_db_connection();
     $pdo->beginTransaction();
 
-    if ($bookingId < 1) {
-        $findPayment = $pdo->prepare('SELECT booking_id FROM payments WHERE order_id = :order_id LIMIT 1');
-        $findPayment->execute([':order_id' => $orderId]);
-        $found = $findPayment->fetch();
-        $bookingId = $found ? (int) $found['booking_id'] : 0;
-    }
-
-    $paymentStmt = $pdo->prepare('SELECT id FROM payments WHERE order_id = :order_id LIMIT 1 FOR UPDATE');
+    $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE order_id = :order_id LIMIT 1 FOR UPDATE');
     $paymentStmt->execute([':order_id' => $orderId]);
     $existingPayment = $paymentStmt->fetch();
+
+    if ($existingPayment && $bookingId < 1) {
+        $bookingId = (int) ($existingPayment['booking_id'] ?? 0);
+    }
+
+    if ($bookingId > 0) {
+        $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
+        $bookingStmt->execute([':id' => $bookingId]);
+        $booking = $bookingStmt->fetch() ?: null;
+    }
+
+    if (!$booking && $existingPayment && !empty($existingPayment['booking_id'])) {
+        $bookingId = (int) $existingPayment['booking_id'];
+        $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
+        $bookingStmt->execute([':id' => $bookingId]);
+        $booking = $bookingStmt->fetch() ?: null;
+    }
+
+    if ($paymentStatus === 'Paid' && $booking) {
+        $expectedAmount = normalize_payhere_amount((string) calculate_booking_amount((string) $booking['room_name'], (string) $booking['check_in_date'], (string) $booking['check_out_date']));
+        $expectedCurrency = (string) ($booking['currency'] ?? PAYMENT_CURRENCY);
+
+        if (!hash_equals($expectedAmount, $payhereAmount) || !hash_equals($expectedCurrency, $payhereCurrency)) {
+            error_log('PayHere notify amount/currency mismatch for order ' . $orderId . '. Expected ' . $expectedAmount . ' ' . $expectedCurrency . ', received ' . $payhereAmount . ' ' . $payhereCurrency);
+            $paymentStatus = 'Failed';
+            $bookingStatus = null;
+            $statusMessage = trim($statusMessage . ' Amount or currency mismatch.');
+        }
+    }
+
+    $gatewayResponse = $_POST;
+    $gatewayResponse['server_status_message'] = $statusMessage;
 
     if ($existingPayment) {
         $updatePayment = $pdo->prepare(
             'UPDATE payments
-             SET payment_id = :payment_id,
+             SET booking_id = COALESCE(booking_id, :booking_id),
+                 payment_id = :payment_id,
                  amount = :amount,
                  currency = :currency,
                  status = :status,
@@ -76,12 +124,13 @@ try {
              WHERE order_id = :order_id'
         );
         $updatePayment->execute([
-            ':payment_id' => $paymentId,
+            ':booking_id' => $bookingId ?: null,
+            ':payment_id' => $paymentId ?: null,
             ':amount' => (float) $payhereAmount,
             ':currency' => $payhereCurrency,
             ':status' => $paymentStatus,
-            ':method' => $method,
-            ':gateway_response' => json_encode($_POST, JSON_UNESCAPED_SLASHES),
+            ':method' => $method ?: 'PayHere',
+            ':gateway_response' => json_encode($gatewayResponse, JSON_UNESCAPED_SLASHES),
             ':order_id' => $orderId,
         ]);
     } else {
@@ -92,16 +141,16 @@ try {
         $insertPayment->execute([
             ':booking_id' => $bookingId ?: null,
             ':order_id' => $orderId,
-            ':payment_id' => $paymentId,
+            ':payment_id' => $paymentId ?: null,
             ':amount' => (float) $payhereAmount,
             ':currency' => $payhereCurrency,
             ':status' => $paymentStatus,
-            ':method' => $method,
-            ':gateway_response' => json_encode($_POST, JSON_UNESCAPED_SLASHES),
+            ':method' => $method ?: 'PayHere',
+            ':gateway_response' => json_encode($gatewayResponse, JSON_UNESCAPED_SLASHES),
         ]);
     }
 
-    if ($bookingId > 0) {
+    if ($bookingId > 0 && $booking) {
         if ($bookingStatus === 'Confirmed') {
             $conflictStatement = $pdo->prepare(
                 "SELECT blocker.id
@@ -123,8 +172,13 @@ try {
             }
         }
 
-        $updateBookingSql = 'UPDATE bookings SET payment_status = :payment_status';
-        $updateBookingParams = [':payment_status' => $paymentStatus, ':id' => $bookingId];
+        $updateBookingSql = 'UPDATE bookings SET payment_status = :payment_status, amount = :amount, currency = :currency';
+        $updateBookingParams = [
+            ':payment_status' => $paymentStatus,
+            ':amount' => (float) $payhereAmount,
+            ':currency' => $payhereCurrency,
+            ':id' => $bookingId,
+        ];
 
         if ($bookingStatus !== null) {
             $updateBookingSql .= ', status = :status';
@@ -137,40 +191,42 @@ try {
     }
 
     $pdo->commit();
-
-    if ($bookingId > 0) {
-        $booking = get_booking_by_id($pdo, $bookingId);
-
-        if ($booking) {
-            if ($paymentStatus === 'Paid') {
-                $invoice = generate_invoice_for_booking($pdo, $bookingId, [
-                    'amount' => (float) $payhereAmount,
-                    'currency' => $payhereCurrency,
-                    'method' => $method,
-                    'paid_at' => date('Y-m-d H:i:s'),
-                ]);
-
-                $booking = get_booking_by_id($pdo, $bookingId) ?: $booking;
-                send_payment_success_emails($pdo, $booking, [
-                    'amount' => (float) $payhereAmount,
-                    'currency' => $payhereCurrency,
-                    'method' => $method,
-                    'invoice' => $invoice,
-                ]);
-            } elseif ($paymentStatus === 'Failed') {
-                send_payment_failed_email($pdo, $booking);
-            }
-        }
-    }
-
-    http_response_code(200);
-    exit('OK');
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
 
-    error_log('PayHere notify error: ' . $e->getMessage());
-    http_response_code(500);
-    exit('Server error');
+    error_log('PayHere notify database error: ' . $e->getMessage());
+    notify_text_response(500, 'Server error');
 }
+
+if ($bookingId > 0) {
+    try {
+        $freshBooking = get_booking_by_id($pdo, $bookingId);
+
+        if ($freshBooking) {
+            if ($paymentStatus === 'Paid') {
+                $invoice = generate_invoice_for_booking($pdo, $bookingId, [
+                    'amount' => (float) $payhereAmount,
+                    'currency' => $payhereCurrency,
+                    'method' => $method ?: 'PayHere',
+                    'paid_at' => date('Y-m-d H:i:s'),
+                ]);
+
+                $freshBooking = get_booking_by_id($pdo, $bookingId) ?: $freshBooking;
+                send_payment_success_emails($pdo, $freshBooking, [
+                    'amount' => (float) $payhereAmount,
+                    'currency' => $payhereCurrency,
+                    'method' => $method ?: 'PayHere',
+                    'invoice' => $invoice,
+                ]);
+            } elseif ($paymentStatus === 'Failed') {
+                send_payment_failed_email($pdo, $freshBooking);
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('PayHere notify side-effect error after DB update: ' . $e->getMessage());
+    }
+}
+
+notify_text_response(200, 'OK');

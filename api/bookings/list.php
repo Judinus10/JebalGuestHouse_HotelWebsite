@@ -14,27 +14,47 @@ try {
     $pdo = get_db_connection();
     $stmt = $pdo->query(
         "SELECT
-            id,
-            CONCAT('BK-', LPAD(id, 5, '0')) AS booking_no,
-            full_name AS guest_name,
-            email AS guest_email,
-            phone AS guest_phone,
-            room_name,
-            check_in_date,
-            check_out_date,
-            guests,
-            message AS special_requests,
-            LOWER(status) AS booking_status,
-            payment_status,
-            amount AS total_amount,
-            currency AS payment_currency,
-            invoice_number,
-            invoice_file_path,
-            email_status,
-            created_at,
-            updated_at
-         FROM bookings
-         ORDER BY created_at DESC"
+            b.id,
+            CONCAT('BK-', LPAD(b.id, 5, '0')) AS booking_no,
+            b.full_name AS guest_name,
+            b.email AS guest_email,
+            b.phone AS guest_phone,
+            r.id AS room_id,
+            b.room_name,
+            CASE
+                WHEN b.room_name LIKE 'Ground Floor%' THEN 'Ground Floor'
+                WHEN b.room_name LIKE 'First Floor%' THEN 'First Floor'
+                WHEN b.room_name = 'Family Room' THEN 'Family'
+                WHEN b.room_name = 'Private Cottage' THEN 'Cottage'
+                ELSE 'Guest House'
+            END AS room_type,
+            CONCAT('R', LPAD(COALESCE(r.id, b.id), 2, '0')) AS room_code,
+            CASE
+                WHEN b.room_name = 'Private Cottage' THEN 'Cottage'
+                ELSE 'Guest House'
+            END AS property_type,
+            b.check_in_date,
+            b.check_out_date,
+            b.check_in_date AS check_in,
+            b.check_out_date AS check_out,
+            b.guests,
+            b.guests AS adults,
+            0 AS children,
+            GREATEST(1, DATEDIFF(b.check_out_date, b.check_in_date)) AS total_nights,
+            b.message AS special_requests,
+            b.message AS special_request,
+            LOWER(b.status) AS booking_status,
+            b.payment_status,
+            b.amount AS total_amount,
+            b.currency AS payment_currency,
+            b.invoice_number,
+            b.invoice_file_path,
+            b.email_status,
+            b.created_at,
+            b.updated_at
+         FROM bookings b
+         LEFT JOIN rooms r ON r.room_name = b.room_name
+         ORDER BY b.created_at DESC"
     );
 
     json_response(true, 'Bookings loaded successfully.', 200, [
@@ -44,3 +64,4 @@ try {
     error_log('Admin bookings list error: ' . $e->getMessage());
     json_response(false, 'Unable to load bookings.', 500);
 }
+

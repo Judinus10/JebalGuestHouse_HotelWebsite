@@ -1,12 +1,12 @@
 Options -Indexes
 
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-
-  # Force HTTPS for API.
-  RewriteCond %{HTTPS} !=on
-  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-</IfModule>
+# Optional HTTPS redirect for production only.
+# Enable this block only after SSL is active on the live domain.
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteCond %{HTTPS} !=on
+#   RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
 
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
@@ -16,7 +16,7 @@ Options -Indexes
 </IfModule>
 
 # Block sensitive config, logs, backups, and environment files.
-<FilesMatch "(\.env|\.log|\.sql|\.bak|\.zip|composer\.(json|lock)|package(-lock)?\.json|README|readme|config\.example\.php)$">
+<FilesMatch "(\.env|env\.php|\.log|\.sql|\.bak|\.zip|composer\.(json|lock)|package(-lock)?\.json|README|readme|config\.example\.php)$">
   Require all denied
 </FilesMatch>
 

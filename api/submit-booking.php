@@ -29,8 +29,28 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     json_response(false, 'Please enter a valid email address.', 422);
 }
 
-if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate) || strtotime($checkOutDate) <= strtotime($checkInDate)) {
+if (!array_key_exists($roomName, ROOM_RATES)) {
+    json_response(false, 'Please select a valid room.', 422);
+}
+
+if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate)) {
     json_response(false, 'Please enter valid check-in and check-out dates.', 422);
+}
+
+$today = new DateTimeImmutable('today');
+$checkIn = DateTimeImmutable::createFromFormat('Y-m-d', $checkInDate);
+$checkOut = DateTimeImmutable::createFromFormat('Y-m-d', $checkOutDate);
+
+if (!$checkIn || !$checkOut) {
+    json_response(false, 'Please enter valid check-in and check-out dates.', 422);
+}
+
+if ($checkIn < $today) {
+    json_response(false, 'Check-in date cannot be in the past.', 422);
+}
+
+if ($checkOut <= $checkIn) {
+    json_response(false, 'Check-out date must be after check-in date.', 422);
 }
 
 if ($guests > 20) {
@@ -38,6 +58,10 @@ if ($guests > 20) {
 }
 
 $amount = calculate_booking_amount($roomName, $checkInDate, $checkOutDate);
+
+if ($amount <= 0) {
+    json_response(false, 'Unable to calculate booking amount for the selected room.', 422);
+}
 
 try {
     $pdo = get_db_connection();
@@ -79,35 +103,27 @@ try {
         ':status' => 'Pending',
         ':payment_status' => 'Payment Pending',
         ':amount' => $amount,
-        ':currency' => 'LKR',
+        ':currency' => PAYMENT_CURRENCY,
         ':ip_address' => get_client_ip(),
         ':user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
     ]);
 
     $bookingId = (int) $pdo->lastInsertId();
 
-    send_plain_email(ADMIN_EMAIL, 'New Booking Inquiry - BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT), "A new booking inquiry has been received.
-
-Guest: {$fullName}
-Email: {$email}
-Phone: {$phone}
-Room: {$roomName}
-Check-in: {$checkInDate}
-Check-out: {$checkOutDate}
-Guests: {$guests}", $email);
-    send_plain_email($email, 'Booking Inquiry Received - Jebal Homes', "Dear {$fullName},
-
-We received your booking inquiry for {$roomName}. We will contact you soon.
-
-Regards,
-Jebal Homes");
+    send_plain_email(ADMIN_EMAIL, 'New Booking Inquiry - BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT), "A new booking inquiry has been received.\n\nGuest: {$fullName}\nEmail: {$email}\nPhone: {$phone}\nRoom: {$roomName}\nCheck-in: {$checkInDate}\nCheck-out: {$checkOutDate}\nGuests: {$guests}", $email);
+    send_plain_email($email, 'Booking Inquiry Received - Jebal Homes', "Dear {$fullName},\n\nWe received your booking inquiry for {$roomName}. Please complete the payment step to confirm your reservation.\n\nRegards,\nJebal Homes");
 
     json_response(true, 'Booking inquiry submitted successfully.', 201, [
+        'inquiry_id' => $bookingId,
+        'booking_id' => $bookingId,
+        'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
+        'amount' => $amount,
+        'currency' => PAYMENT_CURRENCY,
         'data' => [
             'booking_id' => $bookingId,
             'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
             'amount' => $amount,
-            'currency' => 'LKR',
+            'currency' => PAYMENT_CURRENCY,
         ],
     ]);
 } catch (Throwable $e) {

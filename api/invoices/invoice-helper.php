@@ -30,7 +30,7 @@ function create_simple_invoice_pdf(string $filePath, array $invoice): void
         'Room Name: ' . $invoice['room_name'],
         'Check-in Date: ' . $invoice['check_in_date'],
         'Check-out Date: ' . $invoice['check_out_date'],
-        'Amount Paid: ' . $invoice['currency'] . ' ' . format_money_amount((float) $invoice['amount_paid']),
+        'Amount Paid: ' . format_money_amount((float) $invoice['amount_paid']),
         'Payment Method: ' . $invoice['payment_method'],
         'Payment Date: ' . ($invoice['payment_date'] ?: date('Y-m-d H:i:s')),
         '',

@@ -14,6 +14,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../db.php';
 
 apply_cors_headers();
+require_admin_auth();
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
