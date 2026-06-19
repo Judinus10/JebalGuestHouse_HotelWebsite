@@ -44,10 +44,11 @@ const bookingStatusVariant = {
 }
 
 const paymentStatusVariant = {
-  unpaid: 'secondary',
   pending: 'warning',
   paid: 'success',
-
+  failed: 'destructive',
+  cancelled: 'secondary',
+  refunded: 'secondary',
 }
 
 function formatDate(date) {
@@ -67,8 +68,8 @@ function humanizeStatus(value) {
     .join(' ')
 }
 
-function getRoom(roomId) {
-  return bookingRooms.find((room) => room.id === Number(roomId))
+function getRoom(roomId, roomName = '') {
+  return bookingRooms.find((room) => room.id === Number(roomId)) || bookingRooms.find((room) => room.room_name === roomName)
 }
 
 function Modal({ title, description, children, onClose, size = 'max-w-3xl' }) {
@@ -198,7 +199,7 @@ function StatusSelectModal({ booking, onClose, onSave }) {
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="rounded-xl border border-border bg-slate-50 p-4">
           <p className="text-sm font-semibold text-text-primary">{booking.guest_name}</p>
-          <p className="mt-1 text-sm text-text-secondary">{getRoom(booking.room_id)?.room_name}</p>
+          <p className="mt-1 text-sm text-text-secondary">{getRoom(booking.room_id, booking.room_name)?.room_name || booking.room_name}</p>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -243,7 +244,7 @@ function StatusSelectModal({ booking, onClose, onSave }) {
 }
 
 function BookingDetailsModal({ booking, onClose }) {
-  const room = getRoom(booking.room_id)
+  const room = getRoom(booking.room_id, booking.room_name)
 
   return (
     <Modal title="Booking details" description={booking.booking_no} onClose={onClose}>
@@ -400,13 +401,13 @@ export default function Bookings() {
     const query = searchTerm.trim().toLowerCase()
 
     return bookings.filter((booking) => {
-      const room = getRoom(booking.room_id)
+      const room = getRoom(booking.room_id, booking.room_name)
       const searchableText = [
         booking.booking_no,
         booking.guest_name,
         booking.guest_phone,
         booking.guest_email,
-        room?.room_name,
+        room?.room_name || booking.room_name,
       ]
         .join(' ')
         .toLowerCase()
@@ -577,7 +578,7 @@ export default function Bookings() {
           ) : (
             <div className="divide-y divide-border">
               {filteredBookings.map((booking) => {
-                const room = getRoom(booking.room_id)
+                const room = getRoom(booking.room_id, booking.room_name)
 
                 return (
                   <div
@@ -598,8 +599,8 @@ export default function Bookings() {
 
                     <div>
                       <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Room</p>
-                      <p className="font-semibold text-text-primary">{room?.room_name || 'Unknown room'}</p>
-                      <p className="mt-1 text-xs text-text-secondary">{room?.room_type || '-'}</p>
+                      <p className="font-semibold text-text-primary">{room?.room_name || booking.room_name || 'Unknown room'}</p>
+                      <p className="mt-1 text-xs text-text-secondary">{room?.room_type || booking.room_type || '-'}</p>
                     </div>
 
                     <div>

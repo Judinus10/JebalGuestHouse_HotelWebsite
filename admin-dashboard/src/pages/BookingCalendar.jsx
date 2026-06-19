@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { fetchBookings } from '@/services/bookingsApi'
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const calendarBookings = []
 
 const statusStyles = {
   pending: 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200',
@@ -32,7 +32,7 @@ const statusVariant = {
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'USD',
+  currency: 'LKR',
   maximumFractionDigits: 0,
 })
 
@@ -43,15 +43,19 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 })
 
 function normalizeStatus(status) {
-  return status.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
+  return String(status || '-')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
 }
 
 function toDate(value) {
-  return new Date(`${value}T00:00:00`)
+  const parsedDate = new Date(`${value}T00:00:00`)
+  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate
 }
 
 function formatDate(value) {
-  return dateFormatter.format(toDate(value))
+  const parsedDate = toDate(value)
+  return parsedDate ? dateFormatter.format(parsedDate) : '-'
 }
 
 function getMonthWeeks(year, monthIndex) {
@@ -81,6 +85,9 @@ function getMonthWeeks(year, monthIndex) {
 function getSegmentForWeek(booking, week) {
   const checkIn = toDate(booking.check_in)
   const checkOut = toDate(booking.check_out)
+
+  if (!checkIn || !checkOut) return null
+
   const weekStart = week[0]
   const weekEnd = week[6]
 
@@ -252,18 +259,46 @@ function BookingDetailsModal({ booking, onClose }) {
 }
 
 export default function BookingCalendar() {
-  const [currentDate, setCurrentDate] = useState(new Date(2026, 5, 1))
+  const [currentDate, setCurrentDate] = useState(new Date())
+  const [calendarBookings, setCalendarBookings] = useState([])
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [tooltip, setTooltip] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const year = currentDate.getFullYear()
   const monthIndex = currentDate.getMonth()
   const weeks = useMemo(() => getMonthWeeks(year, monthIndex), [year, monthIndex])
   const monthTitle = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(currentDate)
 
+  useEffect(() => {
+    let active = true
+
+    async function loadCalendarBookings() {
+      try {
+        setIsLoading(true)
+        setError('')
+        const data = await fetchBookings()
+        if (active) {
+          setCalendarBookings(data.filter((booking) => booking.booking_status !== 'cancelled'))
+        }
+      } catch (err) {
+        if (active) setError(err.message || 'Unable to load booking calendar.')
+      } finally {
+        if (active) setIsLoading(false)
+      }
+    }
+
+    loadCalendarBookings()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   const goToPreviousMonth = () => setCurrentDate(new Date(year, monthIndex - 1, 1))
   const goToNextMonth = () => setCurrentDate(new Date(year, monthIndex + 1, 1))
-  const goToToday = () => setCurrentDate(new Date(2026, 5, 1))
+  const goToToday = () => setCurrentDate(new Date())
 
   const showTooltip = (event, booking) => {
     const rect = event.currentTarget.getBoundingClientRect()
@@ -290,6 +325,14 @@ export default function BookingCalendar() {
         </div>
       </PageHeader>
 
+      {error ? (
+        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{error}</div>
+      ) : null}
+
+      {isLoading ? (
+        <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">Loading booking calendar...</div>
+      ) : null}
+
       <SectionCard className="overflow-hidden p-0">
         <div className="hidden border-b border-slate-200 bg-slate-50 md:grid md:grid-cols-7">
           {days.map((day) => (
@@ -310,7 +353,7 @@ export default function BookingCalendar() {
                 <div className="absolute inset-0 grid grid-cols-7">
                   {week.map((date) => {
                     const isCurrentMonth = date.getMonth() === monthIndex
-                    const isToday = date.toISOString().slice(0, 10) === '2026-06-15'
+                    const isToday = date.toDateString() === new Date().toDateString()
 
                     return (
                       <div key={date.toISOString()} className="border-r border-slate-200 p-3 last:border-r-0">
@@ -361,6 +404,9 @@ export default function BookingCalendar() {
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-700">
             Mobile agenda view · {monthTitle}
           </div>
+          {calendarBookings.length === 0 && !isLoading ? (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm font-medium text-slate-600">No bookings found for the calendar.</div>
+          ) : null}
           {calendarBookings.map((booking) => (
             <button
               key={booking.id}
@@ -389,3 +435,4 @@ export default function BookingCalendar() {
     </div>
   )
 }
+
