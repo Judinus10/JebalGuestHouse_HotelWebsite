@@ -1,7 +1,7 @@
 import { bookingRooms } from '@/data/bookingData'
-import { apiFetch, readJsonResponse } from '@/services/apiClient'
+import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
-const API_BASE_URL = import.meta.env.VITE_BOOKING_API_BASE_URL || '/api/bookings'
+const API_BASE_URL = buildApiUrl('/bookings')
 
 function normalizeBookingStatus(status) {
   const value = String(status || 'pending').trim().toLowerCase().replace(/\s+/g, '_')

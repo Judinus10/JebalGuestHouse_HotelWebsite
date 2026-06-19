@@ -1,5 +1,12 @@
 import { clearStoredSession, getStoredToken } from '@/utils/auth'
 
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+
+export function buildApiUrl(path) {
+  const normalizedPath = String(path || '').startsWith('/') ? path : `/${path}`
+  return `${API_BASE_URL}${normalizedPath}`
+}
+
 export async function apiFetch(url, options = {}) {
   const token = getStoredToken()
   const headers = new Headers(options.headers || {})
@@ -36,4 +43,3 @@ export async function readJsonResponse(response) {
 
   return payload
 }
-

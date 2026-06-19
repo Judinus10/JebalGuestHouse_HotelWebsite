@@ -1,6 +1,6 @@
-import { apiFetch, readJsonResponse } from '@/services/apiClient'
+import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
-const API_BASE_URL = import.meta.env.VITE_PAYMENT_API_BASE_URL || '/api/payments'
+const API_BASE_URL = buildApiUrl('/payments')
 
 function normalizePaymentStatus(status) {
   const value = String(status || 'Payment Pending')
