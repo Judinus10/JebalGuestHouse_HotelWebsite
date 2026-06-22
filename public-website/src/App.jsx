@@ -5,6 +5,7 @@ import Home from './pages/Home'
 import Rooms from './pages/Rooms'
 import RoomDetails from './pages/RoomDetails'
 import Contact from './pages/Contact'
+import Gallery from './pages/Gallery'
 
 /**
  * Root application with route-based page transitions.
@@ -18,6 +19,7 @@ function App() {
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
           <Route path="/rooms" element={<Rooms />} />
+          <Route path="/gallery" element={<Gallery />} />
           <Route path="/rooms/:id" element={<RoomDetails />} />
           <Route path="/contact" element={<Contact />} />
         </Routes>

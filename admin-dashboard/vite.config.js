@@ -13,4 +13,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/HotelWebsite/api': {
+        target: 'http://localhost',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 })
