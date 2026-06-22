@@ -12,6 +12,7 @@ import Offers from '@/pages/Offers'
 import Messages from '@/pages/Messages'
 import WebsiteSettings from '@/pages/WebsiteSettings'
 import Notifications from '@/pages/Notifications'
+import Experience from '@/pages/Experience'
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
           <Route path="/messages" element={<Messages />} />
           <Route path="/website-settings" element={<WebsiteSettings />} />
           <Route path="/notifications" element={<Notifications />} />
+          <Route path="/experience" element={<Experience />} />
         </Route>
       </Route>
 

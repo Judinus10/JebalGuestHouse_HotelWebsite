@@ -6,6 +6,7 @@ import Rooms from './pages/Rooms'
 import RoomDetails from './pages/RoomDetails'
 import Contact from './pages/Contact'
 import Gallery from './pages/Gallery'
+import Experience from './pages/Experience'
 
 /**
  * Root application with route-based page transitions.
@@ -22,6 +23,7 @@ function App() {
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/rooms/:id" element={<RoomDetails />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/experience" element={<Experience />} />
         </Routes>
       </AnimatePresence>
     </Layout>

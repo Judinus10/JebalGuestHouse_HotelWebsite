@@ -9,6 +9,7 @@ import {
   MessageSquare,
   Globe,
   Bell,
+  Sparkles,
 } from 'lucide-react'
 
 export const SIDEBAR_WIDTH_EXPANDED = 288
@@ -32,6 +33,7 @@ export const navigation = [
     items: [
       { name: 'Rooms', href: '/rooms', icon: BedDouble },
       { name: 'Gallery', href: '/gallery', icon: Images },
+      { name: 'Experience', href: '/experience', icon: Sparkles },
       { name: 'Offers & Packages', href: '/offers', icon: Tag },
     ],
   },
@@ -57,6 +59,7 @@ export const pageTitles = {
   '/booking-calendar': 'Booking Calendar',
   '/payments': 'Payments',
   '/gallery': 'Gallery',
+  '/experience': 'Experience',
   '/offers': 'Offers & Packages',
   '/messages': 'Messages',
   '/website-settings': 'Website Settings',
@@ -70,6 +73,7 @@ export const pageDescriptions = {
   '/booking-calendar': 'Visual overview of room occupancy and booking schedules.',
   '/payments': 'Track booking payments and refunds.',
   '/gallery': 'Manage room, garden, facility, and property photos.',
+  '/experience': 'Manage public website experiences, attractions, food, culture, and activities.',
   '/offers': 'Create and manage accommodation offers and packages.',
   '/messages': 'Manage guest inquiries and contact requests.',
   '/website-settings': 'Manage contact information, social links, and admin account settings.',

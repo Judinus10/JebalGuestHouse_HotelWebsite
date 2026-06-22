@@ -463,3 +463,16 @@ CREATE TABLE IF NOT EXISTS gallery_images (
   INDEX idx_gallery_images_folder_sort (folder_id, sort_order),
   INDEX idx_gallery_images_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS experience_items (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  title VARCHAR(150) NOT NULL,
+  category VARCHAR(80) NOT NULL,
+  location VARCHAR(150) DEFAULT NULL,
+  description TEXT NOT NULL,
+  image_path VARCHAR(255) DEFAULT NULL,
+  status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+  sort_order INT UNSIGNED NOT NULL DEFAULT 1,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
