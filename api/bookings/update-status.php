@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -13,7 +14,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $data = read_request_data();
 $id = (int) ($data['id'] ?? 0);
 $status = strtolower(clean_string($data['status'] ?? '', 30));
-$allowedStatuses = ['pending', 'confirmed', 'cancelled'];
+$allowedStatuses = ['pending', 'confirmed', 'cancelled', 'canceled'];
+
+if ($status === 'canceled') {
+    $status = 'cancelled';
+}
 
 if ($id < 1 || !in_array($status, $allowedStatuses, true)) {
     json_response(false, 'Valid booking ID and status are required.', 422);
@@ -28,6 +33,17 @@ try {
 
     if (!$booking) {
         json_response(false, 'Booking was not found.', 404);
+    }
+
+    $oldStatus = strtolower((string) ($booking['status'] ?? ''));
+
+    if ($oldStatus === $status) {
+        json_response(true, 'Booking status is already updated.', 200, [
+            'data' => [
+                'id' => $id,
+                'booking_status' => $status,
+            ],
+        ]);
     }
 
     if ($status === 'confirmed') {
@@ -53,11 +69,27 @@ try {
         }
     }
 
+    $displayStatus = $status === 'cancelled' ? 'Cancelled' : ucfirst($status);
+
     $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE id = :id');
     $update->execute([
-        ':status' => ucfirst($status),
+        ':status' => $displayStatus,
         ':id' => $id,
     ]);
+
+    $booking['status'] = $displayStatus;
+
+    try {
+        if ($status === 'confirmed') {
+            send_booking_confirmed_email($pdo, $booking);
+        }
+
+        if ($status === 'cancelled') {
+            send_booking_cancelled_emails($pdo, $booking);
+        }
+    } catch (Throwable $emailError) {
+        error_log('Booking status email error: ' . $emailError->getMessage());
+    }
 
     json_response(true, 'Booking status updated successfully.', 200, [
         'data' => [

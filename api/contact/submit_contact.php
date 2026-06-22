@@ -45,8 +45,9 @@ try {
 
     $id = (int) $pdo->lastInsertId();
     $ref = 'INQ-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
+    $adminEmail = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : (getenv('ADMIN_EMAIL') ?: 'admin@localhost');
 
-    send_plain_email(ADMIN_EMAIL, 'New Contact Enquiry - ' . $ref, "New contact enquiry received.
+    send_plain_email($adminEmail, 'New Contact Enquiry - ' . $ref, "New contact enquiry received.
 
 Ref: {$ref}
 Name: {$name}

@@ -4,11 +4,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 
 apply_cors_headers();
-require_admin_auth();
 
-if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    json_response(false, 'Only GET requests are allowed.', 405);
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
 }
+
+require_admin_auth();
 
 try {
     $pdo = get_db_connection();

@@ -5,32 +5,43 @@ declare(strict_types=1);
 ==================================================
 JEBAL HOMES BACKEND CONFIGURATION LOADER
 ==================================================
-Backend secrets are centralized in api/env.php.
+Backend secrets are loaded from api/.env using vlucas/phpdotenv.
 
 Production rule:
-- Create api/env.php from api/env.example.php on the server.
-- Keep api/env.php out of Git and out of public sharing.
+- Create api/.env from api/.env.example on the server.
+- Keep api/.env out of Git and out of public sharing.
 - Do not put database, SMTP, or PayHere secrets in frontend .env files.
-- Switch local/production behavior using APP_ENV inside api/env.php only.
+- Switch local/production behavior using APP_ENV inside api/.env only.
 */
 
-$envFile = __DIR__ . '/env.php';
+$autoloadFile = __DIR__ . '/vendor/autoload.php';
 
-if (!is_file($envFile)) {
+if (!is_file($autoloadFile)) {
     http_response_code(500);
-    exit('Backend environment file is missing. Copy api/env.example.php to api/env.php and configure it.');
+    exit('Backend dependencies are missing. Run composer install in the api directory.');
 }
 
-$env = require $envFile;
+require_once $autoloadFile;
 
-if (!is_array($env)) {
+try {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+    $dotenv->load();
+} catch (Throwable $exception) {
     http_response_code(500);
-    exit('Backend environment file must return a configuration array.');
+    exit('Backend environment file is missing or invalid. Copy api/.env.example to api/.env and configure it.');
 }
 
-function jebal_env_value(array $env, string $key, mixed $default = null): mixed
+function jebal_env_value(string $key, mixed $default = null): mixed
 {
-    return array_key_exists($key, $env) ? $env[$key] : $default;
+    if (array_key_exists($key, $_ENV)) {
+        return $_ENV[$key];
+    }
+
+    if (array_key_exists($key, $_SERVER)) {
+        return $_SERVER[$key];
+    }
+
+    return $default;
 }
 
 function jebal_define(string $name, mixed $value): void
@@ -40,69 +51,85 @@ function jebal_define(string $name, mixed $value): void
     }
 }
 
-jebal_define('APP_ENV', (string) jebal_env_value($env, 'APP_ENV', 'local'));
-jebal_define('APP_BASE_URL', rtrim((string) jebal_env_value($env, 'APP_BASE_URL', ''), '/'));
-jebal_define('API_BASE_URL', rtrim((string) jebal_env_value($env, 'API_BASE_URL', ''), '/'));
+function jebal_env_csv(string $key, array $default = []): array
+{
+    $value = jebal_env_value($key, '');
 
-jebal_define('DB_HOST', (string) jebal_env_value($env, 'DB_HOST', 'localhost'));
-jebal_define('DB_NAME', (string) jebal_env_value($env, 'DB_NAME', 'hotel_jebal'));
-jebal_define('DB_USER', (string) jebal_env_value($env, 'DB_USER', 'root'));
-jebal_define('DB_PASS', (string) jebal_env_value($env, 'DB_PASS', ''));
-jebal_define('DB_CHARSET', (string) jebal_env_value($env, 'DB_CHARSET', 'utf8mb4'));
+    if (is_array($value)) {
+        return $value;
+    }
 
-jebal_define('SMTP_HOST', (string) jebal_env_value($env, 'SMTP_HOST', ''));
-jebal_define('SMTP_USER', (string) jebal_env_value($env, 'SMTP_USER', ''));
-jebal_define('SMTP_PASS', (string) jebal_env_value($env, 'SMTP_PASS', ''));
-jebal_define('SMTP_PORT', (int) jebal_env_value($env, 'SMTP_PORT', 587));
-jebal_define('SMTP_SECURE', (string) jebal_env_value($env, 'SMTP_SECURE', 'tls'));
+    $items = array_filter(
+        array_map('trim', explode(',', (string) $value)),
+        static fn (string $item): bool => $item !== ''
+    );
 
-jebal_define('ADMIN_EMAIL', (string) jebal_env_value($env, 'ADMIN_EMAIL', 'admin@jebalhomes.com'));
-jebal_define('FROM_EMAIL', (string) jebal_env_value($env, 'FROM_EMAIL', 'info@jebalhomes.com'));
-jebal_define('FROM_NAME', (string) jebal_env_value($env, 'FROM_NAME', 'Jebal Homes'));
-
-jebal_define('PAYHERE_MERCHANT_ID', (string) jebal_env_value($env, 'PAYHERE_MERCHANT_ID', ''));
-jebal_define('PAYHERE_MERCHANT_SECRET', (string) jebal_env_value($env, 'PAYHERE_MERCHANT_SECRET', ''));
-
-$allowedOrigins = jebal_env_value($env, 'ALLOWED_ORIGINS', []);
-if (!is_array($allowedOrigins)) {
-    $allowedOrigins = [];
+    return $items !== [] ? array_values($items) : $default;
 }
-jebal_define('ALLOWED_ORIGINS', $allowedOrigins);
 
-jebal_define('PAYMENT_CURRENCY', (string) jebal_env_value($env, 'PAYMENT_CURRENCY', 'LKR'));
-jebal_define(
-    'INVOICE_PUBLIC_BASE_URL',
-    (API_BASE_URL !== '' ? API_BASE_URL : 'http://localhost/HotelWebsite/api') . '/invoices/download.php'
-);
-jebal_define('INVOICE_STORAGE_DIR', __DIR__ . '/storage/invoices');
+function jebal_env_json_array(string $key, array $default = []): array
+{
+    $value = jebal_env_value($key, '');
 
-jebal_define('ADMIN_SESSION_HOURS', (int) jebal_env_value($env, 'ADMIN_SESSION_HOURS', 12));
-jebal_define('PUBLIC_RATE_LIMIT_MAX', (int) jebal_env_value($env, 'PUBLIC_RATE_LIMIT_MAX', 8));
-jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', (int) jebal_env_value($env, 'PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15));
+    if (is_array($value)) {
+        return $value;
+    }
 
-$roomRates = jebal_env_value($env, 'ROOM_RATES', [
+    $decoded = json_decode((string) $value, true);
+
+    return is_array($decoded) && $decoded !== [] ? $decoded : $default;
+}
+
+$defaultRoomRates = [
     'Ground Floor Room 1' => 8500.00,
     'Ground Floor Room 2' => 8500.00,
     'First Floor Room 1' => 9500.00,
     'First Floor Room 2' => 9500.00,
     'Family Room' => 14000.00,
     'Private Cottage' => 18000.00,
-]);
+];
 
-if (!is_array($roomRates) || $roomRates === []) {
-    $roomRates = [
-        'Ground Floor Room 1' => 8500.00,
-        'Ground Floor Room 2' => 8500.00,
-        'First Floor Room 1' => 9500.00,
-        'First Floor Room 2' => 9500.00,
-        'Family Room' => 14000.00,
-        'Private Cottage' => 18000.00,
-    ];
-}
+jebal_define('APP_ENV', (string) jebal_env_value('APP_ENV', 'local'));
+jebal_define('APP_BASE_URL', rtrim((string) jebal_env_value('APP_BASE_URL', ''), '/'));
 
-jebal_define('ROOM_RATES', $roomRates);
+$apiBaseUrl = rtrim((string) jebal_env_value('API_BASE_URL', ''), '/');
+jebal_define('API_BASE_URL', $apiBaseUrl);
 
-if (APP_ENV === 'production') {
+jebal_define('DB_HOST', (string) jebal_env_value('DB_HOST', 'localhost'));
+jebal_define('DB_NAME', (string) jebal_env_value('DB_NAME', 'hotel_jebal'));
+jebal_define('DB_USER', (string) jebal_env_value('DB_USER', 'root'));
+jebal_define('DB_PASS', (string) jebal_env_value('DB_PASS', ''));
+jebal_define('DB_CHARSET', (string) jebal_env_value('DB_CHARSET', 'utf8mb4'));
+
+jebal_define('SMTP_HOST', (string) jebal_env_value('SMTP_HOST', ''));
+jebal_define('SMTP_USER', (string) jebal_env_value('SMTP_USER', ''));
+jebal_define('SMTP_PASS', (string) jebal_env_value('SMTP_PASS', ''));
+jebal_define('SMTP_PORT', (int) jebal_env_value('SMTP_PORT', 587));
+jebal_define('SMTP_SECURE', (string) jebal_env_value('SMTP_SECURE', 'tls'));
+
+jebal_define('ADMIN_EMAIL', (string) jebal_env_value('ADMIN_EMAIL', 'admin@jebalhomes.com'));
+jebal_define('FROM_EMAIL', (string) jebal_env_value('FROM_EMAIL', 'info@jebalhomes.com'));
+jebal_define('FROM_NAME', (string) jebal_env_value('FROM_NAME', 'Jebal Homes'));
+
+jebal_define('PAYHERE_MERCHANT_ID', (string) jebal_env_value('PAYHERE_MERCHANT_ID', ''));
+jebal_define('PAYHERE_MERCHANT_SECRET', (string) jebal_env_value('PAYHERE_MERCHANT_SECRET', ''));
+
+jebal_define('ALLOWED_ORIGINS', jebal_env_csv('ALLOWED_ORIGINS'));
+
+jebal_define('PAYMENT_CURRENCY', (string) jebal_env_value('PAYMENT_CURRENCY', 'LKR'));
+jebal_define(
+    'INVOICE_PUBLIC_BASE_URL',
+    ($apiBaseUrl !== '' ? $apiBaseUrl : 'http://localhost/HotelWebsite/api') . '/invoices/download.php'
+);
+jebal_define('INVOICE_STORAGE_DIR', __DIR__ . '/storage/invoices');
+
+jebal_define('ADMIN_SESSION_HOURS', (int) jebal_env_value('ADMIN_SESSION_HOURS', 12));
+jebal_define('PUBLIC_RATE_LIMIT_MAX', (int) jebal_env_value('PUBLIC_RATE_LIMIT_MAX', 8));
+jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', (int) jebal_env_value('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15));
+
+jebal_define('ROOM_RATES', jebal_env_json_array('ROOM_RATES', $defaultRoomRates));
+
+if (defined('APP_ENV') && APP_ENV === 'production') {
     ini_set('display_errors', '0');
     ini_set('display_startup_errors', '0');
     ini_set('log_errors', '1');

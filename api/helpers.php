@@ -4,6 +4,11 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
 function apply_security_headers(): void
 {
     header('X-Content-Type-Options: nosniff');
@@ -21,8 +26,9 @@ function apply_cors_headers(): void
     apply_security_headers();
 
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    $allowedOrigins = defined('ALLOWED_ORIGINS') ? ALLOWED_ORIGINS : [];
 
-    if ($origin !== '' && in_array($origin, ALLOWED_ORIGINS, true)) {
+    if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Vary: Origin');
     }
@@ -62,7 +68,7 @@ function read_request_data(): array
 function clean_string(mixed $value, int $maxLength = 1000): string
 {
     $value = trim((string) $value);
-    $value = preg_replace('/[ -]/u', '', $value) ?? '';
+    $value = preg_replace('/[\x00-\x1F\x7F]/u', '', $value) ?? '';
     return mb_substr($value, 0, $maxLength);
 }
 
@@ -104,22 +110,38 @@ function rate_limit_or_fail(string $action, int $maxAttempts = PUBLIC_RATE_LIMIT
     ]);
 }
 
-function get_bearer_token(): string
+function get_bearer_token(): ?string
 {
-    $header = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+    $headers = [];
 
-    if (stripos($header, 'Bearer ') === 0) {
-        return trim(substr($header, 7));
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
     }
 
-    return '';
-}
+    $authorization = $headers['Authorization']
+        ?? $headers['authorization']
+        ?? $_SERVER['HTTP_AUTHORIZATION']
+        ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+        ?? '';
 
+    if ($authorization === '' && function_exists('apache_request_headers')) {
+        $apacheHeaders = apache_request_headers();
+        $authorization = $apacheHeaders['Authorization']
+            ?? $apacheHeaders['authorization']
+            ?? '';
+    }
+
+    if (!preg_match('/Bearer\s+(.+)/i', $authorization, $matches)) {
+        return null;
+    }
+
+    return trim($matches[1]);
+}
 function require_admin_auth(): array
 {
     $token = get_bearer_token();
 
-    if ($token === '') {
+    if ($token === null || $token === '') {
         json_response(false, 'Authentication required.', 401);
     }
 
@@ -184,7 +206,8 @@ function ensure_directory_exists(string $directory): bool
 function format_money_amount(float|int|string $amount): string
 {
     $numericAmount = is_numeric($amount) ? (float) $amount : 0.0;
-    return PAYMENT_CURRENCY . ' ' . number_format($numericAmount, 2, '.', ',');
+    $currency = defined('PAYMENT_CURRENCY') ? PAYMENT_CURRENCY : '';
+    return trim($currency . ' ' . number_format($numericAmount, 2, '.', ','));
 }
 
 function format_amount_only(float|int|string $amount): string
@@ -212,17 +235,86 @@ function generate_payhere_notify_hash(
 
 function send_plain_email(string $to, string $subject, string $message, ?string $replyTo = null): bool
 {
-    $headers = [];
-    $headers[] = 'MIME-Version: 1.0';
-    $headers[] = 'Content-Type: text/plain; charset=UTF-8';
-    $headers[] = 'From: ' . FROM_NAME . ' <' . FROM_EMAIL . '>';
+    try {
+        if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
+            error_log('PHPMailer class not found. Check vendor/autoload.php path.');
+            return false;
+        }
 
-    if ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
-        $headers[] = 'Reply-To: ' . $replyTo;
+        $smtpHost = defined('SMTP_HOST') ? trim((string) SMTP_HOST) : '';
+        $smtpUser = defined('SMTP_USER') ? trim((string) SMTP_USER) : '';
+        $smtpPass = defined('SMTP_PASS') ? trim((string) SMTP_PASS) : '';
+        $smtpPort = defined('SMTP_PORT') ? (int) SMTP_PORT : 0;
+        $smtpSecure = defined('SMTP_SECURE') ? strtolower(trim((string) SMTP_SECURE)) : 'tls';
+        $fromEmail = defined('FROM_EMAIL') ? trim((string) FROM_EMAIL) : '';
+        $fromName = defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Jebal Guest House';
+
+        if (
+            $smtpHost === '' ||
+            $smtpUser === '' ||
+            $smtpPass === '' ||
+            $smtpPort < 1 ||
+            $fromEmail === ''
+        ) {
+            error_log('SMTP configuration missing. Host/User/Password/Port/FromEmail required.');
+            return false;
+        }
+
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            error_log('Invalid recipient email: ' . $to);
+            return false;
+        }
+
+        if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            error_log('Invalid FROM_EMAIL: ' . $fromEmail);
+            return false;
+        }
+
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+
+        $mail->isSMTP();
+
+        $mail->Host = $smtpHost;
+        $mail->SMTPAuth = true;
+        $mail->Username = $smtpUser;
+        $mail->Password = $smtpPass;
+        $mail->Port = $smtpPort;
+
+        if ($smtpSecure === 'ssl') {
+            $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        } elseif ($smtpSecure === 'tls') {
+            $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+        } else {
+            $mail->SMTPSecure = '';
+        }
+
+        if (APP_ENV === 'local') {
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer' => false,
+                    'verify_peer_name' => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
+        }
+
+        $mail->CharSet = 'UTF-8';
+        $mail->setFrom($fromEmail, $fromName);
+        $mail->addAddress($to);
+
+        if ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+            $mail->addReplyTo($replyTo);
+        }
+
+        $mail->isHTML(false);
+        $mail->Subject = $subject;
+        $mail->Body = $message;
+
+        return $mail->send();
+    } catch (Throwable $e) {
+        error_log('PHPMailer send failed: ' . $e->getMessage());
+        return false;
     }
-
-    return mail($to, $subject, $message, implode("
-", $headers));
 }
 
 function calculate_nights(string $checkInDate, string $checkOutDate): int
@@ -234,6 +326,7 @@ function calculate_nights(string $checkInDate, string $checkOutDate): int
 
 function calculate_booking_amount(string $roomName, string $checkInDate, string $checkOutDate): float
 {
-    $rate = (float) (ROOM_RATES[$roomName] ?? 0);
+    $roomRates = defined('ROOM_RATES') && is_array(ROOM_RATES) ? ROOM_RATES : [];
+    $rate = (float) ($roomRates[$roomName] ?? 0);
     return $rate * calculate_nights($checkInDate, $checkOutDate);
 }
