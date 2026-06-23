@@ -7,6 +7,8 @@ import RoomDetails from './pages/RoomDetails'
 import Contact from './pages/Contact'
 import Gallery from './pages/Gallery'
 import Experience from './pages/Experience'
+import PrivacyPolicy from './pages/PrivacyPolicy'
+import TermsOfService from './pages/TermsOfService'
 
 /**
  * Root application with route-based page transitions.
@@ -24,6 +26,8 @@ function App() {
           <Route path="/rooms/:id" element={<RoomDetails />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/experience" element={<Experience />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-of-service" element={<TermsOfService />} />
         </Routes>
       </AnimatePresence>
     </Layout>

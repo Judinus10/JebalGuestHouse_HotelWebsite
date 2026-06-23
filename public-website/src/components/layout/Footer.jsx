@@ -9,8 +9,8 @@ const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 const footerLinks = [
   { label: 'Rooms', path: '/rooms' },
   { label: 'Contact', path: '/contact' },
-  { label: 'Privacy Policy', path: '#' },
-  { label: 'Terms of Service', path: '#' },
+  { label: 'Privacy Policy', path: '/privacy-policy' },
+  { label: 'Terms of Service', path: '/terms-of-service' },
 ]
 
 const fallbackSettings = {
