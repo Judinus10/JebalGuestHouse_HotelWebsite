@@ -7,7 +7,7 @@ import Button from '../ui/Button'
  */
 export default function IntroSection() {
   return (
-    <section className="pattern-diamond py-24 md:py-32">
+    <section className="pattern-diamond pt-36 pb-24 md:pt-44 md:pb-32">
       <div className="mx-auto grid max-w-7xl items-center gap-12 px-6 lg:grid-cols-2 lg:gap-20">
         {/* Text content */}
         <FadeUp>
