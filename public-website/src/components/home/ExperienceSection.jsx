@@ -51,7 +51,7 @@ export default function ExperienceSection() {
 
                   <div className="absolute bottom-0 left-0 p-5">
                     <p className="text-[10px] tracking-[0.2em] uppercase text-gold-light">
-                      {item.location || item.category}
+                      {item.distance || item.location || item.category}
                     </p>
                     <h3 className="mt-1 font-serif text-xl text-white">
                       {item.title}

@@ -57,6 +57,7 @@ function experience_normalize(array $row): array
         'title' => (string) $row['title'],
         'category' => (string) $row['category'],
         'location' => (string) ($row['location'] ?? ''),
+        'distance' => (string) ($row['distance'] ?? ''),
         'description' => (string) $row['description'],
         'image_path' => experience_image_url($row['image_path'] ?? ''),
         'stored_path' => (string) ($row['image_path'] ?? ''),

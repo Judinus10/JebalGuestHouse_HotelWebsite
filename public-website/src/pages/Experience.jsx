@@ -83,13 +83,21 @@ export default function Experience() {
                     {item.title}
                   </h3>
 
-                  {item.location ? (
-                    <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
-                      <MapPin className="h-4 w-4" />
-                      {item.location}
-                    </div>
-                  ) : null}
+                  <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                    <MapPin className="h-4 w-4 shrink-0" />
 
+                    {item.location && (
+                      <span>{item.location}</span>
+                    )}
+
+                    {item.location && item.distance && (
+                      <span>•</span>
+                    )}
+
+                    {item.distance && (
+                      <span>{item.distance}</span>
+                    )}
+                  </div>
                   <p className="mt-4 text-sm leading-7 text-slate-600">
                     {item.description}
                   </p>

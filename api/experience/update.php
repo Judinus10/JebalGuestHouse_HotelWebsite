@@ -10,6 +10,7 @@ try {
     $title = trim($_POST['title'] ?? '');
     $category = trim($_POST['category'] ?? '');
     $location = trim($_POST['location'] ?? '');
+    $distance = trim($_POST['distance'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $status = $_POST['status'] ?? 'active';
     $sortOrder = (int) ($_POST['sort_order'] ?? 1);
@@ -48,6 +49,7 @@ try {
             title = :title,
             category = :category,
             location = :location,
+            distance = :distance,
             description = :description,
             image_path = :image_path,
             status = :status,
@@ -60,6 +62,7 @@ try {
         ':title' => $title,
         ':category' => $category,
         ':location' => $location,
+        ':distance' => $distance,
         ':description' => $description,
         ':image_path' => $imagePath,
         ':status' => $status,

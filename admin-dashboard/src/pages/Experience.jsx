@@ -41,6 +41,7 @@ const emptyForm = {
   title: '',
   category: 'Culture',
   location: '',
+  distance: '',
   description: '',
   image_path: '',
   image_file: null,
@@ -131,7 +132,11 @@ export default function Experience() {
     setModal({
       mode: 'edit',
       form: {
+        ...emptyForm,
         ...item,
+        distance: item.distance || '',
+        location: item.location || '',
+        description: item.description || '',
         image_file: null,
       },
     })
@@ -334,10 +339,12 @@ export default function Experience() {
                   </span>
                 </div>
 
-                {item.location ? (
+                {item.location || item.distance ? (
                   <p className="mt-3 flex items-center gap-1.5 text-sm text-text-secondary">
-                    <MapPin className="h-4 w-4" />
-                    {item.location}
+                    <MapPin className="h-4 w-4 shrink-0" />
+                    <span>{item.location}</span>
+                    {item.location && item.distance ? <span>•</span> : null}
+                    {item.distance ? <span>{item.distance}</span> : null}
                   </p>
                 ) : null}
 
@@ -414,6 +421,15 @@ export default function Experience() {
                     value={modal.form.location}
                     onChange={(event) => updateForm('location', event.target.value)}
                     placeholder="Jaffna"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Distance</Label>
+                  <Input
+                    value={modal.form.distance}
+                    onChange={(e) => updateForm('distance', e.target.value)}
+                    placeholder="5 km"
                   />
                 </div>
 

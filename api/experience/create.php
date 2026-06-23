@@ -9,6 +9,7 @@ try {
     $title = trim($_POST['title'] ?? '');
     $category = trim($_POST['category'] ?? '');
     $location = trim($_POST['location'] ?? '');
+    $distance = trim($_POST['distance'] ?? '');
     $description = trim($_POST['description'] ?? '');
     $status = $_POST['status'] ?? 'active';
     $sortOrder = (int) ($_POST['sort_order'] ?? 1);
@@ -24,15 +25,16 @@ try {
 
     $stmt = $pdo->prepare("
         INSERT INTO experience_items
-        (title, category, location, description, image_path, status, sort_order)
+        (title, category, location, distance, description, image_path, status, sort_order)
         VALUES
-        (:title, :category, :location, :description, :image_path, :status, :sort_order)
+        (:title, :category, :location, :distance, :description, :image_path, :status, :sort_order)
     ");
 
     $stmt->execute([
         ':title' => $title,
         ':category' => $category,
         ':location' => $location,
+        ':distance' => $distance,
         ':description' => $description,
         ':image_path' => $imagePath,
         ':status' => $status,
