@@ -10,6 +10,7 @@ import {
   Globe,
   Bell,
   Sparkles,
+  KeyRound,
 } from 'lucide-react'
 
 export const SIDEBAR_WIDTH_EXPANDED = 288
@@ -48,6 +49,7 @@ export const navigation = [
     label: 'Website Management',
     items: [
       { name: 'Website Settings', href: '/website-settings', icon: Globe },
+      { name: 'Admin Password', href: '/admin-password', icon: KeyRound },
     ],
   },
 ]
@@ -63,6 +65,7 @@ export const pageTitles = {
   '/offers': 'Offers & Packages',
   '/messages': 'Messages',
   '/website-settings': 'Website Settings',
+  '/admin-password': 'Admin Password',
   '/notifications': 'Notifications',
 }
 
@@ -76,6 +79,7 @@ export const pageDescriptions = {
   '/experience': 'Manage public website experiences, attractions, food, culture, and activities.',
   '/offers': 'Create and manage accommodation offers and packages.',
   '/messages': 'Manage guest inquiries and contact requests.',
-  '/website-settings': 'Manage contact information, social links, and admin account settings.',
+  '/website-settings': 'Manage public website contact information and social links.',
+  '/admin-password': 'Change the dashboard administrator password.',
   '/notifications': 'View booking, payment, and system notifications.',
 }

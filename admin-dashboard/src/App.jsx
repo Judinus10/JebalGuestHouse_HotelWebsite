@@ -13,6 +13,7 @@ import Messages from '@/pages/Messages'
 import WebsiteSettings from '@/pages/WebsiteSettings'
 import Notifications from '@/pages/Notifications'
 import Experience from '@/pages/Experience'
+import AdminPassword from '@/pages/AdminPassword'
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/website-settings" element={<WebsiteSettings />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/experience" element={<Experience />} />
+          <Route path="/admin-password" element={<AdminPassword />} />
         </Route>
       </Route>
 

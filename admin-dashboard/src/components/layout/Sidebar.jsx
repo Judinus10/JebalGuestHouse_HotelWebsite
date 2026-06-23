@@ -1,5 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { X, PanelLeftClose, PanelLeft, Headphones } from 'lucide-react'
+import {
+  X,
+  PanelLeftClose,
+  PanelLeft,
+  Headphones,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { navigation } from '@/config/navigation'
 import { Button } from '@/components/ui/button'
@@ -34,12 +39,14 @@ function NavItem({ item, collapsed, onNavigate }) {
                 )}
               />
             )}
+
             <item.icon
               className={cn(
                 'h-[18px] w-[18px] shrink-0 transition-colors duration-200',
                 isActive ? 'text-white' : 'text-slate-300 group-hover:text-white'
               )}
             />
+
             {!collapsed && (
               <>
                 <span className="truncate">{item.name}</span>
@@ -55,7 +62,12 @@ function NavItem({ item, collapsed, onNavigate }) {
   )
 }
 
-export function Sidebar({ mobileOpen, collapsed, onCloseMobile, onToggleCollapse }) {
+export function Sidebar({
+  mobileOpen,
+  collapsed,
+  onCloseMobile,
+  onToggleCollapse,
+}) {
   return (
     <>
       <div
@@ -86,9 +98,12 @@ export function Sidebar({ mobileOpen, collapsed, onCloseMobile, onToggleCollapse
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm shadow-blue-950/30 ring-1 ring-white/10">
               <span className="text-sm font-bold text-white">JH</span>
             </div>
+
             {!collapsed && (
               <div className="min-w-0">
-                <p className="truncate text-base font-semibold text-white">Jebal Homes</p>
+                <p className="truncate text-base font-semibold text-white">
+                  Jebal Homes
+                </p>
                 <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-blue-200">
                   Guest House PMS
                 </p>
@@ -109,7 +124,7 @@ export function Sidebar({ mobileOpen, collapsed, onCloseMobile, onToggleCollapse
         <nav className="sidebar-scroll flex-1 overflow-y-auto overflow-x-hidden px-3 py-5">
           {navigation.map((section, index) => (
             <div
-              key={section.label ?? 'dashboard'}
+              key={section.label ?? `section-${index}`}
               className={cn(index > 0 && 'mt-6 border-t border-white/10 pt-6')}
             >
               {section.label && !collapsed && (
@@ -117,11 +132,13 @@ export function Sidebar({ mobileOpen, collapsed, onCloseMobile, onToggleCollapse
                   {section.label}
                 </p>
               )}
+
               {section.label && collapsed && (
                 <div className="mb-2 flex justify-center">
                   <span className="h-px w-6 bg-white/15" />
                 </div>
               )}
+
               <ul className="space-y-1">
                 {section.items.map((item) => (
                   <NavItem
@@ -142,8 +159,12 @@ export function Sidebar({ mobileOpen, collapsed, onCloseMobile, onToggleCollapse
               <div className="flex items-start gap-2.5">
                 <Headphones className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
                 <div>
-                  <p className="text-xs font-medium text-white">Need assistance?</p>
-                  <p className="mt-0.5 text-xs text-slate-300">support@jebalhomes.com</p>
+                  <p className="text-xs font-medium text-white">
+                    Need assistance?
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-300">
+                    support@jebalhomes.com
+                  </p>
                 </div>
               </div>
             </div>

@@ -479,3 +479,23 @@ CREATE TABLE IF NOT EXISTS experience_items (
 
 ALTER TABLE experience_items
 ADD COLUMN distance VARCHAR(100) NULL AFTER location;
+
+CREATE TABLE IF NOT EXISTS `website_settings` (
+  `setting_key` varchar(100) NOT NULL,
+  `setting_value` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO `website_settings` (`setting_key`, `setting_value`) VALUES
+('business_name', 'Jebal Guest House'),
+('address', 'Jebal Guest House, Sri Lanka'),
+('phone', '+94 77 123 4567'),
+('reception_contact_number', '+94 21 222 4567'),
+('whatsapp_reservation_number', '+94 77 123 4567'),
+('email', 'reservations@jebalguesthouse.com'),
+('business_hours', 'Daily · 7:00 AM – 10:00 PM'),
+('facebook_link', ''),
+('instagram_link', ''),
+('map_embed_url', '')
+ON DUPLICATE KEY UPDATE `setting_value` = VALUES(`setting_value`);

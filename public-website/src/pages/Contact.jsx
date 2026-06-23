@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { MapPin, Phone, Mail, Clock, Send } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { MapPin, Phone, Mail, Clock, Send, MessageCircle } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
@@ -7,11 +7,28 @@ import Button from '../components/ui/Button'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
+const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 
-/**
- * Contact page with form, info, and map placeholder.
- */
+const fallbackContactDetails = {
+  address: 'Jebal Guest House, Jaffna, Sri Lanka',
+  phone: '+94 77 123 4567',
+  reception_contact_number: '+94 21 222 4567',
+  whatsapp_reservation_number: '+94 77 123 4567',
+  email: 'reservations@jebalguesthouse.com',
+  business_hours: 'Daily · 7:00 AM – 10:00 PM',
+  business_name: 'Jebal Guest House',
+  map_embed_url: '',
+}
+
+function whatsappHref(number) {
+  return `https://wa.me/${String(number || '').replace(/[^\d]/g, '')}?text=${encodeURIComponent(
+    'Hello Jebal Guest House, I want to make an enquiry.'
+  )}`
+}
+
 export default function Contact() {
+  const [contactDetails, setContactDetails] = useState(fallbackContactDetails)
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,6 +39,41 @@ export default function Contact() {
   const [submitted, setSubmitted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    async function loadContactDetails() {
+      try {
+        const response = await fetch(CONTACT_SETTINGS_API_URL, {
+          headers: {
+            Accept: 'application/json',
+          },
+        })
+
+        const result = await response.json().catch(() => null)
+
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.message || 'Could not load contact settings.')
+        }
+
+        if (active) {
+          setContactDetails({
+            ...fallbackContactDetails,
+            ...(result.data || {}),
+          })
+        }
+      } catch (error) {
+        console.warn('Using fallback contact details:', error)
+      }
+    }
+
+    loadContactDetails()
+
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -75,7 +127,6 @@ export default function Contact() {
 
   return (
     <PageTransition>
-      {/* Page header */}
       <section className="relative flex h-[35vh] min-h-[250px] items-end bg-charcoal">
         <img
           src="https://images.unsplash.com/photo-1423666639043-560641683e4c?w=1920&q=80"
@@ -103,7 +154,6 @@ export default function Contact() {
           />
 
           <div className="grid gap-12 lg:grid-cols-2 lg:gap-20">
-            {/* Contact form */}
             <FadeUp>
               {submitted ? (
                 <div className="flex h-full flex-col items-center justify-center bg-ice p-12 text-center">
@@ -150,6 +200,7 @@ export default function Contact() {
                         placeholder="Your name"
                       />
                     </div>
+
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">
                         Email
@@ -180,6 +231,7 @@ export default function Contact() {
                         placeholder="+94 77 000 0000"
                       />
                     </div>
+
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">
                         Subject
@@ -194,6 +246,7 @@ export default function Contact() {
                         <option>Room Reservation</option>
                         <option>Room Availability</option>
                         <option>Special Request</option>
+                        <option>WhatsApp Enquiry</option>
                       </select>
                     </div>
                   </div>
@@ -217,14 +270,31 @@ export default function Contact() {
                     <p className="text-sm text-red-600">{errorMessage}</p>
                   )}
 
-                  <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
-                    {isSubmitting ? 'Sending...' : 'Send Message'}
-                  </Button>
+                  <div className="flex gap-20 w-full">
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-[260px]"
+                    >
+                      {isSubmitting ? 'Sending...' : 'Send Message'}
+                    </Button>
+
+                    {contactDetails.whatsapp_reservation_number && (
+                      <a
+                        href={whatsappHref(contactDetails.whatsapp_reservation_number)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex flex-1 items-center justify-center gap-2 bg-green-600 px-6 py-3 text-sm font-medium text-white transition hover:bg-green-700"
+                      >
+                        <MessageCircle size={18} />
+                        WhatsApp Enquiry
+                      </a>
+                    )}
+                  </div>
                 </form>
               )}
             </FadeUp>
 
-            {/* Contact info + map */}
             <FadeUp delay={0.2}>
               <div className="space-y-8">
                 <ul className="space-y-6">
@@ -232,51 +302,72 @@ export default function Contact() {
                     {
                       icon: MapPin,
                       title: 'Address',
-                      text: 'Jebal Homes, Sri Lanka',
+                      text: contactDetails.address,
                     },
                     {
                       icon: Phone,
-                      title: 'Phone',
-                      text: '+94 77 000 0000',
+                      title: 'Main Phone',
+                      text: contactDetails.phone,
+                    },
+                    {
+                      icon: Phone,
+                      title: 'Reception Contact',
+                      text: contactDetails.reception_contact_number,
                     },
                     {
                       icon: Mail,
                       title: 'Email',
-                      text: 'reservations@jebalhomes.com',
+                      text: contactDetails.email,
                     },
                     {
                       icon: Clock,
                       title: 'Hours',
-                      text: 'Daily · 7:00 AM – 10:00 PM',
+                      text: contactDetails.business_hours,
                     },
-                  ].map(({ icon: Icon, title, text }) => (
-                    <li key={title} className="flex gap-4">
-                      <span className="flex h-12 w-12 shrink-0 items-center justify-center bg-ice text-gold">
-                        <Icon size={20} />
-                      </span>
-                      <div>
-                        <p className="text-xs tracking-wider uppercase text-muted">
-                          {title}
-                        </p>
-                        <p className="mt-1 text-sm text-charcoal">{text}</p>
-                      </div>
-                    </li>
-                  ))}
+                  ]
+                    .filter((item) => item.text)
+                    .map(({ icon: Icon, title, text }) => (
+                      <li key={title} className="flex gap-4">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center bg-ice text-gold">
+                          <Icon size={20} />
+                        </span>
+                        <div>
+                          <p className="text-xs tracking-wider uppercase text-muted">
+                            {title}
+                          </p>
+                          <p className="mt-1 text-sm text-charcoal">{text}</p>
+                        </div>
+                      </li>
+                    ))}
                 </ul>
 
-                {/* Map placeholder */}
                 <div className="relative aspect-[16/10] overflow-hidden bg-ice">
-                  <img
-                    src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80"
-                    alt="Location map"
-                    className="h-full w-full object-cover opacity-50"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="bg-white px-6 py-4 text-center shadow-md">
-                      <MapPin className="mx-auto text-gold" size={24} />
-                      <p className="mt-2 font-serif text-charcoal">Jebal Homes</p>
-                    </div>
-                  </div>
+                  {contactDetails.map_embed_url ? (
+                    <iframe
+                      src={contactDetails.map_embed_url}
+                      title={`${contactDetails.business_name} map`}
+                      className="h-full w-full border-0"
+                      allowFullScreen
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                    />
+                  ) : (
+                    <>
+                      <img
+                        src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80"
+                        alt="Location map"
+                        className="h-full w-full object-cover opacity-50"
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="bg-white px-6 py-4 text-center shadow-md">
+                          <MapPin className="mx-auto text-gold" size={24} />
+                          <p className="mt-2 font-serif text-charcoal">
+                            {contactDetails.business_name}
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </FadeUp>
