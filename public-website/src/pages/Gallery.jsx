@@ -131,9 +131,6 @@ export default function Gallery() {
                           <p className="text-[11px] tracking-[0.25em] uppercase text-gold">
                             {item.folder_name || 'Gallery'}
                           </p>
-                          <h2 className="mt-2 font-serif text-2xl text-charcoal">
-                            {item.title || 'Gallery Image'}
-                          </h2>
                         </div>
                       </div>
                     </FadeUp>

@@ -5,11 +5,11 @@ import SectionHeading from '../components/ui/SectionHeading'
 export default function PrivacyPolicy() {
   return (
     <PageTransition>
-      <section className="relative flex h-[35vh] min-h-[250px] items-end bg-charcoal">
+      <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
           src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1920&q=80"
           alt="Privacy policy"
-          className="absolute inset-0 h-full w-full object-cover opacity-35"
+          className="absolute inset-0 h-full w-full object-cover opacity-50"
         />
         <div className="relative mx-auto w-full max-w-7xl px-6 pb-12">
           <FadeUp>

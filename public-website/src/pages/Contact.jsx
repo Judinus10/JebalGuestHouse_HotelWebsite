@@ -127,11 +127,11 @@ export default function Contact() {
 
   return (
     <PageTransition>
-      <section className="relative flex h-[35vh] min-h-[250px] items-end bg-charcoal">
+      <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
           src="https://images.unsplash.com/photo-1423666639043-560641683e4c?w=1920&q=80"
           alt="Contact us"
-          className="absolute inset-0 h-full w-full object-cover opacity-40"
+          className="absolute inset-0 h-full w-full object-cover opacity-50"
         />
         <div className="relative mx-auto w-full max-w-7xl px-6 pb-12">
           <FadeUp>
