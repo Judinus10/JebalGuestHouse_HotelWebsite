@@ -9,15 +9,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
 }
 
-rate_limit_or_fail('check_availability', 20, 15);
+rate_limit_or_fail('check_availability', 30, 15);
 
 $data = read_request_data();
+$roomId = (int) ($data['room_id'] ?? 0);
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
 
-if ($roomName === '' || $checkInDate === '' || $checkOutDate === '') {
-    json_response(false, 'Room name, check-in date, and check-out date are required.', 422);
+if (($roomId < 1 && $roomName === '') || $checkInDate === '' || $checkOutDate === '') {
+    json_response(false, 'Room, check-in date, and check-out date are required.', 422);
 }
 
 if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate) || strtotime($checkOutDate) <= strtotime($checkInDate)) {
@@ -26,11 +27,25 @@ if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate) || strtotime($
 
 try {
     $pdo = get_db_connection();
+
+    if ($roomId > 0) {
+        $roomStmt = $pdo->prepare('SELECT room_name FROM rooms WHERE id = :id LIMIT 1');
+        $roomStmt->execute([':id' => $roomId]);
+        $room = $roomStmt->fetch();
+
+        if (!$room) {
+            json_response(false, 'Room not found.', 404);
+        }
+
+        $roomName = (string) $room['room_name'];
+    }
+
     $stmt = $pdo->prepare(
-        "SELECT id, check_in_date, check_out_date
+        "SELECT id, check_in_date, check_out_date, status, payment_status
          FROM bookings
          WHERE room_name = :room_name
-           AND status = 'Confirmed'
+           AND status IN ('Confirmed', 'Pending')
+           AND COALESCE(payment_status, '') NOT IN ('Failed', 'Cancelled', 'Refunded')
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
@@ -44,6 +59,7 @@ try {
 
     json_response(true, $conflict ? 'Room is unavailable for the selected dates.' : 'Room is available.', 200, [
         'available' => !$conflict,
+        'room_name' => $roomName,
         'conflict' => $conflict ?: null,
     ]);
 } catch (Throwable $e) {

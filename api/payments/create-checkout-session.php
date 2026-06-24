@@ -2,7 +2,7 @@
 /**
  * Creates a PayHere checkout session for an existing booking.
  * This endpoint never trusts frontend amount values. It recalculates amount from
- * the saved booking room name and stay dates using backend ROOM_RATES.
+ * the saved booking room name and stay dates using the current room price from the database.
  */
 
 declare(strict_types=1);
@@ -59,11 +59,6 @@ try {
     $roomName = (string) ($booking['room_name'] ?? '');
     $checkInDate = (string) ($booking['check_in_date'] ?? '');
     $checkOutDate = (string) ($booking['check_out_date'] ?? '');
-
-    if (!array_key_exists($roomName, ROOM_RATES)) {
-        $pdo->rollBack();
-        json_response(false, 'Booking contains an invalid room name.', 422);
-    }
 
     if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate)) {
         $pdo->rollBack();

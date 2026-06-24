@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, Link, Navigate } from 'react-router-dom'
-import { Users, Maximize2, BedDouble, Check, ArrowLeft } from 'lucide-react'
+import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom'
+import { Users, Maximize2, BedDouble, Check, ArrowLeft, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import ImageReveal from '../components/ui/ImageReveal'
 import Button from '../components/ui/Button'
 import RoomCard from '../components/ui/RoomCard'
-import { fetchRoom, fetchRooms } from '../services/roomsApi'
+import { checkRoomAvailability, fetchRoom, fetchRooms } from '../services/roomsApi'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
@@ -18,6 +18,7 @@ const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.p
  */
 export default function RoomDetails() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const [room, setRoom] = useState(null)
   const [rooms, setRooms] = useState([])
   const [pageLoading, setPageLoading] = useState(true)
@@ -35,6 +36,9 @@ export default function RoomDetails() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [availabilityWarning, setAvailabilityWarning] = useState('')
+  const [checkingAvailability, setCheckingAvailability] = useState(false)
+  const [lightboxOpen, setLightboxOpen] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -67,6 +71,59 @@ export default function RoomDetails() {
     }
   }, [id])
 
+  useEffect(() => {
+    const checkInDate = searchParams.get('check_in_date') || ''
+    const checkOutDate = searchParams.get('check_out_date') || ''
+    const guests = searchParams.get('guests') || ''
+
+    if (!checkInDate && !checkOutDate && !guests) return
+
+    setFormData((current) => ({
+      ...current,
+      check_in_date: checkInDate || current.check_in_date,
+      check_out_date: checkOutDate || current.check_out_date,
+      guests: guests || current.guests,
+    }))
+  }, [searchParams])
+
+  useEffect(() => {
+    let active = true
+
+    async function verifySelectedDates() {
+      setAvailabilityWarning('')
+
+      if (!room || !formData.check_in_date || !formData.check_out_date) return
+
+      if (formData.check_out_date <= formData.check_in_date) return
+
+      try {
+        setCheckingAvailability(true)
+        const result = await checkRoomAvailability({
+          roomId: room.id,
+          roomName: room.name,
+          checkInDate: formData.check_in_date,
+          checkOutDate: formData.check_out_date,
+        })
+
+        if (!active) return
+
+        if (!result.available) {
+          setAvailabilityWarning('This room is not available for the selected dates.')
+        }
+      } catch (err) {
+        if (active) setAvailabilityWarning('Unable to confirm availability right now. Please try again.')
+      } finally {
+        if (active) setCheckingAvailability(false)
+      }
+    }
+
+    verifySelectedDates()
+
+    return () => {
+      active = false
+    }
+  }, [room, formData.check_in_date, formData.check_out_date])
+
   const relatedRooms = useMemo(() => {
     if (!room) return []
     return rooms.filter((r) => Number(r.id) !== Number(room.id)).slice(0, 3)
@@ -84,7 +141,23 @@ export default function RoomDetails() {
 
   if (notFound || !room) return <Navigate to="/rooms" replace />
 
-  const images = room.images?.length ? room.images : [room.main_image]
+  const images = room.images?.length ? room.images : [room.main_image].filter(Boolean)
+  const isRoomUnavailable = Boolean(availabilityWarning)
+
+  const showPreviousImage = () => {
+    if (!images.length) return
+    setActiveImage((current) => (current === 0 ? images.length - 1 : current - 1))
+  }
+
+  const showNextImage = () => {
+    if (!images.length) return
+    setActiveImage((current) => (current === images.length - 1 ? 0 : current + 1))
+  }
+
+  const openImageViewer = (index) => {
+    setActiveImage(index)
+    setLightboxOpen(true)
+  }
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -94,8 +167,22 @@ export default function RoomDetails() {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setAvailabilityWarning('')
 
     try {
+      const availability = await checkRoomAvailability({
+        roomId: room.id,
+        roomName: room.name,
+        checkInDate: formData.check_in_date,
+        checkOutDate: formData.check_out_date,
+      })
+
+      if (!availability.available) {
+        setAvailabilityWarning('This room is not available for the selected dates.')
+        setLoading(false)
+        return
+      }
+
       const response = await fetch(BOOKING_API_URL, {
         method: 'POST',
         headers: {
@@ -199,7 +286,7 @@ export default function RoomDetails() {
                     <button
                       key={`${img}-${i}`}
                       type="button"
-                      onClick={() => setActiveImage(i)}
+                      onClick={() => openImageViewer(i)}
                       className={`image-zoom aspect-[4/3] overflow-hidden transition-all ${
                         activeImage === i ? 'ring-2 ring-gold' : 'opacity-70 hover:opacity-100'
                       }`}
@@ -310,10 +397,31 @@ export default function RoomDetails() {
                       <textarea name="message" rows={3} value={formData.message} onChange={handleChange} className="mt-1 w-full resize-none border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
                     </div>
 
+                    {checkingAvailability && (
+                      <p className="text-xs text-muted">Checking room availability...</p>
+                    )}
+
+                    {availabilityWarning && (
+                      <div className="border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                          <div>
+                            <p>{availabilityWarning}</p>
+                            <Link
+                              to="/"
+                              className="mt-2 inline-block text-xs font-medium tracking-wider uppercase underline"
+                            >
+                              View available rooms from home search
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {error && <p className="text-xs text-red-600">{error}</p>}
 
-                    <Button type="submit" className="w-full" disabled={loading}>
-                      {loading ? 'Processing...' : 'Send Inquiry & Pay'}
+                    <Button type="submit" className="w-full" disabled={loading || checkingAvailability || isRoomUnavailable}>
+                      {loading ? 'Processing...' : checkingAvailability ? 'Checking...' : 'Send Inquiry & Pay'}
                     </Button>
                   </form>
                 )}
@@ -326,6 +434,73 @@ export default function RoomDetails() {
           </div>
         </div>
       </section>
+
+
+
+      {lightboxOpen && images[activeImage] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm"
+          onClick={() => setLightboxOpen(false)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setLightboxOpen(false)
+            if (e.key === 'ArrowLeft') showPreviousImage()
+            if (e.key === 'ArrowRight') showNextImage()
+          }}
+        >
+          <div
+            className="relative w-full max-w-4xl overflow-hidden rounded-2xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              key={images[activeImage]}
+              src={images[activeImage]}
+              alt={`${room.name} view ${activeImage + 1}`}
+              className="max-h-[82vh] w-full animate-[roomImageFade_0.28s_ease] object-cover"
+            />
+
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={showPreviousImage}
+                  className="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-lg transition hover:scale-105 hover:bg-white"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={showNextImage}
+                  className="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-charcoal shadow-lg transition hover:scale-105 hover:bg-white"
+                  aria-label="Next image"
+                >
+                  <ChevronRight size={24} />
+                </button>
+
+                <div className="absolute bottom-4 right-4 rounded-full bg-black/70 px-4 py-2 text-sm font-semibold text-white">
+                  {activeImage + 1}/{images.length}
+                </div>
+              </>
+            )}
+          </div>
+
+          <style>{`
+            @keyframes roomImageFade {
+              from {
+                opacity: 0;
+                transform: scale(1.02);
+              }
+              to {
+                opacity: 1;
+                transform: scale(1);
+              }
+            }
+          `}</style>
+        </div>
+      )}
 
       {/* Related rooms */}
       <section className="bg-ice-light py-16 md:py-24">

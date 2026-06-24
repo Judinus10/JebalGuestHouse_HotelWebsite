@@ -7,8 +7,21 @@ function normalizeResponse(payload) {
   return []
 }
 
-export async function fetchRooms() {
-  const response = await fetch(`${API_BASE_URL}/rooms/public-list.php`, {
+function buildQuery(params = {}) {
+  const query = new URLSearchParams()
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      query.set(key, String(value))
+    }
+  })
+
+  const queryString = query.toString()
+  return queryString ? `?${queryString}` : ''
+}
+
+export async function fetchRooms(filters = {}) {
+  const response = await fetch(`${API_BASE_URL}/rooms/public-list.php${buildQuery(filters)}`, {
     headers: { Accept: 'application/json' },
   })
   const payload = await response.json().catch(() => null)
@@ -27,4 +40,28 @@ export async function fetchRoom(idOrSlug) {
     throw new Error(payload?.message || 'Unable to load room.')
   }
   return payload.data || payload.room
+}
+
+export async function checkRoomAvailability({ roomId, roomName, checkInDate, checkOutDate }) {
+  const response = await fetch(`${API_BASE_URL}/check-availability.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      room_id: roomId,
+      room_name: roomName,
+      check_in_date: checkInDate,
+      check_out_date: checkOutDate,
+    }),
+  })
+
+  const payload = await response.json().catch(() => null)
+
+  if (!response.ok || !payload?.success) {
+    throw new Error(payload?.message || 'Unable to check availability.')
+  }
+
+  return payload
 }

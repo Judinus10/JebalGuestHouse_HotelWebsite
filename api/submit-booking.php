@@ -29,10 +29,6 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     json_response(false, 'Please enter a valid email address.', 422);
 }
 
-if (!array_key_exists($roomName, ROOM_RATES)) {
-    json_response(false, 'Please select a valid room.', 422);
-}
-
 if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate)) {
     json_response(false, 'Please enter valid check-in and check-out dates.', 422);
 }
@@ -66,11 +62,24 @@ if ($amount <= 0) {
 try {
     $pdo = get_db_connection();
 
+    $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1");
+    $roomStmt->execute([':room_name' => $roomName]);
+    $room = $roomStmt->fetch();
+
+    if (!$room || ($room['status'] ?? '') !== 'Available') {
+        json_response(false, 'Please select a valid available room.', 422);
+    }
+
+    if ($guests > (int) ($room['max_guests'] ?? 0)) {
+        json_response(false, 'Selected room cannot hold this number of guests.', 422);
+    }
+
     $conflict = $pdo->prepare(
         "SELECT id, check_in_date, check_out_date
          FROM bookings
          WHERE room_name = :room_name
-           AND status = 'Confirmed'
+           AND status IN ('Confirmed', 'Pending')
+           AND COALESCE(payment_status, '') NOT IN ('Failed', 'Cancelled', 'Refunded')
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"

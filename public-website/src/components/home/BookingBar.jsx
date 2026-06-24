@@ -13,6 +13,7 @@ const roomTypes = [
 
 /**
  * Floating booking search bar — sits below the hero section.
+ * Sends the selected filters to /rooms. UI classes are kept unchanged.
  */
 export default function BookingBar() {
   const navigate = useNavigate()
@@ -20,10 +21,30 @@ export default function BookingBar() {
   const [checkOut, setCheckOut] = useState('')
   const [guests, setGuests] = useState('2')
   const [roomType, setRoomType] = useState('All Rooms')
+  const [error, setError] = useState('')
 
   const handleSearch = (e) => {
     e.preventDefault()
-    navigate('/rooms')
+    setError('')
+
+    if ((checkIn && !checkOut) || (!checkIn && checkOut)) {
+      setError('Select both check-in and check-out dates.')
+      return
+    }
+
+    if (checkIn && checkOut && checkOut <= checkIn) {
+      setError('Check-out date must be after check-in date.')
+      return
+    }
+
+    const params = new URLSearchParams()
+
+    if (checkIn) params.set('check_in_date', checkIn)
+    if (checkOut) params.set('check_out_date', checkOut)
+    if (guests) params.set('guests', guests)
+    if (roomType && roomType !== 'All Rooms') params.set('room_type', roomType)
+
+    navigate(`/rooms${params.toString() ? `?${params.toString()}` : ''}`)
   }
 
   return (
@@ -43,6 +64,7 @@ export default function BookingBar() {
               <input
                 type="date"
                 value={checkIn}
+                min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => setCheckIn(e.target.value)}
                 className="w-full border-b border-ice-dark bg-transparent py-2 text-sm text-charcoal outline-none focus:border-gold"
               />
@@ -57,6 +79,7 @@ export default function BookingBar() {
               <input
                 type="date"
                 value={checkOut}
+                min={checkIn || new Date().toISOString().split('T')[0]}
                 onChange={(e) => setCheckOut(e.target.value)}
                 className="w-full border-b border-ice-dark bg-transparent py-2 text-sm text-charcoal outline-none focus:border-gold"
               />
@@ -111,6 +134,8 @@ export default function BookingBar() {
               </button>
             </div>
           </div>
+
+          {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
         </form>
       </FadeUp>
     </div>
