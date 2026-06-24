@@ -9,6 +9,7 @@ import Gallery from './pages/Gallery'
 import Experience from './pages/Experience'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
+import ScrollToTop from './components/layout/ScrollToTop'
 
 /**
  * Root application with route-based page transitions.
@@ -18,6 +19,7 @@ function App() {
 
   return (
     <Layout>
+      <ScrollToTop />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
