@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useParams, Link, Navigate } from 'react-router-dom'
 import { Users, Maximize2, BedDouble, Check, ArrowLeft } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
@@ -6,7 +6,7 @@ import FadeUp from '../components/ui/FadeUp'
 import ImageReveal from '../components/ui/ImageReveal'
 import Button from '../components/ui/Button'
 import RoomCard from '../components/ui/RoomCard'
-import { fetchRoom, fetchRooms } from '../services/roomsApi'
+import { getRoomById, rooms } from '../data/rooms'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
@@ -14,14 +14,10 @@ const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.p
 
 /**
  * Individual room details page with gallery, amenities, and booking CTA.
- * UI and animation classes are intentionally kept from the finalized version.
  */
 export default function RoomDetails() {
   const { id } = useParams()
-  const [room, setRoom] = useState(null)
-  const [rooms, setRooms] = useState([])
-  const [pageLoading, setPageLoading] = useState(true)
-  const [notFound, setNotFound] = useState(false)
+  const room = getRoomById(id)
   const [activeImage, setActiveImage] = useState(0)
   const [formData, setFormData] = useState({
     full_name: '',
@@ -36,55 +32,10 @@ export default function RoomDetails() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    let active = true
+  if (!room) return <Navigate to="/rooms" replace />
 
-    async function loadData() {
-      setPageLoading(true)
-      setNotFound(false)
-      setActiveImage(0)
-
-      try {
-        const [roomData, roomList] = await Promise.all([
-          fetchRoom(id),
-          fetchRooms(),
-        ])
-
-        if (!active) return
-        setRoom(roomData)
-        setRooms(roomList)
-      } catch (err) {
-        if (active) setNotFound(true)
-      } finally {
-        if (active) setPageLoading(false)
-      }
-    }
-
-    loadData()
-
-    return () => {
-      active = false
-    }
-  }, [id])
-
-  const relatedRooms = useMemo(() => {
-    if (!room) return []
-    return rooms.filter((r) => Number(r.id) !== Number(room.id)).slice(0, 3)
-  }, [room, rooms])
-
-  if (pageLoading) {
-    return (
-      <PageTransition>
-        <section className="flex min-h-[50vh] items-center justify-center bg-white">
-          <p className="text-sm text-muted">Loading room...</p>
-        </section>
-      </PageTransition>
-    )
-  }
-
-  if (notFound || !room) return <Navigate to="/rooms" replace />
-
-  const images = room.images?.length ? room.images : [room.main_image]
+  // Suggest other rooms excluding current
+  const relatedRooms = rooms.filter((r) => r.id !== room.id).slice(0, 3)
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -154,7 +105,7 @@ export default function RoomDetails() {
       {/* Hero image */}
       <section className="relative h-[50vh] min-h-[350px]">
         <img
-          src={images[activeImage]}
+          src={room.images[activeImage]}
           alt={room.name}
           className="h-full w-full object-cover"
         />
@@ -188,16 +139,16 @@ export default function RoomDetails() {
             <div className="lg:col-span-2">
               <FadeUp>
                 <p className="text-sm leading-relaxed text-muted md:text-base">
-                  {room.longDescription || room.description}
+                  {room.longDescription}
                 </p>
               </FadeUp>
 
               {/* Image gallery thumbnails */}
               <FadeUp delay={0.1}>
                 <div className="mt-10 grid grid-cols-3 gap-4">
-                  {images.map((img, i) => (
+                  {room.images.map((img, i) => (
                     <button
-                      key={`${img}-${i}`}
+                      key={i}
                       type="button"
                       onClick={() => setActiveImage(i)}
                       className={`image-zoom aspect-[4/3] overflow-hidden transition-all ${
@@ -220,7 +171,7 @@ export default function RoomDetails() {
                   Room Amenities
                 </h2>
                 <ul className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
-                  {(room.amenities || []).map((amenity) => (
+                  {room.amenities.map((amenity) => (
                     <li
                       key={amenity}
                       className="flex items-center gap-3 text-sm text-charcoal"
@@ -237,7 +188,7 @@ export default function RoomDetails() {
             <ImageReveal direction="right">
               <div className="sticky top-32 bg-ice p-8">
                 <p className="font-serif text-3xl text-charcoal">
-                  {room.currency} {Number(room.price || 0).toLocaleString()}
+                  ${room.price}
                   <span className="text-base text-muted"> / night</span>
                 </p>
 
@@ -279,35 +230,96 @@ export default function RoomDetails() {
                       <label className="text-xs tracking-wider uppercase text-muted">
                         Full Name
                       </label>
-                      <input type="text" name="full_name" required value={formData.full_name} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <input
+                        type="text"
+                        name="full_name"
+                        required
+                        value={formData.full_name}
+                        onChange={handleChange}
+                        className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold"
+                      />
                     </div>
                     <div>
-                      <label className="text-xs tracking-wider uppercase text-muted">Email</label>
-                      <input type="email" name="email" required value={formData.email} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <label className="text-xs tracking-wider uppercase text-muted">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        required
+                        value={formData.email}
+                        onChange={handleChange}
+                        className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold"
+                      />
                     </div>
                     <div>
-                      <label className="text-xs tracking-wider uppercase text-muted">Phone</label>
-                      <input type="tel" name="phone" required value={formData.phone} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <label className="text-xs tracking-wider uppercase text-muted">
+                        Phone
+                      </label>
+                      <input
+                        type="tel"
+                        name="phone"
+                        required
+                        value={formData.phone}
+                        onChange={handleChange}
+                        className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold"
+                      />
                     </div>
                     <div>
-                      <label className="text-xs tracking-wider uppercase text-muted">Check In</label>
-                      <input type="date" name="check_in_date" required value={formData.check_in_date} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <label className="text-xs tracking-wider uppercase text-muted">
+                        Check In
+                      </label>
+                      <input
+                        type="date"
+                        name="check_in_date"
+                        required
+                        value={formData.check_in_date}
+                        onChange={handleChange}
+                        className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold"
+                      />
                     </div>
                     <div>
-                      <label className="text-xs tracking-wider uppercase text-muted">Check Out</label>
-                      <input type="date" name="check_out_date" required value={formData.check_out_date} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <label className="text-xs tracking-wider uppercase text-muted">
+                        Check Out
+                      </label>
+                      <input
+                        type="date"
+                        name="check_out_date"
+                        required
+                        value={formData.check_out_date}
+                        onChange={handleChange}
+                        className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold"
+                      />
                     </div>
                     <div>
-                      <label className="text-xs tracking-wider uppercase text-muted">Guests</label>
-                      <select name="guests" required value={formData.guests} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold">
-                        {Array.from({ length: Number(room.guests || 6) }, (_, i) => i + 1).map((n) => (
-                          <option key={n} value={n}>{n} Guest{n > 1 ? 's' : ''}</option>
+                      <label className="text-xs tracking-wider uppercase text-muted">
+                        Guests
+                      </label>
+                      <select
+                        name="guests"
+                        required
+                        value={formData.guests}
+                        onChange={handleChange}
+                        className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold"
+                      >
+                        {[1, 2, 3, 4, 5, 6].map((n) => (
+                          <option key={n} value={n}>
+                            {n} Guest{n > 1 ? 's' : ''}
+                          </option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs tracking-wider uppercase text-muted">Message</label>
-                      <textarea name="message" rows={3} value={formData.message} onChange={handleChange} className="mt-1 w-full resize-none border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <label className="text-xs tracking-wider uppercase text-muted">
+                        Message
+                      </label>
+                      <textarea
+                        name="message"
+                        rows={3}
+                        value={formData.message}
+                        onChange={handleChange}
+                        className="mt-1 w-full resize-none border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold"
+                      />
                     </div>
 
                     {error && <p className="text-xs text-red-600">{error}</p>}

@@ -1,22 +1,45 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { getFeaturedRooms } from '../../data/rooms'
+import { fetchRooms } from '../../services/roomsApi'
 import SectionHeading from '../ui/SectionHeading'
 import FadeUp from '../ui/FadeUp'
 
 /**
  * Featured rooms carousel with overlapping text card.
+ * Same UI/animations as before, now loaded from database/API.
  */
 export default function FeaturedRooms() {
-  const featured = getFeaturedRooms()
+  const [featured, setFeatured] = useState([])
   const [current, setCurrent] = useState(0)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadRooms() {
+      try {
+        const data = await fetchRooms()
+        if (active) setFeatured(data.slice(0, 6))
+      } catch (error) {
+        console.error(error)
+      }
+    }
+
+    loadRooms()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
+  if (featured.length === 0) return null
 
   const next = () => setCurrent((prev) => (prev + 1) % featured.length)
   const prev = () => setCurrent((prev) => (prev - 1 + featured.length) % featured.length)
 
   const room = featured[current]
+  const roomImage = (room.images && room.images[0]) || room.main_image
 
   return (
     <section className="bg-white py-24 md:py-32">
@@ -34,7 +57,7 @@ export default function FeaturedRooms() {
               <AnimatePresence mode="wait">
                 <motion.img
                   key={room.id}
-                  src={room.images[0]}
+                  src={roomImage}
                   alt={room.name}
                   className="h-full w-full object-cover"
                   initial={{ opacity: 0, scale: 1.05 }}
@@ -64,11 +87,11 @@ export default function FeaturedRooms() {
                   </p>
                   <div className="mt-4 flex items-center justify-between">
                     <span className="font-serif text-xl text-charcoal">
-                      From ${room.price}
+                      From {room.currency} {Number(room.price || 0).toLocaleString()}
                       <span className="text-sm text-muted"> / night</span>
                     </span>
                     <Link
-                      to={`/rooms/${room.id}`}
+                      to={`/rooms/${room.slug || room.id}`}
                       className="text-xs font-medium tracking-[0.2em] uppercase text-charcoal underline-offset-4 hover:text-gold hover:underline"
                     >
                       Explore
@@ -80,33 +103,15 @@ export default function FeaturedRooms() {
 
             {/* Navigation controls */}
             <div className="mt-8 flex items-center justify-center gap-6 md:mt-0 md:absolute md:bottom-12 md:left-12">
-              <button
-                type="button"
-                onClick={prev}
-                className="flex h-12 w-12 items-center justify-center border border-charcoal/20 transition-colors hover:border-gold hover:text-gold"
-                aria-label="Previous room"
-              >
+              <button type="button" onClick={prev} className="flex h-12 w-12 items-center justify-center border border-charcoal/20 transition-colors hover:border-gold hover:text-gold" aria-label="Previous room">
                 <ChevronLeft size={20} />
               </button>
               <div className="flex gap-2">
                 {featured.map((_, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setCurrent(i)}
-                    className={`h-0.5 transition-all duration-300 ${
-                      i === current ? 'w-8 bg-gold' : 'w-4 bg-charcoal/20'
-                    }`}
-                    aria-label={`Go to slide ${i + 1}`}
-                  />
+                  <button key={i} type="button" onClick={() => setCurrent(i)} className={`h-0.5 transition-all duration-300 ${i === current ? 'w-8 bg-gold' : 'w-4 bg-charcoal/20'}`} aria-label={`Go to slide ${i + 1}`} />
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={next}
-                className="flex h-12 w-12 items-center justify-center border border-charcoal/20 transition-colors hover:border-gold hover:text-gold"
-                aria-label="Next room"
-              >
+              <button type="button" onClick={next} className="flex h-12 w-12 items-center justify-center border border-charcoal/20 transition-colors hover:border-gold hover:text-gold" aria-label="Next room">
                 <ChevronRight size={20} />
               </button>
             </div>

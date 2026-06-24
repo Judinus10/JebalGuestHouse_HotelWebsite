@@ -1,45 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import PageTransition from '../components/layout/PageTransition'
 import SectionHeading from '../components/ui/SectionHeading'
 import RoomCard from '../components/ui/RoomCard'
 import FadeUp from '../components/ui/FadeUp'
-import { fetchRooms } from '../services/roomsApi'
+import { rooms } from '../data/rooms'
 
+const roomTypes = ['All', 'Ground Floor', 'First Floor', 'Family Room', 'Private Cottage']
 
 /**
  * Rooms listing page with filter and grid layout.
  */
 export default function Rooms() {
   const [filter, setFilter] = useState('All')
-  const [rooms, setRooms] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    let active = true
-
-    async function loadRooms() {
-      try {
-        const data = await fetchRooms()
-        if (active) setRooms(data)
-      } catch (err) {
-        if (active) setError(err.message || 'Unable to load rooms.')
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
-    loadRooms()
-
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const availableTypes = useMemo(() => {
-    const types = rooms.map((room) => room.type).filter(Boolean)
-    return ['All', ...new Set(types)]
-  }, [rooms])
 
   const filtered =
     filter === 'All' ? rooms : rooms.filter((room) => room.type === filter)
@@ -77,7 +49,7 @@ export default function Rooms() {
           {/* Filter tabs */}
           <FadeUp>
             <div className="mb-12 flex flex-wrap justify-center gap-3">
-              {availableTypes.map((type) => (
+              {roomTypes.map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -94,29 +66,17 @@ export default function Rooms() {
             </div>
           </FadeUp>
 
-          {loading && (
-            <p className="py-16 text-center text-muted">Loading rooms...</p>
-          )}
+          {/* Room cards grid */}
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((room, index) => (
+              <RoomCard key={room.id} room={room} index={index} />
+            ))}
+          </div>
 
-          {error && !loading && (
-            <p className="py-16 text-center text-red-600">{error}</p>
-          )}
-
-          {!loading && !error && (
-            <>
-              {/* Room cards grid */}
-              <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((room, index) => (
-                  <RoomCard key={room.id} room={room} index={index} />
-                ))}
-              </div>
-
-              {filtered.length === 0 && (
-                <p className="py-16 text-center text-muted">
-                  No rooms found for this category.
-                </p>
-              )}
-            </>
+          {filtered.length === 0 && (
+            <p className="py-16 text-center text-muted">
+              No rooms found for this category.
+            </p>
           )}
         </div>
       </section>

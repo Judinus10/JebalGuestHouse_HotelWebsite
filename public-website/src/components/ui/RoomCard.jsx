@@ -10,10 +10,10 @@ export default function RoomCard({ room, index = 0, variant = 'default' }) {
 
   return (
     <FadeUp delay={index * 0.1}>
-      <Link to={`/rooms/${room.id}`} className="group block">
+      <Link to={`/rooms/${room.slug || room.id}`} className="group block">
         <div className="image-zoom relative aspect-[4/5] overflow-hidden bg-ice">
           <img
-            src={room.images[0]}
+            src={(room.images && room.images[0]) || room.main_image}
             alt={room.name}
             className="h-full w-full object-cover"
             loading="lazy"
@@ -21,7 +21,7 @@ export default function RoomCard({ room, index = 0, variant = 'default' }) {
           {/* Price badge */}
           <div className="absolute right-4 top-4 bg-white/95 px-4 py-2 backdrop-blur-sm">
             <span className="text-xs tracking-wider text-muted">From</span>
-            <p className="font-serif text-lg text-charcoal">${room.price}</p>
+            <p className="font-serif text-lg text-charcoal">{room.currency} {Number(room.price || 0).toLocaleString()}</p>
           </div>
         </div>
 
@@ -38,7 +38,7 @@ export default function RoomCard({ room, index = 0, variant = 'default' }) {
           <div className="flex items-center gap-4 pt-2 text-xs text-muted">
             <span className="flex items-center gap-1.5">
               <Users size={14} />
-              {room.guests} Guests
+              {room.guests || room.max_guests} Guests
             </span>
             <span className="flex items-center gap-1.5">
               <Maximize2 size={14} />

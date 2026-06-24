@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Bath,
   BedDouble,
   BriefcaseBusiness,
   Building2,
   Check,
+  ChevronLeft,
+  ChevronRight,
   Coffee,
   Eye,
   GlassWater,
@@ -24,32 +26,29 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import {
-  initialAmenities,
-  initialRoomAmenities,
-  initialRoomImages,
-  initialRooms,
-} from '@/data/roomData'
+import { initialAmenities } from '@/data/roomData'
+import { createRoom, deleteRoomById, listRooms, updateRoom } from '@/services/roomsApi'
 
 const emptyForm = {
   room_name: '',
   room_type: 'Standard',
   price_per_night: '',
   capacity: '',
+  bed_type: '',
+  currency: 'LKR',
   description: '',
   status: 'Available',
-  image_path: '',
+  images: [],
   amenity_ids: [],
 }
 
 const roomTypes = ['Ground Floor', 'First Floor', 'Family Room', 'Private Cottage']
-const roomStatuses = ['Available', 'Occupied', 'Maintenance', 'Inactive']
+const roomStatuses = ['Available', 'Unavailable', 'Maintenance']
 
 const statusVariant = {
   Available: 'success',
-  Occupied: 'info',
+  Unavailable: 'secondary',
   Maintenance: 'warning',
-  Inactive: 'secondary',
 }
 
 const amenityIcons = {
@@ -66,7 +65,7 @@ const amenityIcons = {
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'LKR',
     maximumFractionDigits: 0,
   }).format(Number(value || 0))
 }
@@ -80,11 +79,120 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
+
+function resolveImageSrc(image) {
+  if (!image) return ''
+  if (typeof image === 'string') return image
+  return image.image_url || image.url || image.image_path || ''
+}
+
+function getRoomImages(room) {
+  if (!room) return []
+
+  const records = Array.isArray(room.image_records) ? room.image_records : []
+  const urls = Array.isArray(room.images) ? room.images : []
+  const mainImage = room.image ? [room.image] : []
+  const merged = [...records, ...mainImage, ...urls]
+
+  const unique = []
+  const seen = new Set()
+
+  merged.forEach((image) => {
+    const src = resolveImageSrc(image)
+    if (!src || seen.has(src)) return
+    seen.add(src)
+    unique.push({ src, raw: image })
+  })
+
+  return unique
+}
+
+function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true }) {
+  const images = getRoomImages(room)
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [room?.id, images.length])
+
+  const hasImages = images.length > 0
+  const activeImage = hasImages ? images[Math.min(activeIndex, images.length - 1)] : null
+
+  function previousImage() {
+    if (!hasImages) return
+    setActiveIndex((current) => (current === 0 ? images.length - 1 : current - 1))
+  }
+
+  function nextImage() {
+    if (!hasImages) return
+    setActiveIndex((current) => (current === images.length - 1 ? 0 : current + 1))
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className={cn('relative overflow-hidden rounded-2xl border border-border bg-slate-100', heightClass)}>
+        {activeImage ? (
+          <img src={activeImage.src} alt={room?.room_name || 'Room'} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-slate-400">
+            <BedDouble className="h-10 w-10" />
+          </div>
+        )}
+
+        {images.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={previousImage}
+              className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-lg shadow-slate-900/15 transition hover:bg-white"
+              aria-label="Previous room image"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={nextImage}
+              className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-lg shadow-slate-900/15 transition hover:bg-white"
+              aria-label="Next room image"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+            <div className="absolute bottom-3 right-3 rounded-full bg-slate-950/70 px-3 py-1 text-xs font-semibold text-white">
+              {Math.min(activeIndex, images.length - 1) + 1} / {images.length}
+            </div>
+          </>
+        )}
+      </div>
+
+      {showThumbnails && images.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {images.map((image, index) => (
+            <button
+              type="button"
+              key={image.src}
+              onClick={() => setActiveIndex(index)}
+              className={cn(
+                'h-14 w-20 shrink-0 overflow-hidden rounded-xl border bg-slate-100 transition',
+                index === activeIndex ? 'border-primary-600 ring-2 ring-primary-600/20' : 'border-border hover:border-primary-300'
+              )}
+              aria-label={`View room image ${index + 1}`}
+            >
+              <img src={image.src} alt={`${room?.room_name || 'Room'} ${index + 1}`} className="h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RoomImage({ src, name }) {
+  const imageSrc = resolveImageSrc(src)
+
   return (
     <div className="h-14 w-20 overflow-hidden rounded-xl border border-border bg-slate-100">
-      {src ? (
-        <img src={src} alt={name} className="h-full w-full object-cover" />
+      {imageSrc ? (
+        <img src={imageSrc} alt={name} className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-slate-400">
           <BedDouble className="h-5 w-5" />
@@ -192,6 +300,7 @@ function Toast({ toast, onClose }) {
 function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
   const [form, setForm] = useState(() => room || emptyForm)
   const [errors, setErrors] = useState({})
+  const [selectedFiles, setSelectedFiles] = useState([])
 
   const isEdit = mode === 'edit'
 
@@ -232,6 +341,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
       ...form,
       price_per_night: Number(form.price_per_night),
       capacity: Number(form.capacity),
+      images: selectedFiles,
     })
   }
 
@@ -297,17 +407,19 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="image_path">Image upload mock</Label>
+              <Label htmlFor="room_images">Room images</Label>
               <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-slate-50 px-3 py-2">
                 <ImagePlus className="h-5 w-5 text-primary-600" />
                 <Input
-                  id="image_path"
-                  value={form.image_path}
-                  onChange={(e) => updateField('image_path', e.target.value)}
-                  placeholder="Paste image URL"
+                  id="room_images"
+                  type="file"
+                  multiple
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
                   className="border-0 bg-transparent p-0 shadow-none focus-visible:ring-0"
                 />
               </div>
+              {isEdit && <p className="text-xs text-text-secondary">Upload new images only if you want to add more photos.</p>}
             </div>
 
             <div className="space-y-2 md:col-span-2">
@@ -344,6 +456,36 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
             </div>
           </div>
 
+          {(isEdit || selectedFiles.length > 0) && (
+            <div className="mt-6 border-t border-border pt-5">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-text-primary">Room image preview</p>
+                  <p className="text-xs text-text-secondary">
+                    Use the arrows or thumbnails to review current room photos before saving.
+                  </p>
+                </div>
+                {selectedFiles.length > 0 && (
+                  <Badge variant="secondary">{selectedFiles.length} new selected</Badge>
+                )}
+              </div>
+
+              {selectedFiles.length > 0 ? (
+                <ImageCarousel
+                  room={{
+                    ...form,
+                    images: selectedFiles.map((file) => URL.createObjectURL(file)),
+                    image_records: [],
+                    image: null,
+                  }}
+                  heightClass="h-56"
+                />
+              ) : (
+                <ImageCarousel room={form} heightClass="h-56" />
+              )}
+            </div>
+          )}
+
           <div className="mt-6 flex flex-col-reverse gap-3 border-t border-border pt-5 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
             <Button type="submit">{isEdit ? 'Save Changes' : 'Add Room'}</Button>
@@ -372,15 +514,7 @@ function RoomDetailsModal({ room, amenities, image, onClose }) {
 
         <div className="max-h-[calc(92vh-81px)] overflow-y-auto p-6">
           <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-            <div className="overflow-hidden rounded-2xl border border-border bg-slate-100">
-              {image ? (
-                <img src={image.image_path} alt={room.room_name} className="h-72 w-full object-cover" />
-              ) : (
-                <div className="flex h-72 items-center justify-center text-slate-400">
-                  <BedDouble className="h-10 w-10" />
-                </div>
-              )}
-            </div>
+            <ImageCarousel room={room} heightClass="h-72" />
 
             <div className="space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -445,7 +579,7 @@ function DeleteDialog({ room, onCancel, onConfirm }) {
         </div>
         <h2 className="mt-4 text-lg font-bold text-text-primary">Delete room?</h2>
         <p className="mt-2 text-sm leading-6 text-text-secondary">
-          This will remove <span className="font-semibold text-text-primary">{room.room_name}</span> from the mock room list. This action only affects frontend state.
+          This will remove <span className="font-semibold text-text-primary">{room.room_name}</span> from the database and public website.
         </p>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <Button variant="outline" onClick={onCancel}>Cancel</Button>
@@ -457,9 +591,9 @@ function DeleteDialog({ room, onCancel, onConfirm }) {
 }
 
 export default function Rooms() {
-  const [rooms, setRooms] = useState(initialRooms)
-  const [roomImages, setRoomImages] = useState(initialRoomImages)
-  const [roomAmenities, setRoomAmenities] = useState(initialRoomAmenities)
+  const [rooms, setRooms] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [typeFilter, setTypeFilter] = useState('All')
@@ -475,18 +609,51 @@ export default function Rooms() {
     window.setTimeout(() => setToast(null), 2800)
   }
 
-  const roomTypeOptions = useMemo(() => ['All', ...new Set(rooms.map((room) => room.room_type))], [rooms])
+  async function loadRooms() {
+    setLoading(true)
+    setLoadError('')
+
+    try {
+      const data = await listRooms()
+      setRooms(data)
+    } catch (error) {
+      setLoadError(error.message || 'Unable to load rooms.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadRooms()
+  }, [])
+
+  const roomTypeOptions = useMemo(() => ['All', ...new Set(rooms.map((room) => room.room_type || room.type).filter(Boolean))], [rooms])
   const roomStatusOptions = ['All', ...roomStatuses]
 
   const enrichedRooms = useMemo(() => {
     return rooms.map((room) => {
-      const image = roomImages.find((item) => item.room_id === room.id && item.is_main)
-      const amenityIds = roomAmenities.filter((item) => item.room_id === room.id).map((item) => item.amenity_id)
+      const amenityNames = Array.isArray(room.amenities) ? room.amenities : []
+      const amenityIds = initialAmenities
+        .filter((amenity) => amenityNames.includes(amenity.amenity_name))
+        .map((amenity) => amenity.id)
       const amenities = initialAmenities.filter((amenity) => amenityIds.includes(amenity.id))
+      const imageRecords = Array.isArray(room.image_records) ? room.image_records : []
+      const imageUrls = Array.isArray(room.images) ? room.images : []
+      const image = imageRecords[0] || room.image || (room.main_image ? { image_url: room.main_image } : null)
 
-      return { ...room, image, amenities, amenity_ids: amenityIds }
+      return {
+        ...room,
+        image_records: imageRecords,
+        images: imageUrls,
+        room_type: room.room_type || room.type,
+        price_per_night: room.price_per_night ?? room.base_price ?? room.price,
+        capacity: room.capacity ?? room.max_guests ?? room.guests,
+        image,
+        amenities,
+        amenity_ids: amenityIds,
+      }
     })
-  }, [rooms, roomImages, roomAmenities])
+  }, [rooms])
 
   const filteredRooms = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -509,7 +676,11 @@ export default function Rooms() {
     setOpenActionsId(null)
     setSelectedRoom({
       ...room,
-      image_path: room.image?.image_path || '',
+      room_type: room.room_type || room.type || 'Ground Floor',
+      price_per_night: room.price_per_night ?? room.base_price ?? room.price,
+      capacity: room.capacity ?? room.max_guests ?? room.guests,
+      bed_type: room.bed_type || room.beds || '',
+      currency: room.currency || 'LKR',
       amenity_ids: room.amenity_ids || [],
     })
     setFormMode('edit')
@@ -520,91 +691,51 @@ export default function Rooms() {
     setSelectedRoom(null)
   }
 
-  function handleSubmitRoom(form) {
-    const now = new Date().toISOString()
-    const amenitySummary = initialAmenities
+  async function handleSubmitRoom(form) {
+    const amenityNames = initialAmenities
       .filter((amenity) => form.amenity_ids.includes(amenity.id))
       .map((amenity) => amenity.amenity_name)
-      .join(', ')
 
-    if (formMode === 'edit') {
-      setRooms((current) => current.map((room) => (
-        room.id === selectedRoom.id
-          ? {
-              ...room,
-              room_name: form.room_name,
-              room_type: form.room_type,
-              price_per_night: form.price_per_night,
-              capacity: form.capacity,
-              description: form.description,
-              amenities_summary: amenitySummary,
-              status: form.status,
-              updated_at: now,
-            }
-          : room
-      )))
+    const payload = new FormData()
+    if (formMode === 'edit') payload.append('id', selectedRoom.id)
+    payload.append('room_name', form.room_name)
+    payload.append('description', form.description)
+    payload.append('max_guests', form.capacity)
+    payload.append('capacity', form.capacity)
+    payload.append('bed_type', form.bed_type || form.room_type)
+    payload.append('base_price', form.price_per_night)
+    payload.append('price_per_night', form.price_per_night)
+    payload.append('currency', form.currency || 'LKR')
+    payload.append('amenities', JSON.stringify(amenityNames))
+    payload.append('status', form.status)
+    payload.append('sort_order', form.sort_order || 0)
 
-      setRoomImages((current) => {
-        const exists = current.some((image) => image.room_id === selectedRoom.id && image.is_main)
-        if (!form.image_path) return current.filter((image) => !(image.room_id === selectedRoom.id && image.is_main))
-        if (exists) {
-          return current.map((image) => image.room_id === selectedRoom.id && image.is_main ? { ...image, image_path: form.image_path } : image)
-        }
-        return [...current, { id: Date.now(), room_id: selectedRoom.id, image_path: form.image_path, is_main: true, sort_order: 1, created_at: now }]
-      })
+    ;(form.images || []).forEach((file) => payload.append('images[]', file))
 
-      setRoomAmenities((current) => {
-        const withoutRoom = current.filter((item) => item.room_id !== selectedRoom.id)
-        const nextLinks = form.amenity_ids.map((amenityId, index) => ({
-          id: Date.now() + index,
-          room_id: selectedRoom.id,
-          amenity_id: amenityId,
-        }))
-        return [...withoutRoom, ...nextLinks]
-      })
-
-      showToast('Room updated', `${form.room_name} was updated successfully.`)
-    } else {
-      const nextRoomId = Math.max(0, ...rooms.map((room) => room.id)) + 1
-      const nextRoom = {
-        id: nextRoomId,
-        room_name: form.room_name,
-        room_type: form.room_type,
-        price_per_night: form.price_per_night,
-        capacity: form.capacity,
-        description: form.description,
-        amenities_summary: amenitySummary,
-        status: form.status,
-        created_at: now,
-        updated_at: now,
+    try {
+      if (formMode === 'edit') {
+        await updateRoom(payload)
+        showToast('Room updated', `${form.room_name} was updated successfully.`)
+      } else {
+        await createRoom(payload)
+        showToast('Room added', `${form.room_name} was added successfully.`)
       }
-
-      setRooms((current) => [nextRoom, ...current])
-
-      if (form.image_path) {
-        setRoomImages((current) => [
-          { id: Date.now(), room_id: nextRoomId, image_path: form.image_path, is_main: true, sort_order: 1, created_at: now },
-          ...current,
-        ])
-      }
-
-      setRoomAmenities((current) => [
-        ...form.amenity_ids.map((amenityId, index) => ({ id: Date.now() + index, room_id: nextRoomId, amenity_id: amenityId })),
-        ...current,
-      ])
-
-      showToast('Room added', `${form.room_name} was added successfully.`)
+      closeFormModal()
+      await loadRooms()
+    } catch (error) {
+      showToast('Room save failed', error.message || 'Unable to save room.')
     }
-
-    closeFormModal()
   }
 
-  function confirmDeleteRoom() {
-    setRooms((current) => current.filter((room) => room.id !== deleteRoom.id))
-    setRoomImages((current) => current.filter((image) => image.room_id !== deleteRoom.id))
-    setRoomAmenities((current) => current.filter((item) => item.room_id !== deleteRoom.id))
-    showToast('Room deleted', `${deleteRoom.room_name} was removed from the mock list.`)
-    setDeleteRoom(null)
+  async function confirmDeleteRoom() {
+    try {
+      await deleteRoomById(deleteRoom.id)
+      showToast('Room deleted', `${deleteRoom.room_name} was removed.`)
+      setDeleteRoom(null)
+      await loadRooms()
+    } catch (error) {
+      showToast('Delete failed', error.message || 'Unable to delete room.')
+    }
   }
 
   return (
@@ -642,6 +773,15 @@ export default function Rooms() {
         </select>
       </div>
 
+      {loading && (
+        <div className="rounded-2xl border border-border bg-white p-8 text-center text-sm text-text-secondary shadow-sm shadow-slate-200/60">Loading rooms from database...</div>
+      )}
+
+      {loadError && !loading && (
+        <div className="rounded-2xl border border-red-200 bg-white p-8 text-center text-sm font-medium text-red-600 shadow-sm shadow-slate-200/60">{loadError}</div>
+      )}
+
+      {!loading && !loadError && (
       <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm shadow-slate-200/60">
         <div className="overflow-x-auto">
           <table className="min-w-[980px] w-full text-left text-sm">
@@ -661,7 +801,7 @@ export default function Rooms() {
                 <tr key={room.id} className="transition hover:bg-slate-50/80">
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <RoomImage src={room.image?.image_path} name={room.room_name} />
+                      <RoomImage src={room.image} name={room.room_name} />
                       <div>
                         <p className="font-semibold text-text-primary">{room.room_name}</p>
                         <p className="mt-0.5 text-xs text-text-secondary">Updated {formatDate(room.updated_at)}</p>
@@ -715,6 +855,7 @@ export default function Rooms() {
           </div>
         )}
       </div>
+      )}
 
       {formMode && (
         <RoomFormModal
