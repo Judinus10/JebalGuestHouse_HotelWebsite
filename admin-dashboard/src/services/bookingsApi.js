@@ -1,17 +1,41 @@
 import { bookingRooms } from '@/data/bookingData'
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
-const API_BASE_URL = buildApiUrl('/bookings')
+const BOOKINGS_API_BASE_URL = buildApiUrl('/bookings')
+const PUBLIC_BOOKING_URL = buildApiUrl('/submit-booking.php')
+
+export const paymentStatusOptions = ['pending', 'paid', 'failed', 'cancelled', 'refunded']
+export const paymentMethodOptions = ['PayHere', 'Cash', 'Bank Transfer']
 
 function normalizeBookingStatus(status) {
-  const value = String(status || 'pending').trim().toLowerCase().replace(/\s+/g, '_')
+  const value = String(status || 'pending')
+    .trim()
+    .toLowerCase()
+    .replace(/^booking\s+/, '')
+    .replace(/^payment\s+/, '')
+    .replace(/\s+/g, '_')
 
   if (value === 'confirmed') return 'confirmed'
   if (value === 'cancelled' || value === 'canceled') return 'cancelled'
+
+  // Some API rows may expose the payment status in a generic `status` field.
+  // Do not show that as the booking status. Treat it as a pending booking instead.
+  if (['paid', 'failed', 'refunded', 'unpaid', 'pending'].includes(value)) return 'pending'
+
   return 'pending'
 }
 
-function normalizePaymentStatus(status) {
+export function toApiPaymentStatus(status) {
+  const value = String(status || 'pending').trim().toLowerCase().replace(/^payment\s+/, '').replace(/\s+/g, '_')
+
+  if (value === 'paid') return 'Paid'
+  if (value === 'failed') return 'Failed'
+  if (value === 'cancelled' || value === 'canceled') return 'Cancelled'
+  if (value === 'refunded') return 'Refunded'
+  return 'Payment Pending'
+}
+
+export function normalizePaymentStatus(status) {
   const value = String(status || 'Payment Pending')
     .trim()
     .toLowerCase()
@@ -50,8 +74,8 @@ export function normalizeBooking(booking) {
   const totalNights = Number(booking.total_nights || booking.nights || calculateNights(checkIn, checkOut))
 
   return {
-    id: Number(booking.id || 0),
-    booking_no: booking.booking_no || booking.bookingNo || `BK-${String(booking.id || 0).padStart(5, '0')}`,
+    id: Number(booking.id || booking.booking_id || 0),
+    booking_no: booking.booking_no || booking.bookingNo || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`,
     guest_name: booking.guest_name || booking.full_name || booking.name || 'Guest',
     guest_email: booking.guest_email || booking.email || '',
     guest_phone: booking.guest_phone || booking.phone || '',
@@ -70,6 +94,7 @@ export function normalizeBooking(booking) {
     total_nights: totalNights,
     booking_status: normalizeBookingStatus(booking.booking_status || booking.status),
     payment_status: normalizePaymentStatus(booking.payment_status),
+    payment_method: booking.payment_method || booking.method || '',
     total_amount: Number(booking.total_amount || booking.amount || 0),
     payment_currency: booking.payment_currency || booking.currency || 'LKR',
     special_requests: booking.special_requests || booking.special_request || booking.message || '',
@@ -83,19 +108,57 @@ export function normalizeBooking(booking) {
 }
 
 export async function fetchBookings() {
-  const response = await apiFetch(`${API_BASE_URL}/list.php`, {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/list.php`, {
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
+    headers: { Accept: 'application/json' },
   })
 
   const payload = await readJsonResponse(response)
   return (payload.data || []).map(normalizeBooking)
 }
 
+export async function createManualBooking(formData) {
+  const payload = {
+    full_name: formData.full_name,
+    email: formData.email,
+    phone: formData.phone,
+    room_name: formData.room_name,
+    check_in_date: formData.check_in_date,
+    check_out_date: formData.check_out_date,
+    guests: Number(formData.guests || 1),
+    message: formData.message || '',
+    payment_status: toApiPaymentStatus(formData.payment_status || 'pending'),
+    payment_method: formData.payment_method || 'Cash',
+  }
+
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/create-manual.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const result = await readJsonResponse(response)
+  return normalizeBooking(result.data || result)
+}
+
+export async function createPublicBooking(formData) {
+  const response = await apiFetch(PUBLIC_BOOKING_URL, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(formData),
+  })
+
+  return readJsonResponse(response)
+}
+
 export async function updateBookingStatus(bookingId, status) {
-  const response = await apiFetch(`${API_BASE_URL}/update-status.php`, {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/update-status.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -113,8 +176,32 @@ export async function updateBookingStatus(bookingId, status) {
   }
 }
 
+export async function updatePaymentStatus(bookingId, paymentStatus, paymentMethod = '') {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/update-payment-status.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      id: bookingId,
+      payment_status: toApiPaymentStatus(paymentStatus),
+      payment_method: paymentMethod,
+    }),
+  })
+
+  const payload = await readJsonResponse(response)
+  const data = payload.data || {}
+
+  return {
+    id: Number(data.id || bookingId),
+    payment_status: normalizePaymentStatus(data.payment_status || paymentStatus),
+    payment_method: data.payment_method || paymentMethod,
+  }
+}
+
 export async function deleteBooking(bookingId) {
-  const response = await apiFetch(`${API_BASE_URL}/delete.php`, {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/delete.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
