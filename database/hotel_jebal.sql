@@ -499,3 +499,20 @@ INSERT INTO `website_settings` (`setting_key`, `setting_value`) VALUES
 ('instagram_link', ''),
 ('map_embed_url', '')
 ON DUPLICATE KEY UPDATE `setting_value` = VALUES(`setting_value`);
+
+CREATE TABLE IF NOT EXISTS admin_password_otps (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  admin_id INT NOT NULL,
+  email VARCHAR(255) NOT NULL,
+  otp_hash VARCHAR(255) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  used_at DATETIME NULL,
+  attempts INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_admin_id (admin_id),
+  INDEX idx_email (email),
+  INDEX idx_expires_at (expires_at)
+);
+
+ALTER TABLE admin_password_otps
+ADD COLUMN expires_at_epoch INT NOT NULL DEFAULT 0 AFTER expires_at;
