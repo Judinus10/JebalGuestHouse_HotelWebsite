@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Bell,
@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 
 const initialActivities = [
   {
@@ -161,6 +160,7 @@ export default function Notifications() {
   const [typeFilter, setTypeFilter] = useState('All Types')
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [toast, setToast] = useState('')
+  const [openActionId, setOpenActionId] = useState(null)
 
   const stats = useMemo(
     () => ({
@@ -188,6 +188,20 @@ export default function Notifications() {
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   }, [activities, search, typeFilter, statusFilter])
+
+
+  useEffect(() => {
+    if (!openActionId) return
+
+    const handleOutsideClick = (event) => {
+      if (!event.target.closest('[data-notification-action-menu]')) {
+        setOpenActionId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [openActionId])
 
   const showToast = (message) => {
     setToast(message)
@@ -291,32 +305,55 @@ export default function Notifications() {
                       <td className="whitespace-nowrap px-4 py-3 text-text-secondary">{formatDate(item.created_at)}</td>
                       <td className="whitespace-nowrap px-4 py-3"><Badge variant={statusVariants[item.status]}>{item.status}</Badge></td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <Dropdown
-                          align="right"
-                          trigger={
-                            <Button size="sm" variant="outline" className="h-9 gap-2">
-                              Actions
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          }
-                        >
-                          {(close) => (
-                            <>
-                              <DropdownItem onClick={() => { setSelectedActivity(item); close() }}>
-                                <Eye className="h-4 w-4" />
+                        <div className="relative inline-block text-left" data-notification-action-menu>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-9 gap-2"
+                            onClick={() => setOpenActionId((current) => (current === item.id ? null : item.id))}
+                          >
+                            Actions
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+
+                          {openActionId === item.id && (
+                            <div className="absolute right-0 z-30 mt-2 w-44 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedActivity(item)
+                                  setOpenActionId(null)
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
+                              >
+                                <Eye className="h-4 w-4 text-primary-600" />
                                 View
-                              </DropdownItem>
-                              <DropdownItem onClick={() => { markViewed(item.id); close() }}>
-                                <CheckCircle2 className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  markViewed(item.id)
+                                  setOpenActionId(null)
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
+                              >
+                                <CheckCircle2 className="h-4 w-4 text-primary-600" />
                                 Mark Read
-                              </DropdownItem>
-                              <DropdownItem destructive onClick={() => { close(); deleteActivity(item.id) }}>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenActionId(null)
+                                  deleteActivity(item.id)
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                              >
                                 <Trash2 className="h-4 w-4" />
                                 Delete
-                              </DropdownItem>
-                            </>
+                              </button>
+                            </div>
                           )}
-                        </Dropdown>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -328,7 +365,12 @@ export default function Notifications() {
       </Card>
 
       {selectedActivity && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedActivity(null)
+          }}
+        >
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-border p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

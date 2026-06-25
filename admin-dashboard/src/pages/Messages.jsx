@@ -151,6 +151,19 @@ export default function Messages() {
     loadInquiries()
   }, [])
 
+  useEffect(() => {
+    if (!openActionId) return
+
+    const handleOutsideClick = (event) => {
+      if (!event.target.closest('[data-message-action-menu]')) {
+        setOpenActionId(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [openActionId])
+
   const updateStatus = async (id, status) => {
     try {
       const response = await apiFetch(`${API_BASE_URL}/contact/update_enquiry_status.php`, {
@@ -314,7 +327,7 @@ export default function Messages() {
                         <Badge variant={statusVariant[item.status]}>{item.status}</Badge>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="relative inline-block text-left">
+                        <div className="relative inline-block text-left" data-message-action-menu>
                           <Button
                             size="sm"
                             variant="outline"
@@ -384,7 +397,12 @@ export default function Messages() {
       </Card>
 
       {selectedInquiry && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedInquiry(null)
+          }}
+        >
           <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-border p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

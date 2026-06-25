@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Bath,
   BedDouble,
@@ -239,8 +239,23 @@ function AmenitiesPreview({ amenities }) {
 }
 
 function RoomActionsDropdown({ room, isOpen, onToggle, onView, onEdit, onDelete }) {
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        onToggle()
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isOpen, onToggle])
+
   return (
-    <div className="relative inline-flex justify-end">
+    <div ref={dropdownRef} className="relative inline-flex justify-end">
       <Button type="button" variant="outline" size="sm" onClick={onToggle} className="gap-2">
         Actions
         <MoreHorizontal className="h-4 w-4" />
@@ -346,8 +361,8 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-text-primary">{isEdit ? 'Edit Room' : 'Add Room'}</h2>
@@ -500,8 +515,8 @@ function RoomDetailsModal({ room, amenities, image, onClose }) {
   if (!room) return null
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-text-primary">Room Details</h2>
@@ -572,8 +587,8 @@ function DeleteDialog({ room, onCancel, onConfirm }) {
   if (!room) return null
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl shadow-slate-950/20">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onCancel}>
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl shadow-slate-950/20" onClick={(event) => event.stopPropagation()}>
         <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-700">
           <Trash2 className="h-5 w-5" />
         </div>

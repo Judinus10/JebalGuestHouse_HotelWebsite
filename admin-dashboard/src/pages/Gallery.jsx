@@ -342,8 +342,8 @@ export default function Gallery() {
       ) : null}
 
       {folderModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm" onClick={() => setFolderModal(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-border p-6">
               <div><h2 className="text-xl font-bold">{folderModal.mode === 'add' ? 'Add Gallery Folder' : 'Edit Gallery Folder'}</h2><p className="mt-1 text-sm text-text-secondary">Saved directly to database.</p></div>
               <button type="button" onClick={() => setFolderModal(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
@@ -358,8 +358,8 @@ export default function Gallery() {
       ) : null}
 
       {imageModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm" onClick={() => setImageModal(null)}>
+          <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4 border-b border-border p-6">
               <div><h2 className="text-xl font-bold">{imageModal.mode === 'add' ? 'Upload Gallery Images' : 'Edit Gallery Image'}</h2><p className="mt-1 text-sm text-text-secondary">Images are stored in api/uploads/gallery/.</p></div>
               <button type="button" onClick={() => setImageModal(null)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"><X className="h-5 w-5" /></button>
@@ -405,8 +405,8 @@ export default function Gallery() {
       ) : null}
 
       {deleteTarget ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm" onClick={() => setDeleteTarget(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <h2 className="text-lg font-bold">Delete {deleteTarget.type === 'folder' ? 'Folder' : 'Image'}</h2>
             <p className="mt-2 text-sm text-text-secondary">This will delete it from database{deleteTarget.type === 'folder' ? ' and remove images inside that folder' : ' and remove the uploaded file'}.</p>
             <div className="mt-6 flex justify-end gap-3"><Button type="button" variant="outline" onClick={() => setDeleteTarget(null)}>Cancel</Button><Button type="button" variant="destructive" onClick={confirmDelete} disabled={saving}>{saving ? 'Deleting...' : 'Delete'}</Button></div>
