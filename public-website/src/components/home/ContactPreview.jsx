@@ -59,24 +59,23 @@ export default function ContactPreview() {
                   allowFullScreen
                 />
               ) : (
-                <>
-                  <img
-                    src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80"
-                    alt="Map location placeholder"
-                    className="h-full w-full object-cover opacity-60"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center bg-charcoal/10">
-                    <div className="bg-white px-8 py-6 text-center shadow-lg">
-                      <MapPin className="mx-auto text-gold" size={28} />
-                      <p className="mt-3 font-serif text-lg text-charcoal">
-                        {settings.business_name}
-                      </p>
-                      <p className="mt-1 text-xs text-muted">
-                        {settings.address || 'Sri Lanka'}
-                      </p>
-                    </div>
+                <div className="flex h-full w-full items-center justify-center bg-ice px-8 text-center">
+                  <div>
+                    <MapPin className="mx-auto text-gold" size={34} />
+
+                    <p className="mt-4 font-serif text-2xl text-charcoal">
+                      {settings.business_name}
+                    </p>
+
+                    <p className="mt-2 text-sm leading-relaxed text-muted">
+                      {settings.address || 'Location details will be updated soon.'}
+                    </p>
+
+                    <Button to="/contact" variant="outline" className="mt-6">
+                      View Contact Details
+                    </Button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </FadeUp>

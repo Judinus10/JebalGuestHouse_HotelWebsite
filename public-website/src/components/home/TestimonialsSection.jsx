@@ -17,13 +17,37 @@ export default function TestimonialsSection() {
 
   const testimonial = testimonials[current]
 
+  const renderStars = (rating) => {
+    return Array.from({ length: 5 }).map((_, i) => {
+      const starValue = i + 1
+      const isFull = rating >= starValue
+      const isHalf = rating >= starValue - 0.5 && rating < starValue
+
+      return (
+        <span key={i} className="relative inline-flex">
+          <Star size={16} className="text-gold/30" />
+
+          {isFull && (
+            <Star
+              size={16}
+              className="absolute left-0 top-0 fill-gold text-gold"
+            />
+          )}
+
+          {isHalf && (
+            <span className="absolute left-0 top-0 w-1/2 overflow-hidden">
+              <Star size={16} className="fill-gold text-gold" />
+            </span>
+          )}
+        </span>
+      )
+    })
+  }
+
   return (
     <section className="pattern-diamond py-24 md:py-32">
       <div className="mx-auto max-w-4xl px-6 text-center">
-        <SectionHeading
-          subtitle="Guest Stories"
-          title="What Our Guests Say"
-        />
+        <SectionHeading subtitle="Guest Stories" title="What Our Guests Say" />
 
         <FadeUp>
           <div className="relative mt-8">
@@ -35,11 +59,8 @@ export default function TestimonialsSection() {
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ duration: 0.5 }}
               >
-                {/* Star rating */}
                 <div className="mb-6 flex justify-center gap-1">
-                  {Array.from({ length: testimonial.rating }).map((_, i) => (
-                    <Star key={i} size={16} className="fill-gold text-gold" />
-                  ))}
+                  {renderStars(testimonial.rating)}
                 </div>
 
                 <blockquote className="font-serif text-xl leading-relaxed text-charcoal md:text-2xl lg:text-3xl">
@@ -55,7 +76,6 @@ export default function TestimonialsSection() {
               </motion.div>
             </AnimatePresence>
 
-            {/* Navigation */}
             <div className="mt-10 flex items-center justify-center gap-6">
               <button
                 type="button"
@@ -65,6 +85,7 @@ export default function TestimonialsSection() {
               >
                 <ChevronLeft size={24} />
               </button>
+
               <div className="flex gap-2">
                 {testimonials.map((_, i) => (
                   <button
@@ -78,6 +99,7 @@ export default function TestimonialsSection() {
                   />
                 ))}
               </div>
+
               <button
                 type="button"
                 onClick={next}

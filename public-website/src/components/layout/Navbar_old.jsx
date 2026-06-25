@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import Button from '../ui/Button'
 import LanguageSwitcher from './LanguageSwitcher'
-import logo from '../../assets/logo.png'
 
 const navLinks = [
   { label: 'Home', path: '/' },
@@ -55,13 +54,24 @@ export default function Navbar() {
       >
         <nav className="navbar-inner">
           <Link to="/" className="navbar-logo" data-no-translate>
-            <img
-              src={logo}
-              alt="Jebal Guest House"
-              className={`navbar-logo-image ${
-                showSolid || mobileOpen ? 'dark' : 'light'
-              }`}
-            />
+            <span
+              className={
+                showSolid || mobileOpen
+                  ? 'logo-title dark'
+                  : 'logo-title light'
+              }
+            >
+              Jebal Guest House
+            </span>
+            <span
+              className={
+                showSolid || mobileOpen
+                  ? 'logo-sub dark'
+                  : 'logo-sub light'
+              }
+            >
+              Guest House
+            </span>
           </Link>
 
           <ul className="navbar-links">

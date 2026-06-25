@@ -99,6 +99,7 @@ body {
   color: rgb(255 255 255 / 60%);
 }
 
+
 /* ==========================================
    LANGUAGE SWITCHER
 ========================================== */
@@ -170,15 +171,11 @@ html[dir='rtl'] .language-switcher-option {
   text-align: right;
 }
 
-/* ==========================================
-   MAIN NAVBAR
-========================================== */
-
 .navbar-main {
   position: sticky;
   top: 0;
   z-index: 50;
-  transition: background-color 0.35s ease, box-shadow 0.35s ease;
+  transition: all 0.4s ease;
 }
 
 .navbar-solid {
@@ -191,7 +188,7 @@ html[dir='rtl'] .language-switcher-option {
   background: transparent;
 }
 
-/* Homepage navbar overlays hero */
+/* Homepage navbar must overlay the hero instead of taking layout space. */
 .navbar-home.navbar-transparent {
   position: absolute;
   top: 0;
@@ -209,33 +206,16 @@ html[dir='rtl'] .language-switcher-option {
   max-width: 80rem;
   padding: 1.25rem 1.5rem;
   display: grid;
-  grid-template-columns: 220px 1fr 260px;
+  grid-template-columns: 260px 1fr 260px;
   align-items: center;
 }
 
 .navbar-logo {
   display: flex;
-  align-items: center;
-  justify-content: flex-start;
+  flex-direction: column;
   text-decoration: none;
-  margin-left: -20px;
 }
 
-.navbar-logo-image {
-  display: block;
-  width: auto;
-  height: 62px;
-  object-fit: contain;
-}
-
-/* Same logo size in all navbar states to stop jumping */
-.navbar-home .navbar-logo-image,
-.navbar-solid .navbar-logo-image,
-.navbar-transparent .navbar-logo-image {
-  height: 62px;
-}
-
-/* old text logo styles kept harmless */
 .logo-title {
   font-family: var(--font-serif);
   font-size: 3rem;
@@ -323,44 +303,12 @@ html[dir='rtl'] .language-switcher-option {
   display: none;
 }
 
-/* ==========================================
-   HOME PAGE NAVBAR FIX
-========================================== */
-
-.home-hide-topbar {
-  display: none;
-}
-
-.home-reserve-btn {
-  color: white !important;
-  border-color: white !important;
-}
-
-.home-reserve-btn:hover {
-  background: white !important;
-  color: var(--color-charcoal) !important;
-}
-
-/* ==========================================
-   MOBILE
-========================================== */
-
+/* Mobile */
 @media (max-width: 1024px) {
   .navbar-inner {
     display: flex;
     justify-content: space-between;
     align-items: center;
-  }
-
-  .navbar-logo {
-    margin-left: 0;
-  }
-
-  .navbar-logo-image,
-  .navbar-home .navbar-logo-image,
-  .navbar-solid .navbar-logo-image,
-  .navbar-transparent .navbar-logo-image {
-    height: 56px;
   }
 
   .navbar-links {
@@ -403,12 +351,22 @@ html[dir='rtl'] .language-switcher-option {
     font-size: 2.25rem;
   }
 }
+/* ==========================================
+   HOME PAGE NAVBAR FIX
+========================================== */
 
-@media (max-width: 768px) {
-  .navbar-logo-image,
-  .navbar-home .navbar-logo-image,
-  .navbar-solid .navbar-logo-image,
-  .navbar-transparent .navbar-logo-image {
-    height: 48px;
-  }
+/* Hide top black utility bar on homepage */
+.home-hide-topbar {
+  display: none;
+}
+
+/* Make reserve button white on homepage */
+.home-reserve-btn {
+  color: white !important;
+  border-color: white !important;
+}
+
+.home-reserve-btn:hover {
+  background: white !important;
+  color: var(--color-charcoal) !important;
 }
