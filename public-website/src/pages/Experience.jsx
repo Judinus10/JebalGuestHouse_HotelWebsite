@@ -28,7 +28,7 @@ export default function Experience() {
     <PageTransition>
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
-          src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1920&q=80"
+          src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=85"
           alt="Experience Jaffna"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />

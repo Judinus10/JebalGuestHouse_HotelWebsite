@@ -4,7 +4,7 @@ import SectionHeading from '../components/ui/SectionHeading'
 import FadeUp from '../components/ui/FadeUp'
 import { fetchPublicGallery } from '../services/galleryApi'
 
-const fallbackHero = 'https://images.unsplash.com/photo-1582719508461-905c673771fd?w=1920&q=80'
+const fallbackHero = 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1920&q=85'
 
 export default function Gallery() {
   const [folders, setFolders] = useState([])

@@ -83,7 +83,7 @@ export default function Rooms() {
       {/* Page header banner */}
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
-          src="https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1920&q=80"
+          src="https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1920&q=85"
           alt="Jebal Guest House guest rooms"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />

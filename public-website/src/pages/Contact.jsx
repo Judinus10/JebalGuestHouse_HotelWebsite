@@ -129,7 +129,7 @@ export default function Contact() {
     <PageTransition>
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
-          src="https://images.unsplash.com/photo-1423666639043-560641683e4c?w=1920&q=80"
+         src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=85"
           alt="Contact us"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />
