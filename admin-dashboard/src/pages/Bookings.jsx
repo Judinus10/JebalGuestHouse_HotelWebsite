@@ -30,6 +30,7 @@ import {
   deleteBooking,
   fetchBookings,
   paymentMethodOptions,
+  updateBookingAndPaymentStatus,
   updateBookingStatus,
   updatePaymentStatus,
 } from '@/services/bookingsApi'
@@ -65,6 +66,7 @@ const paymentStatusVariant = {
   failed: 'destructive',
   cancelled: 'secondary',
   refunded: 'secondary',
+  no_pay: 'secondary',
 }
 
 const emptyManualBooking = {
@@ -82,7 +84,14 @@ const emptyManualBooking = {
 
 function formatDate(date, formatter = dateFormatter) {
   if (!date) return '-'
-  const parsed = new Date(`${date}T00:00:00`)
+
+  const rawValue = String(date).trim()
+  if (!rawValue || rawValue === '0000-00-00' || rawValue === '0000-00-00 00:00:00') return '-'
+
+  // API can return either YYYY-MM-DD or full MySQL datetime.
+  // Do not blindly append T00:00:00 to a datetime string; that turns valid DB values into Invalid Date.
+  const dateOnly = rawValue.includes(' ') ? rawValue.split(' ')[0] : rawValue.split('T')[0]
+  const parsed = new Date(`${dateOnly}T00:00:00`)
   if (Number.isNaN(parsed.getTime())) return '-'
   return formatter.format(parsed)
 }
@@ -118,6 +127,7 @@ function humanizePaymentStatus(value) {
   if (normalized === 'failed') return 'Failed'
   if (normalized === 'cancelled' || normalized === 'canceled') return 'Cancelled'
   if (normalized === 'refunded') return 'Refunded'
+  if (normalized === 'no_pay' || normalized === 'nopay' || normalized === 'no_payment') return 'No Pay'
   return 'Payment Pending'
 }
 
@@ -209,8 +219,8 @@ function FieldError({ message }) {
 
 function Modal({ title, description, children, onClose, size = 'max-w-3xl' }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className={`max-h-[90vh] w-full ${size} overflow-hidden rounded-2xl bg-white shadow-2xl`}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className={`max-h-[90vh] w-full ${size} overflow-hidden rounded-2xl bg-white shadow-2xl`} onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between border-b border-border px-6 py-5">
           <div>
             <h2 className="text-lg font-bold text-text-primary">{title}</h2>
@@ -265,8 +275,22 @@ function SummaryCard({ title, value, icon: Icon, description }) {
   )
 }
 
-function ActionsDropdown({ booking, onView, onEditStatus, onEditPayment, onCancel }) {
+function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
   const [open, setOpen] = useState(false)
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const handleOutsideClick = (event) => {
+      if (!dropdownRef.current?.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    return () => document.removeEventListener('mousedown', handleOutsideClick)
+  }, [open])
 
   const handleAction = (callback) => {
     callback()
@@ -274,7 +298,7 @@ function ActionsDropdown({ booking, onView, onEditStatus, onEditPayment, onCance
   }
 
   return (
-    <div className="relative flex justify-end">
+    <div ref={dropdownRef} className="relative flex justify-end">
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
         <MoreVertical className="h-4 w-4" />
         Actions
@@ -286,13 +310,9 @@ function ActionsDropdown({ booking, onView, onEditStatus, onEditPayment, onCance
             <Eye className="h-4 w-4 text-blue-700" />
             View Details
           </button>
-          <button type="button" onClick={() => handleAction(onEditStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
+          <button type="button" onClick={() => handleAction(onUpdateStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            Update Booking Status
-          </button>
-          <button type="button" onClick={() => handleAction(onEditPayment)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
-            <WalletCards className="h-4 w-4 text-blue-700" />
-            Update Payment
+            Update Status
           </button>
           <button
             type="button"
@@ -409,6 +429,99 @@ function PaymentStatusModal({ booking, onClose, onSave }) {
         <div className="flex justify-end gap-3 pt-2">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="submit">Save Payment</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+
+function CombinedStatusModal({ booking, focus = 'booking', onClose, onSave }) {
+  const [bookingStatus, setBookingStatus] = useState(booking.booking_status || 'pending')
+  const [paymentStatus, setPaymentStatus] = useState(booking.payment_status || 'pending')
+  const [paymentMethod, setPaymentMethod] = useState(booking.payment_method || 'Cash')
+  const [reference, setReference] = useState('')
+  const [remarks, setRemarks] = useState('')
+  const [sendEmail, setSendEmail] = useState(true)
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+
+    if (booking.booking_status !== 'cancelled' && bookingStatus === 'cancelled') {
+      const confirmed = window.confirm('Cancel this booking? The customer can be notified by email if Send email is checked.')
+      if (!confirmed) return
+    }
+
+    onSave(booking.id, {
+      booking_status: bookingStatus,
+      payment_status: paymentStatus,
+      payment_method: paymentMethod,
+      transaction_reference: reference.trim(),
+      remarks: remarks.trim(),
+      send_email: sendEmail,
+    })
+  }
+
+  return (
+    <Modal title="Update booking & payment status" description={`${booking.booking_no} · ${booking.guest_name}`} onClose={onClose} size="max-w-2xl">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="rounded-xl border border-border bg-slate-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-text-primary">{booking.room_name}</p>
+              <p className="mt-1 text-sm text-text-secondary">{formatDate(booking.check_in)} - {formatDate(booking.check_out)}</p>
+            </div>
+            <p className="text-lg font-bold text-text-primary">{formatMoney(booking.total_amount)}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Booking status</Label>
+            <select autoFocus={focus === 'booking'} value={bookingStatus} onChange={(event) => setBookingStatus(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+              {bookingStatuses.map((status) => (
+                <option key={status} value={status}>{humanizeBookingStatus(status)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Payment status</Label>
+            <select autoFocus={focus === 'payment'} value={paymentStatus} onChange={(event) => setPaymentStatus(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+              {paymentStatuses.map((status) => (
+                <option key={status} value={status}>{humanizePaymentStatus(status)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Payment method</Label>
+            <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+              {paymentMethodOptions.map((method) => (
+                <option key={method} value={method}>{method}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Reference / transaction no.</Label>
+            <Input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Optional receipt, bank slip, PayHere ID" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Remarks</Label>
+          <textarea value={remarks} onChange={(event) => setRemarks(event.target.value)} rows={3} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="Optional internal note" />
+        </div>
+
+        <label className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-medium text-blue-900">
+          <input type="checkbox" checked={sendEmail} onChange={(event) => setSendEmail(event.target.checked)} className="mt-1" />
+          <span>Send customer email. If booking and payment both change, the system sends one combined email, not two.</span>
+        </label>
+
+        <div className="flex justify-end gap-3 pt-2">
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit">Save Statuses</Button>
         </div>
       </form>
     </Modal>
@@ -831,6 +944,7 @@ export default function Bookings() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedBooking, setSelectedBooking] = useState(null)
   const [statusBooking, setStatusBooking] = useState(null)
+  const [statusFocus, setStatusFocus] = useState('booking')
   const [paymentBooking, setPaymentBooking] = useState(null)
   const [deleteTargetBooking, setDeleteTargetBooking] = useState(null)
   const [isAddBookingOpen, setIsAddBookingOpen] = useState(false)
@@ -915,26 +1029,24 @@ export default function Bookings() {
     setCurrentPage(1)
   }
 
-  const handleStatusSave = async (bookingId, bookingStatus) => {
+  const handleCombinedStatusSave = async (bookingId, updates) => {
     try {
-      const updatedBooking = await updateBookingStatus(bookingId, bookingStatus)
+      const updatedBooking = await updateBookingAndPaymentStatus(bookingId, updates)
       setBookings((current) => current.map((booking) => (booking.id === bookingId ? { ...booking, ...updatedBooking } : booking)))
       setStatusBooking(null)
-      showToast('Booking status updated successfully.')
+      setPaymentBooking(null)
+      showToast('Statuses updated successfully. Email handled by the server.')
     } catch (error) {
-      showToast(error.message || 'Unable to update booking status.', 'error')
+      showToast(error.message || 'Unable to update statuses.', 'error')
     }
   }
 
+  const handleStatusSave = async (bookingId, bookingStatus) => {
+    return handleCombinedStatusSave(bookingId, { booking_status: bookingStatus, payment_status: statusBooking?.payment_status || 'pending', payment_method: statusBooking?.payment_method || 'Manual', send_email: true })
+  }
+
   const handlePaymentSave = async (bookingId, paymentStatus, paymentMethod) => {
-    try {
-      const updatedBooking = await updatePaymentStatus(bookingId, paymentStatus, paymentMethod)
-      setBookings((current) => current.map((booking) => (booking.id === bookingId ? { ...booking, ...updatedBooking } : booking)))
-      setPaymentBooking(null)
-      showToast('Payment status updated successfully.')
-    } catch (error) {
-      showToast(error.message || 'Unable to update payment status.', 'error')
-    }
+    return handleCombinedStatusSave(bookingId, { booking_status: paymentBooking?.booking_status || 'pending', payment_status: paymentStatus, payment_method: paymentMethod, send_email: true })
   }
 
   const handleAddBooking = async (formData) => {
@@ -1069,7 +1181,7 @@ export default function Bookings() {
                         <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{humanizePaymentStatus(booking.payment_status)}</Badge>
                       </div>
 
-                      <ActionsDropdown booking={booking} onView={() => setSelectedBooking(booking)} onEditStatus={() => setStatusBooking(booking)} onEditPayment={() => setPaymentBooking(booking)} onCancel={() => setDeleteTargetBooking(booking)} />
+                      <ActionsDropdown booking={booking} onView={() => setSelectedBooking(booking)} onUpdateStatus={() => { setStatusFocus('booking'); setStatusBooking(booking) }} onCancel={() => setDeleteTargetBooking(booking)} />
                     </div>
                   )
                 })}
@@ -1082,7 +1194,7 @@ export default function Bookings() {
 
       {isAddBookingOpen ? <AddBookingModal rooms={rooms} bookings={bookings} onClose={() => setIsAddBookingOpen(false)} onSave={handleAddBooking} /> : null}
       {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} /> : null}
-      {statusBooking ? <StatusSelectModal booking={statusBooking} onClose={() => setStatusBooking(null)} onSave={handleStatusSave} /> : null}
+      {statusBooking ? <CombinedStatusModal booking={statusBooking} focus={statusFocus} onClose={() => setStatusBooking(null)} onSave={handleCombinedStatusSave} /> : null}
       {paymentBooking ? <PaymentStatusModal booking={paymentBooking} onClose={() => setPaymentBooking(null)} onSave={handlePaymentSave} /> : null}
       {deleteTargetBooking ? <DeleteBookingModal booking={deleteTargetBooking} onClose={() => setDeleteTargetBooking(null)} onConfirm={handleDeleteBooking} /> : null}
     </div>

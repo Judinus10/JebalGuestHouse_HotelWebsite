@@ -27,6 +27,9 @@ $statusMap = [
     'cancelled' => 'Cancelled',
     'canceled' => 'Cancelled',
     'refunded' => 'Refunded',
+    'no_pay' => 'No Pay',
+    'nopay' => 'No Pay',
+    'no_payment' => 'No Pay',
 ];
 
 $paymentStatus = $statusMap[$statusKey] ?? null;

@@ -1,6 +1,6 @@
 export const bookingStatuses = ['pending', 'confirmed', 'cancelled']
 
-export const paymentStatuses = ['pending', 'paid', 'failed', 'cancelled', 'refunded']
+export const paymentStatuses = ['pending', 'paid', 'cancelled', 'refunded', 'no_pay']
 
 export const bookingRooms = [
   {

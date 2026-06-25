@@ -366,6 +366,71 @@ function send_payment_failed_email(PDO $pdo, array $booking): void
     update_booking_email_status($pdo, (int) $booking['id'], $sent ? 'Sent' : 'Failed');
 }
 
+
+
+function status_label_for_email(?string $status): string
+{
+    $value = strtolower(trim((string) $status));
+    $value = preg_replace('/^payment\s+/', '', $value) ?? $value;
+    $value = str_replace(['_', '-'], ' ', $value);
+    $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+    return $value === '' ? '-' : ucwords($value);
+}
+
+function send_booking_status_changed_email(PDO $pdo, array $booking, string $oldStatus, string $newStatus): void
+{
+    $label = status_label_for_email($newStatus);
+    $subject = 'Booking status updated - Jebal Guest House #' . $booking['id'];
+    $body = email_shell(
+        'Booking status updated',
+        '<p>Dear ' . email_safe($booking['full_name'] ?? '') . ',</p>
+        <p>Your booking status has been updated to <strong>' . email_safe($label) . '</strong>.</p>' .
+        booking_details_html($booking)
+    );
+
+    $sent = send_tracked_email($pdo, 'booking', (int) $booking['id'], $booking['email'], $subject, $body, 'booking_status_updated');
+    update_booking_email_status($pdo, (int) $booking['id'], $sent ? 'Sent' : 'Failed');
+}
+
+function send_payment_status_changed_email(PDO $pdo, array $booking, array $payment, string $oldStatus, string $newStatus): void
+{
+    $label = status_label_for_email($newStatus);
+    $amount = email_safe(format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0)));
+    $subject = 'Payment status updated - Jebal Guest House #' . $booking['id'];
+    $body = email_shell(
+        'Payment status updated',
+        '<p>Dear ' . email_safe($booking['full_name'] ?? '') . ',</p>
+        <p>Your payment status has been updated to <strong>' . email_safe($label) . '</strong>.</p>
+        <p><strong>Amount:</strong> ' . $amount . '</p>' .
+        booking_details_html($booking)
+    );
+
+    $sent = send_tracked_email($pdo, 'booking', (int) $booking['id'], $booking['email'], $subject, $body, 'payment_status_updated');
+    update_booking_email_status($pdo, (int) $booking['id'], $sent ? 'Sent' : 'Failed');
+}
+
+function send_combined_status_changed_email(PDO $pdo, array $booking, array $payment, string $oldBookingStatus, string $newBookingStatus, string $oldPaymentStatus, string $newPaymentStatus): void
+{
+    $bookingLabel = status_label_for_email($newBookingStatus);
+    $paymentLabel = status_label_for_email($newPaymentStatus);
+    $amount = email_safe(format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0)));
+    $subject = 'Booking and payment updated - Jebal Guest House #' . $booking['id'];
+    $body = email_shell(
+        'Booking and payment updated',
+        '<p>Dear ' . email_safe($booking['full_name'] ?? '') . ',</p>
+        <p>Your booking and payment details have been updated.</p>
+        <ul>
+            <li><strong>Booking status:</strong> ' . email_safe($bookingLabel) . '</li>
+            <li><strong>Payment status:</strong> ' . email_safe($paymentLabel) . '</li>
+            <li><strong>Amount:</strong> ' . $amount . '</li>
+        </ul>' .
+        booking_details_html($booking)
+    );
+
+    $sent = send_tracked_email($pdo, 'booking', (int) $booking['id'], $booking['email'], $subject, $body, 'combined_status_updated');
+    update_booking_email_status($pdo, (int) $booking['id'], $sent ? 'Sent' : 'Failed');
+}
+
 function send_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, string $email, string $phone, string $subject, string $message): void
 {
     $adminBody = email_shell(

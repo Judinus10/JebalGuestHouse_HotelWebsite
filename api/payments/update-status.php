@@ -31,6 +31,7 @@ function admin_payment_status_for_db(mixed $status): string
         'paid' => 'Paid',
         'cancelled', 'canceled' => 'Cancelled',
         'refunded' => 'Refunded',
+        'no_pay', 'nopay', 'no_payment' => 'No Pay',
         // Failed is intentionally not accepted from the admin form.
         // Failed should be written by the payment gateway notify flow.
         default => 'Payment Pending',

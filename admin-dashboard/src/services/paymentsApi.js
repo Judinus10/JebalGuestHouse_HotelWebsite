@@ -1,6 +1,7 @@
 import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 const API_BASE_URL = buildApiUrl('/payments')
+const BOOKINGS_API_BASE_URL = buildApiUrl('/bookings')
 
 function normalizePaymentStatus(status) {
   const value = String(status || 'Payment Pending')
@@ -13,6 +14,7 @@ function normalizePaymentStatus(status) {
   if (value === 'failed') return 'failed'
   if (value === 'cancelled' || value === 'canceled') return 'cancelled'
   if (value === 'refunded') return 'refunded'
+  if (value === 'no_pay' || value === 'nopay' || value === 'no_payment') return 'no_pay'
   return 'pending'
 }
 
@@ -36,6 +38,7 @@ function dbPaymentStatus(status) {
   if (value === 'failed') return 'Failed'
   if (value === 'cancelled') return 'Cancelled'
   if (value === 'refunded') return 'Refunded'
+  if (value === 'no_pay') return 'No Pay'
   return 'Payment Pending'
 }
 
@@ -49,6 +52,13 @@ function normalizePayment(payment) {
     booking_no: payment.booking_no || `BK-${String(bookingId).padStart(5, '0')}`,
     guest_name: payment.guest_name || payment.full_name || 'Guest',
     guest_email: payment.guest_email || payment.email || '',
+    guest_phone: payment.guest_phone || payment.phone || '',
+    booking_status: payment.booking_status || payment.status_booking || '',
+    check_in: payment.check_in || payment.check_in_date || '',
+    check_out: payment.check_out || payment.check_out_date || '',
+    guests: Number(payment.guests || payment.total_guests || 0),
+    total_nights: Number(payment.total_nights || payment.nights || 0),
+    special_request: payment.special_request || payment.special_requests || payment.message || '',
     room_name: payment.room_name || '-',
     order_id: payment.order_id || '',
     payment_id: payment.payment_id || '',
@@ -78,6 +88,28 @@ export async function fetchPayments() {
 
   const payload = await readJsonResponse(response)
   return (payload.data || []).map(normalizePayment)
+}
+
+export async function updateCombinedStatusByBooking(bookingId, updates) {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/update-statuses.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      id: bookingId,
+      booking_status: updates.booking_status,
+      payment_status: dbPaymentStatus(updates.payment_status),
+      payment_method: normalizePaymentMethod(updates.payment_method),
+      transaction_reference: updates.transaction_reference || '',
+      remarks: updates.remarks || '',
+      send_email: updates.send_email !== false,
+    }),
+  })
+
+  await readJsonResponse(response)
+  return fetchPayments()
 }
 
 export async function updatePaymentStatus(paymentId, updates) {

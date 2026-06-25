@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Banknote,
   CreditCard,
   Download,
   Edit3,
+  Filter,
   Eye,
   MoreVertical,
   Search,
@@ -16,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
-import { fetchPayments, updatePaymentStatus } from '@/services/paymentsApi'
+import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
 
 const PAGE_SIZE = 6
 
@@ -26,8 +27,9 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
   maximumFractionDigits: 0,
 })
 
-const paymentStatuses = ['pending', 'paid', 'failed', 'cancelled', 'refunded']
-const editablePaymentStatuses = ['pending', 'paid', 'cancelled', 'refunded']
+const paymentStatuses = ['pending', 'paid', 'failed', 'cancelled', 'refunded', 'no_pay']
+const editablePaymentStatuses = ['pending', 'paid', 'cancelled', 'refunded', 'no_pay']
+const bookingStatuses = ['pending', 'confirmed', 'cancelled']
 const defaultPaymentMethods = ['PayHere', 'Cash', 'Bank Transfer', 'Card', 'No Pay', 'Other']
 
 const statusVariant = {
@@ -44,6 +46,7 @@ const statusLabel = {
   failed: 'Failed',
   cancelled: 'Cancelled',
   refunded: 'Refunded',
+  no_pay: 'No Pay',
 }
 
 function formatCurrency(value) {
@@ -130,7 +133,32 @@ function Toast({ message, type, onClose }) {
 
 function ActionsDropdown({ payment, onView, onEdit }) {
   const [open, setOpen] = useState(false)
+  const dropdownRef = useRef(null)
   const invoiceDownloadUrl = payment.invoice_number ? `/api/invoices/download.php?id=${payment.booking_id}` : ''
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    const handleOutsideClick = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setOpen(false)
+      }
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('touchstart', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('touchstart', handleOutsideClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
 
   const handleAction = (callback) => {
     callback()
@@ -138,7 +166,7 @@ function ActionsDropdown({ payment, onView, onEdit }) {
   }
 
   return (
-    <div className="relative flex justify-end">
+    <div ref={dropdownRef} className="relative flex justify-end">
       <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
         <MoreVertical className="h-4 w-4" />
         Actions
@@ -180,7 +208,7 @@ function ActionsDropdown({ payment, onView, onEdit }) {
 
 function DetailCard({ label, value }) {
   return (
-    <div className="rounded-xl border border-border bg-slate-50 p-4">
+    <div className="rounded-xl border border-border bg-slate-50 p-3">
       <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
       <p className="mt-1 break-words text-sm font-semibold text-text-primary">{value || '-'}</p>
     </div>
@@ -191,7 +219,7 @@ function DetailSection({ title, children }) {
   return (
     <section className="space-y-3">
       <h3 className="text-sm font-bold uppercase tracking-wide text-text-secondary">{title}</h3>
-      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+      <div className="grid gap-3 sm:grid-cols-2">{children}</div>
     </section>
   )
 }
@@ -219,8 +247,8 @@ function PaymentDetailsModal({ payment, onClose }) {
   const nightsText = nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : '-'
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-white shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">Payment Details</h2>
@@ -291,10 +319,13 @@ function PaymentDetailsModal({ payment, onClose }) {
 }
 
 function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
+  const normalizedBookingStatus = String(payment.booking_status || 'pending').toLowerCase()
+  const [bookingStatus, setBookingStatus] = useState(['pending', 'confirmed', 'cancelled'].includes(normalizedBookingStatus) ? normalizedBookingStatus : 'pending')
   const [paymentStatus, setPaymentStatus] = useState(payment.payment_status || 'pending')
   const [paymentMethod, setPaymentMethod] = useState(payment.payment_method || 'PayHere')
   const [reference, setReference] = useState(payment.payment_id || payment.transaction_id || '')
   const [remarks, setRemarks] = useState('')
+  const [sendEmail, setSendEmail] = useState(true)
   const [errors, setErrors] = useState({})
 
   const validate = () => {
@@ -309,18 +340,20 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
     event.preventDefault()
     if (!validate()) return
 
-    onSave(payment.id, {
+    onSave(payment, {
+      booking_status: bookingStatus,
       payment_status: paymentStatus,
       payment_method: paymentMethod,
       transaction_reference: reference.trim(),
       remarks: remarks.trim(),
+      send_email: sendEmail,
     })
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm">
-      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-border px-6 py-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between border-b border-border px-5 py-3">
           <div>
             <h2 className="text-lg font-bold text-text-primary">Edit Payment</h2>
             <p className="mt-1 text-sm text-text-secondary">{payment.booking_no}</p>
@@ -335,14 +368,28 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 p-6">
-          <div className="rounded-xl border border-border bg-slate-50 p-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-5">
+          <div className="rounded-xl border border-border bg-slate-50 p-3">
             <p className="text-sm font-semibold text-text-primary">{formatCurrency(payment.amount)}</p>
             <p className="mt-1 text-sm text-text-secondary">Current status: {statusLabel[payment.payment_status] || payment.payment_status}</p>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-booking-status">Booking Status *</Label>
+              <select
+                id="edit-booking-status"
+                value={bookingStatus}
+                onChange={(event) => setBookingStatus(event.target.value)}
+                className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              >
+                {bookingStatuses.map((status) => (
+                  <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
               <Label htmlFor="edit-payment-status">Payment Status *</Label>
               <select
                 id="edit-payment-status"
@@ -357,7 +404,7 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
               {errors.paymentStatus ? <p className="text-xs font-medium text-red-600">{errors.paymentStatus}</p> : null}
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <Label htmlFor="edit-payment-method">Payment Method *</Label>
               <select
                 id="edit-payment-method"
@@ -373,7 +420,7 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="payment-reference">Reference / Transaction No.</Label>
             <Input
               id="payment-reference"
@@ -383,19 +430,24 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
             />
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label htmlFor="payment-remarks">Remarks</Label>
             <textarea
               id="payment-remarks"
               value={remarks}
               onChange={(event) => setRemarks(event.target.value)}
-              rows={3}
+              rows={2}
               placeholder="Optional internal note"
               className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2">
+          <label className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs font-medium leading-5 text-blue-900">
+            <input type="checkbox" checked={sendEmail} onChange={(event) => setSendEmail(event.target.checked)} className="mt-1" />
+            <span>Send one customer email for the final status update. If booking and payment both change, only one combined email will be sent.</span>
+          </label>
+
+          <div className="flex justify-end gap-3 pt-1">
             <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
           </div>
@@ -522,19 +574,15 @@ export default function Payments() {
     showToast('Payment filters reset.')
   }
 
-  const handleSavePayment = async (paymentId, payload) => {
+  const handleSavePayment = async (payment, payload) => {
     try {
       setSavingPayment(true)
-      const updatedPayment = await updatePaymentStatus(paymentId, payload)
-
-      setPayments((current) =>
-        current.map((payment) => (payment.id === paymentId ? { ...payment, ...updatedPayment } : payment))
-      )
-
+      const refreshedPayments = await updateCombinedStatusByBooking(payment.booking_id, payload)
+      setPayments(refreshedPayments)
       setEditingPayment(null)
-      showToast('Payment updated successfully.')
+      showToast('Statuses updated successfully. Email handled by the server.')
     } catch (err) {
-      showToast(err.message || 'Unable to update payment.', 'error')
+      showToast(err.message || 'Unable to update statuses.', 'error')
     } finally {
       setSavingPayment(false)
     }
@@ -544,10 +592,12 @@ export default function Payments() {
     <div className="space-y-6">
       <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
 
-      <PageHeader
-        title="Payments"
-        description="Track Jebal Guest House payment status and payment methods."
-      />
+      <PageHeader title="Payments" description="Track Jebal Guest House payment status and payment methods.">
+        <Button type="button" variant="outline" onClick={handleResetFilters}>
+          <Filter className="h-4 w-4" />
+          Clear Filters
+        </Button>
+      </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard title="Total Revenue" value={formatCurrency(summary.totalPaid)} description="Successfully collected" icon={TrendingUp} />
@@ -557,9 +607,9 @@ export default function Payments() {
 
       <Card>
         <CardContent className="p-5">
-          <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
-              <div className="xl:col-span-2">
+          <div className="mb-5">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div>
                 <Label htmlFor="payment-search">Search payments</Label>
                 <div className="relative mt-2">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -614,9 +664,6 @@ export default function Payments() {
               </div>
             </div>
 
-            <Button type="button" variant="outline" onClick={handleResetFilters}>
-              Reset Filters
-            </Button>
           </div>
 
           {error ? (

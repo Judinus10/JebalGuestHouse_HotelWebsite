@@ -4,7 +4,7 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 const BOOKINGS_API_BASE_URL = buildApiUrl('/bookings')
 const PUBLIC_BOOKING_URL = buildApiUrl('/submit-booking.php')
 
-export const paymentStatusOptions = ['pending', 'paid', 'failed', 'cancelled', 'refunded']
+export const paymentStatusOptions = ['pending', 'paid', 'cancelled', 'refunded', 'no_pay']
 export const paymentMethodOptions = ['PayHere', 'Cash', 'Bank Transfer']
 
 function normalizeBookingStatus(status) {
@@ -32,6 +32,7 @@ export function toApiPaymentStatus(status) {
   if (value === 'failed') return 'Failed'
   if (value === 'cancelled' || value === 'canceled') return 'Cancelled'
   if (value === 'refunded') return 'Refunded'
+  if (value === 'no_pay') return 'No Pay'
   return 'Payment Pending'
 }
 
@@ -46,6 +47,7 @@ export function normalizePaymentStatus(status) {
   if (value === 'failed') return 'failed'
   if (value === 'cancelled' || value === 'canceled') return 'cancelled'
   if (value === 'refunded') return 'refunded'
+  if (value === 'no_pay' || value === 'nopay' || value === 'no_payment') return 'no_pay'
   if (value === 'unpaid') return 'pending'
   return 'pending'
 }
@@ -66,19 +68,20 @@ function getRoomByName(roomName) {
 }
 
 export function normalizeBooking(booking) {
-  const roomName = booking.room_name || booking.roomName || ''
+  const roomName = booking.room_name || booking.roomName || booking.room || ''
   const room = getRoomByName(roomName)
-  const checkIn = booking.check_in || booking.check_in_date || booking.checkIn || ''
-  const checkOut = booking.check_out || booking.check_out_date || booking.checkOut || ''
-  const guests = Number(booking.guests || booking.guest_count || booking.adults || 1)
+  const checkIn = booking.check_in || booking.check_in_date || booking.checkIn || booking.arrival_date || booking.arrival || ''
+  const checkOut = booking.check_out || booking.check_out_date || booking.checkOut || booking.departure_date || booking.departure || ''
+  const guests = Number(booking.guests || booking.guest_count || booking.no_of_guests || booking.adults || 1)
   const totalNights = Number(booking.total_nights || booking.nights || calculateNights(checkIn, checkOut))
+  const amount = Number(booking.total_amount || booking.amount || booking.payment_amount || (Number(room?.price_per_night || 0) * totalNights) || 0)
 
   return {
     id: Number(booking.id || booking.booking_id || 0),
-    booking_no: booking.booking_no || booking.bookingNo || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`,
-    guest_name: booking.guest_name || booking.full_name || booking.name || 'Guest',
-    guest_email: booking.guest_email || booking.email || '',
-    guest_phone: booking.guest_phone || booking.phone || '',
+    booking_no: booking.booking_no || booking.bookingNo || booking.booking_number || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`,
+    guest_name: booking.guest_name || booking.full_name || booking.customer_name || booking.name || 'Guest',
+    guest_email: booking.guest_email || booking.email || booking.customer_email || '',
+    guest_phone: booking.guest_phone || booking.phone || booking.mobile || booking.customer_phone || '',
     room_id: Number(booking.room_id || room?.id || 0),
     room_name: roomName || room?.room_name || 'Unknown room',
     room_type: booking.room_type || room?.room_type || '-',
@@ -92,18 +95,18 @@ export function normalizeBooking(booking) {
     adults: Number(booking.adults || guests || 1),
     children: Number(booking.children || 0),
     total_nights: totalNights,
-    booking_status: normalizeBookingStatus(booking.booking_status || booking.status),
-    payment_status: normalizePaymentStatus(booking.payment_status),
-    payment_method: booking.payment_method || booking.method || '',
-    total_amount: Number(booking.total_amount || booking.amount || 0),
+    booking_status: normalizeBookingStatus(booking.booking_status || booking.status || booking.bookingState),
+    payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus),
+    payment_method: booking.payment_method || booking.method || booking.paymentMethod || '',
+    total_amount: amount,
     payment_currency: booking.payment_currency || booking.currency || 'LKR',
-    special_requests: booking.special_requests || booking.special_request || booking.message || '',
-    special_request: booking.special_request || booking.special_requests || booking.message || '',
+    special_requests: booking.special_requests || booking.special_request || booking.message || booking.note || '',
+    special_request: booking.special_request || booking.special_requests || booking.message || booking.note || '',
     invoice_number: booking.invoice_number || '',
     invoice_file_path: booking.invoice_file_path || '',
     email_status: booking.email_status || 'Pending',
-    created_at: booking.created_at || '',
-    updated_at: booking.updated_at || '',
+    created_at: booking.created_at || booking.createdAt || booking.booking_date || booking.date || '',
+    updated_at: booking.updated_at || booking.updatedAt || booking.modified_at || '',
   }
 }
 
@@ -197,6 +200,35 @@ export async function updatePaymentStatus(bookingId, paymentStatus, paymentMetho
     id: Number(data.id || bookingId),
     payment_status: normalizePaymentStatus(data.payment_status || paymentStatus),
     payment_method: data.payment_method || paymentMethod,
+  }
+}
+
+export async function updateBookingAndPaymentStatus(bookingId, updates) {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/update-statuses.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      id: bookingId,
+      booking_status: updates.booking_status,
+      payment_status: toApiPaymentStatus(updates.payment_status),
+      payment_method: updates.payment_method || 'Manual',
+      transaction_reference: updates.transaction_reference || '',
+      remarks: updates.remarks || '',
+      send_email: updates.send_email !== false,
+    }),
+  })
+
+  const payload = await readJsonResponse(response)
+  const data = payload.data || {}
+
+  return {
+    id: Number(data.id || bookingId),
+    booking_status: normalizeBookingStatus(data.booking_status || updates.booking_status),
+    payment_status: normalizePaymentStatus(data.payment_status || updates.payment_status),
+    payment_method: data.payment_method || updates.payment_method || 'Manual',
   }
 }
 

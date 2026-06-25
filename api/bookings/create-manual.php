@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -33,6 +34,9 @@ $statusMap = [
     'cancelled' => 'Cancelled',
     'canceled' => 'Cancelled',
     'refunded' => 'Refunded',
+    'no_pay' => 'No Pay',
+    'nopay' => 'No Pay',
+    'no_payment' => 'No Pay',
 ];
 $paymentStatus = $statusMap[$statusKey] ?? 'Payment Pending';
 
@@ -159,6 +163,29 @@ try {
     ]);
 
     $pdo->commit();
+
+    $emailBooking = [
+        'id' => $bookingId,
+        'full_name' => $fullName,
+        'email' => $email,
+        'phone' => $phone,
+        'room_name' => $roomName,
+        'check_in_date' => $checkInDate,
+        'check_out_date' => $checkOutDate,
+        'guests' => $guests,
+        'message' => $message,
+        'status' => $bookingStatus,
+        'booking_status' => $bookingStatus,
+        'payment_status' => $paymentStatus,
+        'amount' => $amount,
+        'currency' => PAYMENT_CURRENCY,
+    ];
+
+    try {
+        send_booking_received_emails($pdo, $emailBooking);
+    } catch (Throwable $emailError) {
+        error_log('Manual booking email error: ' . $emailError->getMessage());
+    }
 
     json_response(true, 'Manual booking created successfully.', 201, [
         'data' => [
