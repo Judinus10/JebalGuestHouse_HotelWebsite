@@ -5,7 +5,6 @@ import {
   CalendarCheck,
   CheckCircle2,
   Clock,
-  CreditCard,
   Eye,
   MoreHorizontal,
   LogIn,
@@ -19,92 +18,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 
-const initialActivities = [
-  {
-    id: 1,
-    type: 'Booking',
-    title: 'New Booking Received',
-    reference_id: 'BK-2026-1048',
-    description: 'New booking received for Ground Floor Room 1.',
-    related_room: 'Ground Floor Room 1',
-    related_booking: 'BK-2026-1048',
-    status: 'New',
-    created_at: '2026-06-15T09:40:00Z',
-    details: 'Guest requested attached bathroom and parking access. Confirmation is pending.',
-  },
-  {
-    id: 2,
-    type: 'Payment',
-    title: 'Payment Received',
-    reference_id: 'PAY-9042',
-    description: 'Payment received: LKR 180 for Booking BK-2026-1048.',
-    related_room: 'Ground Floor Room 1',
-    related_booking: 'BK-2026-1048',
-    status: 'Viewed',
-    created_at: '2026-06-15T09:12:00Z',
-    details: 'Advance payment has been recorded in the local payment tracker.',
-  },
-  {
-    id: 3,
-    type: 'Cancellation',
-    title: 'Booking Cancelled',
-    reference_id: 'BK-2026-1039',
-    description: 'Booking cancelled. Refund review required.',
-    related_room: 'First Floor Room 2',
-    related_booking: 'BK-2026-1039',
-    status: 'New',
-    created_at: '2026-06-15T08:20:00Z',
-    details: 'Cancellation was requested after 48 hours. Refund should follow the 80% refund rule.',
-  },
-  {
-    id: 4,
-    type: 'Check-in',
-    title: 'Guest Checked In',
-    reference_id: 'BK-2026-1038',
-    description: 'Guest checked in to Room G01.',
-    related_room: 'Room G01',
-    related_booking: 'BK-2026-1038',
-    status: 'Resolved',
-    created_at: '2026-06-15T07:50:00Z',
-    details: 'Guest arrived and room key was handed over by reception.',
-  },
-  {
-    id: 5,
-    type: 'Check-out',
-    title: 'Guest Checked Out',
-    reference_id: 'BK-2026-1035',
-    description: 'Guest checked out from Room F02.',
-    related_room: 'Room F02',
-    related_booking: 'BK-2026-1035',
-    status: 'Viewed',
-    created_at: '2026-06-15T06:30:00Z',
-    details: 'Room should be cleaned and prepared for the next reservation.',
-  },
-  {
-    id: 6,
-    type: 'Offer',
-    title: 'Offer Expiring Soon',
-    reference_id: 'OFF-004',
-    description: 'Weekend Stay Offer expires in 3 days.',
-    related_room: 'All rooms',
-    related_booking: 'Not linked',
-    status: 'New',
-    created_at: '2026-06-14T16:10:00Z',
-    details: 'Review package status if the offer should be extended.',
-  },
-  {
-    id: 7,
-    type: 'System',
-    title: 'Pending Confirmation Reminder',
-    reference_id: 'SYS-221',
-    description: 'Two bookings are still waiting for confirmation.',
-    related_room: 'Multiple rooms',
-    related_booking: 'Multiple',
-    status: 'New',
-    created_at: '2026-06-14T11:05:00Z',
-    details: 'Check pending reservations and confirm availability with the guest.',
-  },
-]
+import { fetchNotificationActivities } from '@/services/notificationsApi'
 
 const typeVariants = {
   Booking: 'default',
@@ -112,6 +26,7 @@ const typeVariants = {
   'Check-in': 'info',
   'Check-out': 'secondary',
   Cancellation: 'destructive',
+  Contact: 'info',
   Offer: 'warning',
   System: 'outline',
 }
@@ -122,17 +37,21 @@ const statusVariants = {
   Resolved: 'success',
 }
 
-const types = ['All Types', 'Booking', 'Payment', 'Check-in', 'Check-out', 'Cancellation', 'Offer', 'System']
+const types = ['All Types', 'Booking', 'Payment', 'Contact', 'Check-in', 'Check-out', 'Cancellation', 'Offer', 'System']
 const statuses = ['All Statuses', 'New', 'Viewed', 'Resolved']
+const NOTIFICATIONS_PER_PAGE = 6
 
 function formatDate(value) {
+  if (!value) return '-'
+  const date = new Date(String(value).replace(' ', 'T'))
+  if (Number.isNaN(date.getTime())) return '-'
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(value))
+  }).format(date)
 }
 
 function StatCard({ title, value, icon: Icon }) {
@@ -153,19 +72,53 @@ function StatCard({ title, value, icon: Icon }) {
   )
 }
 
+
+function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageChange }) {
+  if (totalItems === 0) return null
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-medium text-text-secondary">Showing {startItem}-{endItem} of {totalItems}</p>
+      <div className="flex items-center justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+        <span className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-bold text-text-primary">{page} / {totalPages}</span>
+        <Button type="button" variant="outline" size="sm" disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+      </div>
+    </div>
+  )
+}
+
+
 export default function Notifications() {
-  const [activities, setActivities] = useState(initialActivities)
+  const [activities, setActivities] = useState([])
   const [selectedActivity, setSelectedActivity] = useState(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('All Types')
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [toast, setToast] = useState('')
   const [openActionId, setOpenActionId] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const loadActivities = async () => {
+    setIsLoading(true)
+    try {
+      setActivities(await fetchNotificationActivities())
+    } catch (error) {
+      showToast(error.message || 'Could not load live notifications.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadActivities()
+  }, [])
 
   const stats = useMemo(
     () => ({
       newBookings: activities.filter((item) => item.type === 'Booking').length,
-      pendingConfirmations: activities.filter((item) => item.type === 'System' && item.status === 'New').length,
+      pendingConfirmations: activities.filter((item) => item.type === 'Booking' && item.status === 'New').length,
       checkIns: activities.filter((item) => item.type === 'Check-in').length,
       checkOuts: activities.filter((item) => item.type === 'Check-out').length,
       cancellations: activities.filter((item) => item.type === 'Cancellation').length,
@@ -178,7 +131,7 @@ export default function Notifications() {
     const query = search.trim().toLowerCase()
     return activities
       .filter((item) => {
-        const matchesSearch = !query || [item.title, item.reference_id, item.description, item.related_room, item.related_booking]
+        const matchesSearch = !query || [item.title, item.reference_id, item.description, item.related_room, item.related_booking, item.details, item.searchText]
           .join(' ')
           .toLowerCase()
           .includes(query)
@@ -188,6 +141,18 @@ export default function Notifications() {
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   }, [activities, search, typeFilter, statusFilter])
+
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, typeFilter, statusFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredActivities.length / NOTIFICATIONS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * NOTIFICATIONS_PER_PAGE
+  const paginatedActivities = filteredActivities.slice(startIndex, startIndex + NOTIFICATIONS_PER_PAGE)
+  const startItem = filteredActivities.length === 0 ? 0 : startIndex + 1
+  const endItem = Math.min(startIndex + NOTIFICATIONS_PER_PAGE, filteredActivities.length)
 
 
   useEffect(() => {
@@ -273,9 +238,13 @@ export default function Notifications() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredActivities.length === 0 ? (
+          {isLoading ? (
             <div className="rounded-xl border border-dashed border-border bg-slate-50 p-8 text-center text-sm text-text-secondary">
-              No notifications match the selected filters.
+              Loading live notifications...
+            </div>
+          ) : filteredActivities.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-slate-50 p-8 text-center text-sm text-text-secondary">
+              No live notifications match the selected filters.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-border">
@@ -290,7 +259,7 @@ export default function Notifications() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-white">
-                  {filteredActivities.map((item) => (
+                  {paginatedActivities.map((item) => (
                     <tr key={item.id} className="align-middle hover:bg-blue-50/40">
                       <td className="whitespace-nowrap px-4 py-3"><Badge variant={typeVariants[item.type] || 'outline'}>{item.type}</Badge></td>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.reference_id}</td>
@@ -359,6 +328,7 @@ export default function Notifications() {
                   ))}
                 </tbody>
               </table>
+              <Pagination page={safeCurrentPage} totalPages={totalPages} totalItems={filteredActivities.length} startItem={startItem} endItem={endItem} onPageChange={setCurrentPage} />
             </div>
           )}
         </CardContent>
@@ -388,7 +358,7 @@ export default function Notifications() {
             <div className="space-y-4 p-6">
               <div className="rounded-xl border border-border p-4">
                 <h3 className="text-sm font-semibold text-text-primary">Activity Details</h3>
-                <p className="mt-3 text-sm leading-6 text-text-secondary">{selectedActivity.details}</p>
+                <p className="mt-3 whitespace-pre-line text-sm leading-6 text-text-secondary">{selectedActivity.details}</p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-xl border border-border p-4 text-sm">

@@ -27,6 +27,7 @@ const inquiryTypes = [
 ]
 
 const statuses = ['All Statuses', 'New', 'Read', 'Replied']
+const MESSAGES_PER_PAGE = 6
 
 const statusVariant = {
   New: 'warning',
@@ -70,6 +71,23 @@ function StatCard({ title, value, icon: Icon }) {
   )
 }
 
+
+function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageChange }) {
+  if (totalItems === 0) return null
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-medium text-text-secondary">Showing {startItem}-{endItem} of {totalItems}</p>
+      <div className="flex items-center justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+        <span className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-bold text-text-primary">{page} / {totalPages}</span>
+        <Button type="button" variant="outline" size="sm" disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+      </div>
+    </div>
+  )
+}
+
+
 export default function Messages() {
   const [inquiries, setInquiries] = useState([])
   const [selectedInquiry, setSelectedInquiry] = useState(null)
@@ -79,6 +97,7 @@ export default function Messages() {
   const [toast, setToast] = useState('')
   const [openActionId, setOpenActionId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
 
   const stats = useMemo(
     () => ({
@@ -107,6 +126,18 @@ export default function Messages() {
       })
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   }, [inquiries, search, statusFilter, typeFilter])
+
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, statusFilter, typeFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredInquiries.length / MESSAGES_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * MESSAGES_PER_PAGE
+  const paginatedInquiries = filteredInquiries.slice(startIndex, startIndex + MESSAGES_PER_PAGE)
+  const startItem = filteredInquiries.length === 0 ? 0 : startIndex + 1
+  const endItem = Math.min(startIndex + MESSAGES_PER_PAGE, filteredInquiries.length)
 
   const showToast = (message) => {
     setToast(message)
@@ -303,7 +334,7 @@ export default function Messages() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-white">
-                  {filteredInquiries.map((item) => (
+                  {paginatedInquiries.map((item) => (
                     <tr key={item.id} className="hover:bg-blue-50/40">
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.inquiry_id}</td>
                       <td className="px-4 py-3">
@@ -391,6 +422,7 @@ export default function Messages() {
                   ))}
                 </tbody>
               </table>
+              <Pagination page={safeCurrentPage} totalPages={totalPages} totalItems={filteredInquiries.length} startItem={startItem} endItem={endItem} onPageChange={setCurrentPage} />
             </div>
           )}
         </CardContent>
