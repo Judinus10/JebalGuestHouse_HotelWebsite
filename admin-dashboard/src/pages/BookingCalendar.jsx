@@ -15,8 +15,28 @@ const statusStyles = {
   checked_in: 'bg-blue-100 text-blue-900 border-blue-300 hover:bg-blue-200',
   checked_out: 'bg-slate-100 text-slate-800 border-slate-300 hover:bg-slate-200',
   cancelled: 'bg-red-100 text-red-900 border-red-300 hover:bg-red-200',
+  canceled: 'bg-red-100 text-red-900 border-red-300 hover:bg-red-200',
   no_show: 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200',
 }
+
+const statusDotStyles = {
+  pending: 'bg-amber-400',
+  confirmed: 'bg-emerald-500',
+  checked_in: 'bg-blue-500',
+  checked_out: 'bg-slate-500',
+  cancelled: 'bg-red-500',
+  canceled: 'bg-red-500',
+  no_show: 'bg-purple-500',
+}
+
+const statusLegendItems = [
+  { key: 'pending', label: 'Pending', description: 'Booking is created but not confirmed yet.' },
+  { key: 'confirmed', label: 'Confirmed', description: 'Booking is approved and the room is reserved.' },
+  { key: 'checked_in', label: 'Checked In', description: 'Guest has arrived and the stay is active.' },
+  { key: 'checked_out', label: 'Checked Out', description: 'Guest has completed the stay.' },
+  { key: 'cancelled', label: 'Cancelled', description: 'Booking was cancelled and should not be treated as active.' },
+  { key: 'no_show', label: 'No Show', description: 'Guest did not arrive for the booking.' },
+]
 
 const statusVariant = {
   pending: 'warning',
@@ -41,6 +61,10 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
   year: 'numeric',
 })
+
+function getBookingStatusKey(status) {
+  return String(status || 'pending').trim().toLowerCase().replace(/[\s-]+/g, '_')
+}
 
 function normalizeStatus(status) {
   return String(status || '-')
@@ -149,6 +173,33 @@ function getTooltipPosition(rect) {
   return { left, top, width: tooltipWidth }
 }
 
+function StatusLegend() {
+  return (
+    <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-sm font-bold text-slate-950">Booking status colours</h3>
+        <p className="text-xs font-medium text-slate-500">Hover each colour to see what it means.</p>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        {statusLegendItems.map((item) => (
+          <div key={item.key} className="group relative">
+            <div
+              title={item.description}
+              className="flex cursor-help items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"
+            >
+              <span className={`h-3 w-3 rounded-full ${statusDotStyles[item.key] || statusDotStyles.pending}`} />
+              <span>{item.label}</span>
+            </div>
+            <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden w-56 -translate-x-1/2 rounded-lg border border-slate-200 bg-slate-950 px-3 py-2 text-xs font-medium text-white shadow-xl group-hover:block">
+              {item.description}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function FloatingBookingTooltip({ tooltip }) {
   if (!tooltip) return null
 
@@ -164,7 +215,7 @@ function FloatingBookingTooltip({ tooltip }) {
           <p className="text-sm font-bold text-slate-950">{booking.booking_no}</p>
           <p className="text-xs text-slate-500">{booking.room_name}</p>
         </div>
-        <Badge variant={statusVariant[booking.booking_status] || 'secondary'}>
+        <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>
           {normalizeStatus(booking.booking_status)}
         </Badge>
       </div>
@@ -230,8 +281,8 @@ function BookingDetailsModal({ booking, onClose }) {
               <p><span className="font-semibold text-slate-500">Room code:</span> {booking.room_code}</p>
               <p><span className="font-semibold text-slate-500">Property type:</span> {booking.property_type}</p>
               <p><span className="font-semibold text-slate-500">Amount:</span> {currencyFormatter.format(booking.total_amount)}</p>
-              <p><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[booking.booking_status] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></p>
-              <p><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[booking.payment_status] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></p>
+              <p><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></p>
+              <p><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></p>
             </div>
           </div>
 
@@ -280,7 +331,7 @@ export default function BookingCalendar() {
         setError('')
         const data = await fetchBookings()
         if (active) {
-          setCalendarBookings(data.filter((booking) => booking.booking_status !== 'cancelled'))
+          setCalendarBookings(data)
         }
       } catch (err) {
         if (active) setError(err.message || 'Unable to load booking calendar.')
@@ -333,6 +384,8 @@ export default function BookingCalendar() {
         <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700">Loading booking calendar...</div>
       ) : null}
 
+      <StatusLegend />
+
       <SectionCard className="overflow-hidden p-0">
         <div className="hidden border-b border-slate-200 bg-slate-50 md:grid md:grid-cols-7">
           {days.map((day) => (
@@ -383,7 +436,7 @@ export default function BookingCalendar() {
                         onMouseLeave={hideTooltip}
                         onFocus={(event) => showTooltip(event, booking)}
                         onBlur={hideTooltip}
-                        className={`absolute flex h-7 items-center border px-3 text-left text-xs font-bold shadow-sm transition ${roundedClass} ${statusStyles[booking.booking_status] || statusStyles.pending}`}
+                        className={`absolute flex h-7 items-center border px-3 text-left text-xs font-bold shadow-sm transition ${roundedClass} ${statusStyles[getBookingStatusKey(booking.booking_status)] || statusStyles.pending}`}
                         style={{
                           left: `${(segment.startIndex / 7) * 100}%`,
                           width: `${(segment.span / 7) * 100}%`,
@@ -419,7 +472,7 @@ export default function BookingCalendar() {
                   <p className="text-sm font-bold text-slate-950">{booking.guest_name} · {booking.room_code}</p>
                   <p className="mt-1 text-xs text-slate-500">{formatDate(booking.check_in)} – {formatDate(booking.check_out)}</p>
                 </div>
-                <Badge variant={statusVariant[booking.booking_status] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge>
+                <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge>
               </div>
               <p className="mt-2 text-xs text-slate-600">{booking.room_name} · {currencyFormatter.format(booking.total_amount)}</p>
             </button>

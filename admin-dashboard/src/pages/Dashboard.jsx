@@ -88,6 +88,26 @@ const defaultDashboardData = {
 
 const chartColors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
 
+const bookingStatusColors = {
+  Pending: '#F59E0B',
+  Confirmed: '#10B981',
+  Cancelled: '#EF4444',
+}
+
+const paymentStatusColors = {
+  Paid: '#10B981',
+  'Payment Pending': '#F59E0B',
+  Cancelled: '#EF4444',
+  Refunded: '#8B5CF6',
+  Failed: '#6B7280',
+}
+
+function getStatusColor(status, type) {
+  if (type === 'booking') return bookingStatusColors[status] || '#94A3B8'
+  if (type === 'payment') return paymentStatusColors[status] || '#94A3B8'
+  return '#94A3B8'
+}
+
 const statusVariant = {
   Available: 'success',
   Occupied: 'secondary',
@@ -188,13 +208,13 @@ function MiniSummaryCard({ title, value, helper, icon: Icon, to }) {
   )
 }
 
-function ChartLegend({ data }) {
+function ChartLegend({ data, type }) {
   return (
     <div className="mt-4 grid gap-2 sm:grid-cols-2">
       {data.map((item, index) => (
         <div key={item.name} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: getStatusColor(item.name, type) }} />
             <span className="truncate text-charcoal">{item.name}</span>
           </div>
           <span className="font-semibold text-blue-700">{item.percentage}%</span>
@@ -218,7 +238,7 @@ function StatusDonut({ title, data, to }) {
             <PieChart>
               <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={82} paddingAngle={3}>
                 {chartData.map((entry, index) => (
-                  <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                  <Cell key={entry.name} fill={getStatusColor(entry.name, title === 'Booking Status' ? 'booking' : 'payment')} />
                 ))}
               </Pie>
               <Tooltip
@@ -227,7 +247,7 @@ function StatusDonut({ title, data, to }) {
               />
             </PieChart>
           </ResponsiveContainer>
-          <ChartLegend data={chartData} />
+          <ChartLegend data={chartData} type={title === 'Booking Status' ? 'booking' : 'payment'} />
         </CardContent>
       </Card>
     </ClickableCard>
