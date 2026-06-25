@@ -3,7 +3,9 @@ import {
   Banknote,
   CreditCard,
   Download,
+  Edit3,
   Eye,
+  MoreVertical,
   Search,
   TrendingUp,
   WalletCards,
@@ -14,7 +16,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
-import { fetchPayments } from '@/services/paymentsApi'
+import { fetchPayments, updatePaymentStatus } from '@/services/paymentsApi'
+
+const PAGE_SIZE = 6
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -23,7 +27,8 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
 })
 
 const paymentStatuses = ['pending', 'paid', 'failed', 'cancelled', 'refunded']
-const paymentMethods = ['PayHere']
+const editablePaymentStatuses = ['pending', 'paid', 'cancelled', 'refunded']
+const defaultPaymentMethods = ['PayHere', 'Cash', 'Bank Transfer', 'Card', 'No Pay', 'Other']
 
 const statusVariant = {
   pending: 'warning',
@@ -47,11 +52,15 @@ function formatCurrency(value) {
 
 function formatDate(value) {
   if (!value) return 'Not paid yet'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Not paid yet'
+
   return new Intl.DateTimeFormat('en-US', {
     month: 'short',
     day: '2-digit',
     year: 'numeric',
-  }).format(new Date(value))
+  }).format(date)
 }
 
 function isInDateRange(value, from, to) {
@@ -59,6 +68,7 @@ function isInDateRange(value, from, to) {
   if (!value) return false
 
   const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return false
   date.setHours(0, 0, 0, 0)
 
   if (from) {
@@ -74,6 +84,10 @@ function isInDateRange(value, from, to) {
   }
 
   return true
+}
+
+function safeText(value) {
+  return String(value || '').toLowerCase()
 }
 
 function StatCard({ title, value, description, icon: Icon }) {
@@ -96,33 +110,117 @@ function StatCard({ title, value, description, icon: Icon }) {
 }
 
 function PaymentStatusBadge({ status }) {
-  return <Badge variant={statusVariant[status] || 'secondary'}>{statusLabel[status] || status}</Badge>
+  return <Badge variant={statusVariant[status] || 'secondary'}>{statusLabel[status] || status || '-'}</Badge>
+}
+
+function Toast({ message, type, onClose }) {
+  if (!message) return null
+
+  const tone = type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-100 bg-white text-blue-900'
+
+  return (
+    <div className={`fixed right-4 top-4 z-50 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg shadow-slate-200 ${tone}`}>
+      <span>{message}</span>
+      <button type="button" onClick={onClose} className="rounded p-1 hover:bg-slate-100" aria-label="Close toast">
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+function ActionsDropdown({ payment, onView, onEdit }) {
+  const [open, setOpen] = useState(false)
+  const invoiceDownloadUrl = payment.invoice_number ? `/api/invoices/download.php?id=${payment.booking_id}` : ''
+
+  const handleAction = (callback) => {
+    callback()
+    setOpen(false)
+  }
+
+  return (
+    <div className="relative flex justify-end">
+      <Button type="button" variant="outline" size="sm" onClick={() => setOpen((value) => !value)}>
+        <MoreVertical className="h-4 w-4" />
+        Actions
+      </Button>
+
+      {open ? (
+        <div className="absolute right-0 top-10 z-30 w-52 overflow-hidden rounded-xl border border-border bg-white py-1 shadow-xl">
+          <button
+            type="button"
+            onClick={() => handleAction(onView)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
+          >
+            <Eye className="h-4 w-4 text-blue-700" />
+            View Details
+          </button>
+          <button
+            type="button"
+            onClick={() => handleAction(onEdit)}
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
+          >
+            <Edit3 className="h-4 w-4 text-emerald-600" />
+            Edit Payment
+          </button>
+          {invoiceDownloadUrl ? (
+            <button
+              type="button"
+              onClick={() => handleAction(() => window.open(invoiceDownloadUrl, '_blank', 'noopener,noreferrer'))}
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50"
+            >
+              <Download className="h-4 w-4 text-slate-700" />
+              Download Invoice
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function DetailCard({ label, value }) {
+  return (
+    <div className="rounded-xl border border-border bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
+      <p className="mt-1 break-words text-sm font-semibold text-text-primary">{value || '-'}</p>
+    </div>
+  )
+}
+
+function DetailSection({ title, children }) {
+  return (
+    <section className="space-y-3">
+      <h3 className="text-sm font-bold uppercase tracking-wide text-text-secondary">{title}</h3>
+      <div className="grid gap-4 sm:grid-cols-2">{children}</div>
+    </section>
+  )
+}
+
+function formatStayDate(value) {
+  if (!value) return '-'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+  }).format(date)
 }
 
 function PaymentDetailsModal({ payment, onClose }) {
   if (!payment) return null
 
   const invoiceDownloadUrl = payment.invoice_number ? `/api/invoices/download.php?id=${payment.booking_id}` : ''
-
-  const details = [
-    ['Payment ID', payment.payment_id || `PAY-${String(payment.id).padStart(4, '0')}`],
-    ['Booking ID', payment.booking_id],
-    ['Booking Number', payment.booking_no],
-    ['Guest Name', payment.guest_name],
-    ['Room Name', payment.room_name || '-'],
-    ['Amount', formatCurrency(payment.amount)],
-    ['Payment Method', payment.payment_method],
-    ['Payment Gateway', payment.payment_gateway],
-    ['Transaction ID', payment.transaction_id],
-    ['Invoice Number', payment.invoice_number || 'Not generated yet'],
-    ['Email Status', payment.email_status || 'Not Sent'],
-    ['Paid Date', formatDate(payment.paid_at)],
-    ['Created Date', formatDate(payment.created_at)],
-  ]
+  const guestCount = Number(payment.guests || payment.total_guests || payment.adults || 0)
+  const guestText = guestCount > 0 ? `${guestCount} guest${guestCount === 1 ? '' : 's'}` : '-'
+  const nights = Number(payment.total_nights || payment.nights || 0)
+  const nightsText = nights > 0 ? `${nights} night${nights === 1 ? '' : 's'}` : '-'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm">
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-white shadow-2xl">
+      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-white shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-text-primary">Payment Details</h2>
@@ -138,8 +236,8 @@ function PaymentDetailsModal({ payment, onClose }) {
           </button>
         </div>
 
-        <div className="p-6">
-          <div className="mb-6 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+        <div className="space-y-6 p-6">
+          <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-medium text-blue-700">Payment Amount</p>
@@ -149,17 +247,37 @@ function PaymentDetailsModal({ payment, onClose }) {
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            {details.map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-border bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
-                <p className="mt-1 break-words text-sm font-semibold text-text-primary">{value}</p>
-              </div>
-            ))}
-          </div>
+          <DetailSection title="Booking Details">
+            <DetailCard label="Booking Number" value={payment.booking_no} />
+            <DetailCard label="Booking ID" value={payment.booking_id} />
+            <DetailCard label="Booking Status" value={payment.booking_status || payment.status || '-'} />
+            <DetailCard label="Room Name" value={payment.room_name} />
+            <DetailCard label="Check-in" value={formatStayDate(payment.check_in || payment.checkin_date)} />
+            <DetailCard label="Check-out" value={formatStayDate(payment.check_out || payment.checkout_date)} />
+            <DetailCard label="Nights" value={nightsText} />
+            <DetailCard label="Guests" value={guestText} />
+          </DetailSection>
+
+          <DetailSection title="Guest Details">
+            <DetailCard label="Guest Name" value={payment.guest_name} />
+            <DetailCard label="Phone" value={payment.guest_phone || payment.phone} />
+            <DetailCard label="Email" value={payment.guest_email || payment.email} />
+            <DetailCard label="Special Request" value={payment.special_request || payment.notes || '-'} />
+          </DetailSection>
+
+          <DetailSection title="Payment Details">
+            <DetailCard label="Payment ID" value={payment.payment_id || `PAY-${String(payment.id).padStart(4, '0')}`} />
+            <DetailCard label="Transaction ID" value={payment.transaction_id} />
+            <DetailCard label="Amount" value={formatCurrency(payment.amount)} />
+            <DetailCard label="Payment Method" value={payment.payment_method} />
+            <DetailCard label="Payment Gateway" value={payment.payment_gateway} />
+            <DetailCard label="Paid Date" value={formatDate(payment.paid_at)} />
+            <DetailCard label="Created Date" value={formatDate(payment.created_at)} />
+            <DetailCard label="Updated Date" value={formatDate(payment.updated_at)} />
+          </DetailSection>
 
           {invoiceDownloadUrl ? (
-            <div className="mt-6 flex justify-end">
+            <div className="flex justify-end">
               <Button type="button" onClick={() => window.open(invoiceDownloadUrl, '_blank', 'noopener,noreferrer')}>
                 <Download className="h-4 w-4" />
                 Download Invoice
@@ -172,40 +290,194 @@ function PaymentDetailsModal({ payment, onClose }) {
   )
 }
 
+function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
+  const [paymentStatus, setPaymentStatus] = useState(payment.payment_status || 'pending')
+  const [paymentMethod, setPaymentMethod] = useState(payment.payment_method || 'PayHere')
+  const [reference, setReference] = useState(payment.payment_id || payment.transaction_id || '')
+  const [remarks, setRemarks] = useState('')
+  const [errors, setErrors] = useState({})
+
+  const validate = () => {
+    const nextErrors = {}
+    if (!paymentStatus) nextErrors.paymentStatus = 'Please select payment status.'
+    if (!paymentMethod) nextErrors.paymentMethod = 'Please select payment method.'
+    setErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    if (!validate()) return
+
+    onSave(payment.id, {
+      payment_status: paymentStatus,
+      payment_method: paymentMethod,
+      transaction_reference: reference.trim(),
+      remarks: remarks.trim(),
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6 backdrop-blur-sm">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-border bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-border px-6 py-5">
+          <div>
+            <h2 className="text-lg font-bold text-text-primary">Edit Payment</h2>
+            <p className="mt-1 text-sm text-text-secondary">{payment.booking_no}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            aria-label="Close edit payment"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5 p-6">
+          <div className="rounded-xl border border-border bg-slate-50 p-4">
+            <p className="text-sm font-semibold text-text-primary">{formatCurrency(payment.amount)}</p>
+            <p className="mt-1 text-sm text-text-secondary">Current status: {statusLabel[payment.payment_status] || payment.payment_status}</p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="edit-payment-status">Payment Status *</Label>
+              <select
+                id="edit-payment-status"
+                value={paymentStatus}
+                onChange={(event) => setPaymentStatus(event.target.value)}
+                className={`h-10 w-full rounded-lg border bg-white px-3 text-sm font-medium text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${errors.paymentStatus ? 'border-red-500' : 'border-border'}`}
+              >
+                {editablePaymentStatuses.map((status) => (
+                  <option key={status} value={status}>{statusLabel[status]}</option>
+                ))}
+              </select>
+              {errors.paymentStatus ? <p className="text-xs font-medium text-red-600">{errors.paymentStatus}</p> : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-payment-method">Payment Method *</Label>
+              <select
+                id="edit-payment-method"
+                value={paymentMethod}
+                onChange={(event) => setPaymentMethod(event.target.value)}
+                className={`h-10 w-full rounded-lg border bg-white px-3 text-sm font-medium text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 ${errors.paymentMethod ? 'border-red-500' : 'border-border'}`}
+              >
+                {methodOptions.map((method) => (
+                  <option key={method} value={method}>{method}</option>
+                ))}
+              </select>
+              {errors.paymentMethod ? <p className="text-xs font-medium text-red-600">{errors.paymentMethod}</p> : null}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="payment-reference">Reference / Transaction No.</Label>
+            <Input
+              id="payment-reference"
+              value={reference}
+              onChange={(event) => setReference(event.target.value)}
+              placeholder="PayHere ID, bank slip no, cash receipt no..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="payment-remarks">Remarks</Label>
+            <textarea
+              id="payment-remarks"
+              value={remarks}
+              onChange={(event) => setRemarks(event.target.value)}
+              rows={3}
+              placeholder="Optional internal note"
+              className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+            <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function Pagination({ page, totalPages, totalItems, onPageChange }) {
+  if (totalPages <= 1) return null
+
+  const start = (page - 1) * PAGE_SIZE + 1
+  const end = Math.min(page * PAGE_SIZE, totalItems)
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-text-secondary">Showing {start}-{end} of {totalItems}</p>
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+        {Array.from({ length: totalPages }, (_, index) => index + 1).map((item) => (
+          <Button
+            key={item}
+            type="button"
+            variant={item === page ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onPageChange(item)}
+          >
+            {item}
+          </Button>
+        ))}
+        <Button type="button" variant="outline" size="sm" disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
+      </div>
+    </div>
+  )
+}
+
 export default function Payments() {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [savingPayment, setSavingPayment] = useState(false)
   const [error, setError] = useState('')
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [methodFilter, setMethodFilter] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedPayment, setSelectedPayment] = useState(null)
-  const [toast, setToast] = useState('')
+  const [editingPayment, setEditingPayment] = useState(null)
+  const [toast, setToast] = useState(null)
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type })
+    window.setTimeout(() => setToast(null), 2400)
+  }
+
+  const loadPayments = async () => {
+    try {
+      setLoading(true)
+      setError('')
+      const data = await fetchPayments()
+      setPayments(data)
+    } catch (err) {
+      setError(err.message || 'Unable to load payments.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
-    let active = true
-
-    async function loadPayments() {
-      try {
-        setLoading(true)
-        setError('')
-        const data = await fetchPayments()
-        if (active) setPayments(data)
-      } catch (err) {
-        if (active) setError(err.message || 'Unable to load payments.')
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
     loadPayments()
-
-    return () => {
-      active = false
-    }
   }, [])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, methodFilter, dateFrom, dateTo])
+
+  const methodOptions = useMemo(() => {
+    const methods = payments.map((payment) => payment.payment_method).filter(Boolean)
+    return Array.from(new Set([...defaultPaymentMethods, ...methods]))
+  }, [payments])
 
   const filteredPayments = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -213,10 +485,9 @@ export default function Payments() {
     return payments.filter((payment) => {
       const matchesSearch =
         !query ||
-        payment.transaction_id.toLowerCase().includes(query) ||
-        payment.booking_no.toLowerCase().includes(query) ||
-        payment.guest_name.toLowerCase().includes(query) ||
-        payment.invoice_number.toLowerCase().includes(query)
+        safeText(payment.transaction_id).includes(query) ||
+        safeText(payment.booking_no).includes(query) ||
+        safeText(payment.payment_id).includes(query)
 
       const matchesStatus = statusFilter === 'all' || payment.payment_status === statusFilter
       const matchesMethod = methodFilter === 'all' || payment.payment_method === methodFilter
@@ -225,6 +496,9 @@ export default function Payments() {
       return matchesSearch && matchesStatus && matchesMethod && matchesDate
     })
   }, [payments, searchTerm, statusFilter, methodFilter, dateFrom, dateTo])
+
+  const totalPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE))
+  const paginatedPayments = filteredPayments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
 
   const summary = useMemo(() => {
     return payments.reduce(
@@ -244,21 +518,35 @@ export default function Payments() {
     setMethodFilter('all')
     setDateFrom('')
     setDateTo('')
-    setToast('Payment filters reset.')
-    window.setTimeout(() => setToast(''), 2200)
+    setCurrentPage(1)
+    showToast('Payment filters reset.')
+  }
+
+  const handleSavePayment = async (paymentId, payload) => {
+    try {
+      setSavingPayment(true)
+      const updatedPayment = await updatePaymentStatus(paymentId, payload)
+
+      setPayments((current) =>
+        current.map((payment) => (payment.id === paymentId ? { ...payment, ...updatedPayment } : payment))
+      )
+
+      setEditingPayment(null)
+      showToast('Payment updated successfully.')
+    } catch (err) {
+      showToast(err.message || 'Unable to update payment.', 'error')
+    } finally {
+      setSavingPayment(false)
+    }
   }
 
   return (
     <div className="space-y-6">
-      {toast ? (
-        <div className="fixed right-4 top-4 z-50 rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm font-medium text-blue-900 shadow-lg shadow-slate-200">
-          {toast}
-        </div>
-      ) : null}
+      <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
 
       <PageHeader
         title="Payments"
-        description="Track PayHere payments, invoice details, and payment email delivery."
+        description="Track Jebal Guest House payment status and payment methods."
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -270,7 +558,7 @@ export default function Payments() {
       <Card>
         <CardContent className="p-5">
           <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid flex-1 gap-4 md:grid-cols-2 xl:grid-cols-6">
               <div className="xl:col-span-2">
                 <Label htmlFor="payment-search">Search payments</Label>
                 <div className="relative mt-2">
@@ -279,7 +567,7 @@ export default function Payments() {
                     id="payment-search"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Transaction, guest, booking no"
+                    placeholder="Transaction or booking no"
                     className="pl-9"
                   />
                 </div>
@@ -309,7 +597,7 @@ export default function Payments() {
                   className="mt-2 h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
                 >
                   <option value="all">All methods</option>
-                  {paymentMethods.map((method) => (
+                  {methodOptions.map((method) => (
                     <option key={method} value={method}>{method}</option>
                   ))}
                 </select>
@@ -318,6 +606,11 @@ export default function Payments() {
               <div>
                 <Label htmlFor="date-from">From</Label>
                 <Input id="date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-2" />
+              </div>
+
+              <div>
+                <Label htmlFor="date-to">To</Label>
+                <Input id="date-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-2" />
               </div>
             </div>
 
@@ -331,41 +624,38 @@ export default function Payments() {
           ) : null}
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px] text-left text-sm">
+            <table className="w-full min-w-[820px] text-left text-sm">
               <thead>
                 <tr className="border-b border-border text-xs uppercase tracking-wide text-text-secondary">
                   <th className="px-3 py-3">Transaction</th>
                   <th className="px-3 py-3">Booking</th>
-                  <th className="px-3 py-3">Guest</th>
                   <th className="px-3 py-3">Amount</th>
+                  <th className="px-3 py-3">Method</th>
                   <th className="px-3 py-3">Status</th>
-                  <th className="px-3 py-3">Invoice</th>
-                  <th className="px-3 py-3">Email</th>
                   <th className="px-3 py-3">Date</th>
                   <th className="px-3 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="9" className="px-3 py-8 text-center text-text-secondary">Loading payments...</td></tr>
+                  <tr><td colSpan="7" className="px-3 py-8 text-center text-text-secondary">Loading payments...</td></tr>
                 ) : filteredPayments.length === 0 ? (
-                  <tr><td colSpan="9" className="px-3 py-8 text-center text-text-secondary">No payments found.</td></tr>
+                  <tr><td colSpan="7" className="px-3 py-8 text-center text-text-secondary">No payments found.</td></tr>
                 ) : (
-                  filteredPayments.map((payment) => (
-                    <tr key={payment.id} className="border-b border-border last:border-0">
+                  paginatedPayments.map((payment) => (
+                    <tr key={payment.id} className="border-b border-border last:border-0 hover:bg-blue-50/40">
                       <td className="px-3 py-4 font-semibold text-text-primary">{payment.transaction_id}</td>
                       <td className="px-3 py-4 text-text-secondary">{payment.booking_no}</td>
-                      <td className="px-3 py-4 text-text-secondary">{payment.guest_name}</td>
                       <td className="px-3 py-4 font-semibold text-text-primary">{formatCurrency(payment.amount)}</td>
+                      <td className="px-3 py-4 text-text-secondary">{payment.payment_method || '-'}</td>
                       <td className="px-3 py-4"><PaymentStatusBadge status={payment.payment_status} /></td>
-                      <td className="px-3 py-4 text-text-secondary">{payment.invoice_number || 'Not generated'}</td>
-                      <td className="px-3 py-4 text-text-secondary">{payment.email_status || 'Not Sent'}</td>
                       <td className="px-3 py-4 text-text-secondary">{formatDate(payment.paid_at || payment.created_at)}</td>
                       <td className="px-3 py-4 text-right">
-                        <Button type="button" variant="outline" size="sm" onClick={() => setSelectedPayment(payment)}>
-                          <Eye className="h-4 w-4" />
-                          View
-                        </Button>
+                        <ActionsDropdown
+                          payment={payment}
+                          onView={() => setSelectedPayment(payment)}
+                          onEdit={() => setEditingPayment(payment)}
+                        />
                       </td>
                     </tr>
                   ))
@@ -374,9 +664,27 @@ export default function Payments() {
             </table>
           </div>
         </CardContent>
+
+        {!loading && filteredPayments.length > 0 ? (
+          <Pagination
+            page={currentPage}
+            totalPages={totalPages}
+            totalItems={filteredPayments.length}
+            onPageChange={setCurrentPage}
+          />
+        ) : null}
       </Card>
 
       {selectedPayment ? <PaymentDetailsModal payment={selectedPayment} onClose={() => setSelectedPayment(null)} /> : null}
+      {editingPayment ? (
+        <EditPaymentModal
+          payment={editingPayment}
+          methodOptions={methodOptions}
+          onClose={() => setEditingPayment(null)}
+          onSave={handleSavePayment}
+          saving={savingPayment}
+        />
+      ) : null}
     </div>
   )
 }

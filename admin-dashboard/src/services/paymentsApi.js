@@ -7,13 +7,36 @@ function normalizePaymentStatus(status) {
     .trim()
     .toLowerCase()
     .replace(/^payment\s+/, '')
-    .replace(/\s+/g, '_')
+    .replace(/[\s-]+/g, '_')
 
   if (value === 'paid') return 'paid'
   if (value === 'failed') return 'failed'
   if (value === 'cancelled' || value === 'canceled') return 'cancelled'
   if (value === 'refunded') return 'refunded'
   return 'pending'
+}
+
+function normalizePaymentMethod(method) {
+  const value = String(method || 'PayHere').trim()
+  if (!value) return 'PayHere'
+
+  const normalized = value.toLowerCase().replace(/[\s_-]+/g, '_')
+  if (normalized === 'payhere') return 'PayHere'
+  if (normalized === 'cash') return 'Cash'
+  if (normalized === 'bank_transfer' || normalized === 'bank') return 'Bank Transfer'
+  if (normalized === 'card' || normalized === 'card_pos' || normalized === 'pos') return 'Card'
+  if (normalized === 'no_pay' || normalized === 'nopay' || normalized === 'no_payment') return 'No Pay'
+  if (normalized === 'other') return 'Other'
+  return value
+}
+
+function dbPaymentStatus(status) {
+  const value = normalizePaymentStatus(status)
+  if (value === 'paid') return 'Paid'
+  if (value === 'failed') return 'Failed'
+  if (value === 'cancelled') return 'Cancelled'
+  if (value === 'refunded') return 'Refunded'
+  return 'Payment Pending'
 }
 
 function normalizePayment(payment) {
@@ -32,8 +55,8 @@ function normalizePayment(payment) {
     amount: Number(payment.amount || 0),
     currency: payment.currency || 'LKR',
     payment_status: paymentStatus,
-    payment_method: payment.payment_method || payment.method || 'PayHere',
-    payment_gateway: payment.payment_gateway || 'PayHere',
+    payment_method: normalizePaymentMethod(payment.payment_method || payment.method),
+    payment_gateway: payment.payment_gateway || normalizePaymentMethod(payment.payment_method || payment.method),
     transaction_id: payment.transaction_id || payment.payment_id || payment.order_id || `PAY-${String(payment.id || 0).padStart(4, '0')}`,
     invoice_id: payment.invoice_id || null,
     invoice_number: payment.invoice_number || '',
@@ -55,4 +78,24 @@ export async function fetchPayments() {
 
   const payload = await readJsonResponse(response)
   return (payload.data || []).map(normalizePayment)
+}
+
+export async function updatePaymentStatus(paymentId, updates) {
+  const response = await apiFetch(`${API_BASE_URL}/update-status.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      id: paymentId,
+      payment_status: dbPaymentStatus(updates.payment_status),
+      payment_method: normalizePaymentMethod(updates.payment_method),
+      transaction_reference: updates.transaction_reference || '',
+      remarks: updates.remarks || '',
+    }),
+  })
+
+  const payload = await readJsonResponse(response)
+  return normalizePayment(payload.data || {})
 }
