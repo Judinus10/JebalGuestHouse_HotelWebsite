@@ -28,7 +28,7 @@ export default function PrivacyPolicy() {
           <SectionHeading
             subtitle="Your Information"
             title="How We Handle Guest Data"
-            description="This policy explains how Jebal Homes collects and uses information when guests contact us, make enquiries, or use our website."
+            description="This policy explains how Jebal Guest House collects and uses information when guests contact us, make enquiries, or use our website."
           />
 
           <div className="space-y-10 text-sm leading-7 text-muted">
@@ -68,7 +68,7 @@ export default function PrivacyPolicy() {
             <div>
               <h2 className="font-serif text-2xl text-charcoal">5. Contact</h2>
               <p className="mt-3">
-                For privacy-related questions, please contact Jebal Homes through the
+                For privacy-related questions, please contact Jebal Guest House through the
                 details provided on our contact page.
               </p>
             </div>

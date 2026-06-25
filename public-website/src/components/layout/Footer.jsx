@@ -14,8 +14,8 @@ const footerLinks = [
 ]
 
 const fallbackSettings = {
-  business_name: 'Jebal Homes',
-  address: 'Jebal Homes, Sri Lanka',
+  business_name: 'Jebal Guest House',
+  address: 'Jebal Guest House, Sri Lanka',
   phone: '+94 77 000 0000',
   email: 'info@jebalhomes.com',
   facebook_link: '',

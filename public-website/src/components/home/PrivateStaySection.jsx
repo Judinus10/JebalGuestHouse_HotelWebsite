@@ -41,7 +41,7 @@ export default function PrivateStaySection() {
               Your Comfortable Stay Awaits
             </h2>
             <p className="mt-6 text-sm leading-relaxed text-muted md:text-base">
-              Jebal Homes offers a simple and peaceful stay with rooms arranged
+              Jebal Guest House offers a simple and peaceful stay with rooms arranged
               for everyday comfort. Guests can choose from ground floor rooms,
               first floor rooms, a family room, or a private cottage.
             </p>

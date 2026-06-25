@@ -15,12 +15,12 @@ export default function Hero() {
   const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
 
   return (
-    <section ref={ref} className="relative -mt-[120px] h-[85vh] min-h-[500px] overflow-hidden md:h-[90vh]">
+    <section ref={ref} className="relative h-[85vh] min-h-[500px] overflow-hidden md:h-[90vh]">
       {/* Parallax background image */}
       <motion.div style={{ y }} className="absolute inset-0">
         <img
           src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1920&q=80"
-          alt="Jebal Homes guest house exterior"
+          alt="Jebal Guest House guest house exterior"
           className="h-[120%] w-full object-cover"
         />
       </motion.div>
@@ -39,7 +39,7 @@ export default function Hero() {
           transition={{ delay: 0.3, duration: 0.8 }}
           className="mb-4 text-xs tracking-[0.4em] uppercase text-white/80"
         >
-          Welcome to Jebal Homes
+          Welcome to Jebal Guest House
         </motion.p>
         <motion.h1
           initial={{ opacity: 0, y: 30 }}

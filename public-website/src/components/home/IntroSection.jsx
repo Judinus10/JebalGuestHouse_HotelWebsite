@@ -18,7 +18,7 @@ export default function IntroSection() {
             A Comfortable Guest House for Peaceful Stays
           </h2>
           <p className="mt-6 text-sm leading-relaxed text-muted md:text-base">
-            Jebal Homes welcomes guests with clean rooms, a calm environment,
+            Jebal Guest House welcomes guests with clean rooms, a calm environment,
             and practical facilities for a relaxed stay. Our guest house is
             suitable for families, couples, and travelers looking for short or
             comfortable extended stays.

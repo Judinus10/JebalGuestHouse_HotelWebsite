@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X } from 'lucide-react'
 import Button from '../ui/Button'
+import LanguageSwitcher from './LanguageSwitcher'
 
 const navLinks = [
   { label: 'Home', path: '/' },
@@ -39,14 +40,20 @@ export default function Navbar() {
     <>
       <div className={`navbar-topbar ${isHome ? 'home-hide-topbar' : ''}`}>
         <div className="navbar-topbar-inner">
-          <span>English</span>
+          <LanguageSwitcher />
           <Link to="/rooms">Find a Room</Link>
         </div>
       </div>
 
-      <header className={`navbar-main ${showSolid ? 'navbar-solid' : 'navbar-transparent'}`}>
+      <header
+        className={[
+          'navbar-main',
+          isHome ? 'navbar-home' : '',
+          showSolid ? 'navbar-solid' : 'navbar-transparent',
+        ].join(' ')}
+      >
         <nav className="navbar-inner">
-          <Link to="/" className="navbar-logo">
+          <Link to="/" className="navbar-logo" data-no-translate>
             <span
               className={
                 showSolid || mobileOpen
@@ -54,7 +61,7 @@ export default function Navbar() {
                   : 'logo-title light'
               }
             >
-              Jebal Homes
+              Jebal Guest House
             </span>
             <span
               className={

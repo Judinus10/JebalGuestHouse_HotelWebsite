@@ -22,7 +22,7 @@ export default function Rooms() {
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
           src="https://images.unsplash.com/photo-1611892440506-42a832e657fb?w=1920&q=80"
-          alt="Jebal Homes guest rooms"
+          alt="Jebal Guest House guest rooms"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />
         <div className="relative mx-auto w-full max-w-7xl px-6 pb-12">
@@ -42,7 +42,7 @@ export default function Rooms() {
         <div className="mx-auto max-w-7xl px-6">
           <SectionHeading
             subtitle="Choose Your Stay"
-            title="Rooms at Jebal Homes"
+            title="Rooms at Jebal Guest House"
             description="Choose from ground floor rooms, first floor rooms, a family room, or a private cottage with practical guest house comforts."
           />
 

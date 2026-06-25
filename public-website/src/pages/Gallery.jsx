@@ -49,14 +49,14 @@ export default function Gallery() {
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
           src={images[0]?.image_path || fallbackHero}
-          alt="Jebal Homes gallery"
+          alt="Jebal Guest House gallery"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />
         <div className="relative mx-auto w-full max-w-7xl px-6 pb-12">
           <FadeUp>
             <p className="text-xs tracking-[0.3em] uppercase text-gold-light">Gallery</p>
             <h1 className="mt-2 font-serif text-4xl text-white md:text-5xl">
-              Explore Jebal Homes
+              Explore Jebal Guest House
             </h1>
           </FadeUp>
         </div>
@@ -67,7 +67,7 @@ export default function Gallery() {
           <SectionHeading
             subtitle="Property Photos"
             title="Guest House Gallery"
-            description="A visual look at rooms, facilities, outdoor areas, and guest comforts available at Jebal Homes."
+            description="A visual look at rooms, facilities, outdoor areas, and guest comforts available at Jebal Guest House."
           />
 
           {loading ? (

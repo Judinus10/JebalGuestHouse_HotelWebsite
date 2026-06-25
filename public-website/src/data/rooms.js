@@ -1,5 +1,5 @@
 /**
- * Room data for the Jebal Homes guest house booking site.
+ * Room data for the Jebal Guest House guest house booking site.
  */
 export const rooms = [
   {

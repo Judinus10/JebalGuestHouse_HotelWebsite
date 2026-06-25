@@ -50,7 +50,7 @@ export default function Experience() {
           <SectionHeading
             subtitle="Explore Around Us"
             title="Discover Local Experiences"
-            description="Explore culture, food, islands, beaches and attractions around Jaffna during your stay at Jebal Homes."
+            description="Explore culture, food, islands, beaches and attractions around Jaffna during your stay at Jebal Guest House."
           />
 
           {loading ? (
@@ -114,7 +114,7 @@ export default function Experience() {
             </h2>
 
             <p className="mx-auto mt-4 max-w-2xl text-muted">
-              Stay with Jebal Homes and discover unforgettable experiences across
+              Stay with Jebal Guest House and discover unforgettable experiences across
               Northern Sri Lanka.
             </p>
 

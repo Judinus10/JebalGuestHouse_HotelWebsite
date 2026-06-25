@@ -47,7 +47,7 @@ export default function FeaturedRooms() {
         <SectionHeading
           subtitle="Where To Stay"
           title="Featured Rooms"
-          description="Comfortable room options for families, couples, and short stays at Jebal Homes."
+          description="Comfortable room options for families, couples, and short stays at Jebal Guest House."
         />
 
         <FadeUp>

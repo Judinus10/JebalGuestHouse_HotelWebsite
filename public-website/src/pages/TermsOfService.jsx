@@ -28,14 +28,14 @@ export default function TermsOfService() {
           <SectionHeading
             subtitle="Guest Guidelines"
             title="Terms for Using Our Website and Services"
-            description="These terms explain the basic conditions for using the Jebal Homes website, enquiries, and reservation-related services."
+            description="These terms explain the basic conditions for using the Jebal Guest House website, enquiries, and reservation-related services."
           />
 
           <div className="space-y-10 text-sm leading-7 text-muted">
             <div>
               <h2 className="font-serif text-2xl text-charcoal">1. Website Use</h2>
               <p className="mt-3">
-                This website is provided to share information about Jebal Homes, room
+                This website is provided to share information about Jebal Guest House, room
                 availability, services, gallery images, and contact options.
               </p>
             </div>
@@ -67,7 +67,7 @@ export default function TermsOfService() {
             <div>
               <h2 className="font-serif text-2xl text-charcoal">5. Updates to Terms</h2>
               <p className="mt-3">
-                Jebal Homes may update these terms when needed. Continued use of the
+                Jebal Guest House may update these terms when needed. Continued use of the
                 website means you accept the latest version of these terms.
               </p>
             </div>

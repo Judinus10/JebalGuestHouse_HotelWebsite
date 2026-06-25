@@ -88,7 +88,7 @@ export default function GallerySection() {
         <SectionHeading
           subtitle="Visual Journey"
           title="Explore the Property"
-          description="A glimpse into the rooms, cottage, garden, parking, and other spaces that define Jebal Homes."
+          description="A glimpse into the rooms, cottage, garden, parking, and other spaces that define Jebal Guest House."
         />
 
         {items.length === 0 ? (

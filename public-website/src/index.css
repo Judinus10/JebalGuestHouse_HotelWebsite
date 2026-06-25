@@ -99,6 +99,78 @@ body {
   color: rgb(255 255 255 / 60%);
 }
 
+
+/* ==========================================
+   LANGUAGE SWITCHER
+========================================== */
+
+.language-switcher {
+  position: relative;
+  z-index: 70;
+}
+
+.language-switcher-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 0;
+  background: transparent;
+  color: rgb(255 255 255 / 70%);
+  font: inherit;
+  cursor: pointer;
+  letter-spacing: 0.12em;
+}
+
+.language-switcher-button:hover {
+  color: var(--color-gold-light);
+}
+
+.language-switcher-arrow {
+  font-size: 0.65rem;
+  line-height: 1;
+  transform: translateY(-1px);
+}
+
+.language-switcher-menu {
+  position: absolute;
+  top: calc(100% + 0.6rem);
+  left: 0;
+  min-width: 210px;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 12%);
+  background: var(--color-charcoal);
+  box-shadow: 0 18px 45px rgb(0 0 0 / 18%);
+}
+
+.language-switcher-option {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 0.75rem 1rem;
+  color: rgb(255 255 255 / 72%);
+  text-align: left;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.language-switcher-option:hover,
+.language-switcher-option.active {
+  background: rgb(255 255 255 / 8%);
+  color: var(--color-gold-light);
+}
+
+html[dir='rtl'] .language-switcher-menu {
+  left: auto;
+  right: 0;
+}
+
+html[dir='rtl'] .language-switcher-option {
+  text-align: right;
+}
+
 .navbar-main {
   position: sticky;
   top: 0;
@@ -114,6 +186,19 @@ body {
 
 .navbar-transparent {
   background: transparent;
+}
+
+/* Homepage navbar must overlay the hero instead of taking layout space. */
+.navbar-home.navbar-transparent {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.navbar-home.navbar-solid {
+  position: sticky;
+  top: 0;
 }
 
 .navbar-inner {
