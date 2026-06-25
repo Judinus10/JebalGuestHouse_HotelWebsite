@@ -33,6 +33,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { fetchDashboardStats } from '@/services/dashboardApi'
 
+const TABLE_LIMIT = 5
+
 const defaultDashboardData = {
   cards: {
     totalBookings: 0,
@@ -127,7 +129,7 @@ function getPercentage(value, total) {
   return Math.round((Number(value || 0) / Number(total || 0)) * 100)
 }
 
-function normalizeDistribution(items) {
+function normalizeDistribution(items = []) {
   const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0)
 
   return items.map((item) => ({
@@ -136,41 +138,53 @@ function normalizeDistribution(items) {
   }))
 }
 
-function KpiCard({ title, value, helper, icon: Icon }) {
+function ClickableCard({ to, children, className = '' }) {
   return (
-    <Card className="transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-muted">{title}</p>
-            <p className="mt-2 text-2xl font-semibold text-charcoal">{value}</p>
-            {helper && <p className="mt-1 text-xs text-muted">{helper}</p>}
-          </div>
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-            <Icon className="h-5 w-5" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <Link to={to} className={`block h-full ${className}`}>
+      {children}
+    </Link>
   )
 }
 
-function MiniSummaryCard({ title, value, helper, icon: Icon }) {
+function KpiCard({ title, value, helper, icon: Icon, to }) {
   return (
-    <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center gap-3">
-          <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
-            <Icon className="h-5 w-5" />
+    <ClickableCard to={to}>
+      <Card className="h-full cursor-pointer transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-muted">{title}</p>
+              <p className="mt-2 break-words text-2xl font-semibold text-charcoal">{value}</p>
+              {helper && <p className="mt-1 text-xs text-muted">{helper}</p>}
+            </div>
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+              <Icon className="h-5 w-5" />
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-sm text-muted">{title}</p>
-            <p className="text-xl font-semibold text-charcoal">{value}</p>
-            {helper && <p className="truncate text-xs text-muted">{helper}</p>}
+        </CardContent>
+      </Card>
+    </ClickableCard>
+  )
+}
+
+function MiniSummaryCard({ title, value, helper, icon: Icon, to }) {
+  return (
+    <ClickableCard to={to}>
+      <Card className="h-full min-h-[112px] cursor-pointer transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md">
+        <CardContent className="p-4">
+          <div className="flex h-full items-start gap-3">
+            <div className="rounded-xl bg-blue-50 p-3 text-blue-700">
+              <Icon className="h-5 w-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium leading-snug text-charcoal">{title}</p>
+              <p className="mt-1 break-words text-xl font-semibold leading-tight text-charcoal">{value}</p>
+              {helper && <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted">{helper}</p>}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </ClickableCard>
   )
 }
 
@@ -190,63 +204,78 @@ function ChartLegend({ data }) {
   )
 }
 
-function StatusDonut({ title, data }) {
+function StatusDonut({ title, data, to }) {
   const chartData = normalizeDistribution(data)
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={210}>
-          <PieChart>
-            <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={82} paddingAngle={3}>
-              {chartData.map((entry, index) => (
-                <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '13px' }}
-              formatter={(value, name, item) => [`${item.payload.percentage}% (${value})`, name]}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-        <ChartLegend data={chartData} />
-      </CardContent>
-    </Card>
+    <ClickableCard to={to}>
+      <Card className="h-full cursor-pointer transition-all hover:border-blue-200 hover:shadow-md">
+        <CardHeader>
+          <CardTitle>{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={210}>
+            <PieChart>
+              <Pie data={chartData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={82} paddingAngle={3}>
+                {chartData.map((entry, index) => (
+                  <Cell key={entry.name} fill={chartColors[index % chartColors.length]} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', fontSize: '13px' }}
+                formatter={(value, name, item) => [`${item.payload.percentage}% (${value})`, name]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+          <ChartLegend data={chartData} />
+        </CardContent>
+      </Card>
+    </ClickableCard>
   )
 }
 
-function CompactList({ title, description, items, emptyText, renderItem }) {
+function CompactList({ title, description, items, emptyText, renderItem, to }) {
+  const visibleItems = items.slice(0, TABLE_LIMIT)
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <p className="text-sm text-muted">{description}</p>}
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-muted">
-            {emptyText}
+    <ClickableCard to={to}>
+      <Card className="h-full cursor-pointer transition-all hover:border-blue-200 hover:shadow-md">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle>{title}</CardTitle>
+              {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+            </div>
+            {items.length > TABLE_LIMIT ? (
+              <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                View all
+              </span>
+            ) : null}
           </div>
-        ) : (
-          <div className="space-y-3">{items.map(renderItem)}</div>
-        )}
-      </CardContent>
-    </Card>
+        </CardHeader>
+        <CardContent>
+          {visibleItems.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-muted">
+              {emptyText}
+            </div>
+          ) : (
+            <div className="space-y-2">{visibleItems.map(renderItem)}</div>
+          )}
+        </CardContent>
+      </Card>
+    </ClickableCard>
   )
 }
 
 function ListRow({ title, subtitle, right, badge }) {
   return (
-    <div className="rounded-xl border border-border p-4 transition-colors hover:bg-blue-50/40">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div className="rounded-xl border border-border px-4 py-3 transition-colors hover:bg-blue-50/40">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="font-semibold text-charcoal">{title}</p>
-          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
+          <p className="line-clamp-1 font-semibold text-charcoal">{title}</p>
+          {subtitle && <p className="mt-1 line-clamp-1 text-sm text-muted">{subtitle}</p>}
         </div>
-        <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+        <div className="flex shrink-0 items-center gap-2 text-right">
           {badge}
           {right && <span className="font-semibold text-charcoal">{right}</span>}
         </div>
@@ -312,14 +341,14 @@ export default function Dashboard() {
   )
 
   const kpis = [
-    { title: 'Total Bookings', value: dashboardData.cards.totalBookings, helper: 'All booking inquiries', icon: CalendarCheck },
-    { title: 'Pending Bookings', value: dashboardData.cards.pendingBookings, helper: 'Need confirmation', icon: TrendingUp },
-    { title: 'Confirmed Bookings', value: dashboardData.cards.confirmedBookings, helper: 'Confirmed stays', icon: CalendarCheck },
-    { title: 'Cancelled Bookings', value: dashboardData.cards.cancelledBookings, helper: 'Cancelled requests', icon: BedDouble },
-    { title: 'Total Enquiries', value: dashboardData.cards.totalEnquiries, helper: 'Contact form messages', icon: Mail },
-    { title: 'Total Revenue', value: currencyFormatter.format(dashboardData.cards.totalRevenue), helper: 'Paid bookings only', icon: DollarSign },
-    { title: 'Paid Bookings', value: dashboardData.cards.paidBookings, helper: 'Payment completed', icon: CreditCard },
-    { title: 'Payment Pending', value: dashboardData.cards.paymentPendingBookings, helper: 'Awaiting payment', icon: CreditCard },
+    { title: 'Total Bookings', value: dashboardData.cards.totalBookings, helper: 'All booking requests', icon: CalendarCheck, to: '/bookings' },
+    { title: 'Pending Bookings', value: dashboardData.cards.pendingBookings, helper: 'Need confirmation', icon: TrendingUp, to: '/bookings' },
+    { title: 'Confirmed Bookings', value: dashboardData.cards.confirmedBookings, helper: 'Confirmed stays', icon: CalendarCheck, to: '/bookings' },
+    { title: 'Cancelled Bookings', value: dashboardData.cards.cancelledBookings, helper: 'Cancelled requests', icon: BedDouble, to: '/bookings' },
+    { title: 'Total Enquiries', value: dashboardData.cards.totalEnquiries, helper: 'Guest messages', icon: Mail, to: '/messages' },
+    { title: 'Total Revenue', value: currencyFormatter.format(dashboardData.cards.totalRevenue), helper: 'Paid bookings only', icon: DollarSign, to: '/payments' },
+    { title: 'Paid Bookings', value: dashboardData.cards.paidBookings, helper: 'Payment completed', icon: CreditCard, to: '/payments' },
+    { title: 'Payment Pending', value: dashboardData.cards.paymentPendingBookings, helper: 'Awaiting payment', icon: CreditCard, to: '/payments' },
   ]
 
   const quickActions = [
@@ -334,7 +363,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       <PageHeader
         title="Dashboard"
-        description="Guest house overview for rooms, reservations, payments, messages, packages, and website content."
+        description="Jebal Guest House overview for rooms, reservations, payments, messages, packages, and website content."
       />
 
       {error ? (
@@ -355,23 +384,18 @@ export default function Dashboard() {
         ))}
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <MiniSummaryCard title="Today Revenue" value={currencyFormatter.format(dashboardData.revenue.today)} helper="Paid today" icon={DollarSign} />
-          <MiniSummaryCard title="Month Revenue" value={currencyFormatter.format(dashboardData.revenue.currentMonth)} helper="Paid this month" icon={TrendingUp} />
-          <MiniSummaryCard title="Year Revenue" value={currencyFormatter.format(dashboardData.revenue.currentYear)} helper="Paid this year" icon={CreditCard} />
-          <MiniSummaryCard title="Ground Floor Rooms" value={dashboardData.rooms.groundFloorRooms} helper="Easy access units" icon={Home} />
-          <MiniSummaryCard title="First Floor Rooms" value={dashboardData.rooms.firstFloorRooms} helper="Balcony-level units" icon={Building2} />
-          <MiniSummaryCard title="Cottage Units" value={dashboardData.rooms.cottageUnits} helper="Separate cottage" icon={Layers} />
-          <MiniSummaryCard title="Most Booked Room" value={dashboardData.rooms.mostBookedRoom} helper="Confirmed bookings" icon={BedDouble} />
-          <MiniSummaryCard title="Occupancy Rate" value={`${dashboardData.rooms.occupancyRate}%`} helper="Confirmed active stays" icon={Home} />
-          <MiniSummaryCard title="New Enquiries" value={dashboardData.enquiries.new} helper="Need attention" icon={MessageSquareText} />
-        </div>
+      <section className="grid gap-4 md:grid-cols-3">
+        <MiniSummaryCard title="Today Revenue" value={currencyFormatter.format(dashboardData.revenue.today)} helper="Paid today" icon={DollarSign} to="/payments" />
+        <MiniSummaryCard title="Month Revenue" value={currencyFormatter.format(dashboardData.revenue.currentMonth)} helper="Paid this month" icon={TrendingUp} to="/payments" />
+        <MiniSummaryCard title="Year Revenue" value={currencyFormatter.format(dashboardData.revenue.currentYear)} helper="Paid this year" icon={CreditCard} to="/payments" />
 
-        <Card>
-          <CardHeader>
+        <MiniSummaryCard title="Ground Floor Rooms" value={dashboardData.rooms.groundFloorRooms} helper="Easy access rooms" icon={Home} to="/rooms" />
+        <MiniSummaryCard title="First Floor Rooms" value={dashboardData.rooms.firstFloorRooms} helper="Upper floor rooms" icon={Building2} to="/rooms" />
+
+        <Card className="h-full min-h-[360px] md:row-span-3">
+          <CardHeader className="pb-3">
             <CardTitle>Quick Actions</CardTitle>
-            <p className="text-sm text-muted">Fast links to key daily operations.</p>
+            <p className="text-sm text-muted">Daily admin shortcuts.</p>
           </CardHeader>
           <CardContent className="space-y-3">
             {quickActions.map((action) => {
@@ -380,7 +404,7 @@ export default function Dashboard() {
                 <Link
                   key={action.label}
                   to={action.to}
-                  className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-charcoal shadow-sm transition-colors hover:bg-slate-50"
+                  className="inline-flex h-10 w-full items-center justify-start gap-2 rounded-lg border border-border bg-white px-4 py-2 text-sm font-medium text-charcoal shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50/60"
                 >
                   <Icon className="h-4 w-4 text-blue-700" />
                   {action.label}
@@ -389,66 +413,76 @@ export default function Dashboard() {
             })}
           </CardContent>
         </Card>
+
+        <MiniSummaryCard title="Cottage Units" value={dashboardData.rooms.cottageUnits} helper="Separate cottage units" icon={Layers} to="/rooms" />
+        <MiniSummaryCard title="Most Booked Room" value={dashboardData.rooms.mostBookedRoom} helper="Based on confirmed bookings" icon={BedDouble} to="/bookings" />
+        <MiniSummaryCard title="Occupancy Rate" value={`${dashboardData.rooms.occupancyRate}%`} helper="Current confirmed stays" icon={Home} to="/booking-calendar" />
+        <MiniSummaryCard title="New Enquiries" value={dashboardData.enquiries.new} helper="Unread guest messages" icon={MessageSquareText} to="/messages" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Booking Trend</CardTitle>
-            <p className="text-sm text-muted">Reservation volume by month.</p>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={dashboardData.charts.monthlyBookingTrend}>
-                <defs>
-                  <linearGradient id="bookingTrend" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.32} />
-                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
-                <YAxis tick={{ fontSize: 12, fill: '#64748B' }} allowDecimals={false} />
-                <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px' }} />
-                <Area type="monotone" dataKey="bookings" stroke="#2563EB" strokeWidth={2} fill="url(#bookingTrend)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ClickableCard to="/bookings">
+          <Card className="h-full cursor-pointer transition-all hover:border-blue-200 hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Monthly Booking Trend</CardTitle>
+              <p className="text-sm text-muted">Reservation volume by month.</p>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={dashboardData.charts.monthlyBookingTrend}>
+                  <defs>
+                    <linearGradient id="bookingTrend" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.32} />
+                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748B' }} allowDecimals={false} />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px' }} />
+                  <Area type="monotone" dataKey="bookings" stroke="#2563EB" strokeWidth={2} fill="url(#bookingTrend)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </ClickableCard>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue Trend</CardTitle>
-            <p className="text-sm text-muted">Paid accommodation revenue trend.</p>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={dashboardData.charts.revenueTrend}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-                <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
-                <YAxis tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-                <Tooltip
-                  contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px' }}
-                  formatter={(value) => [currencyFormatter.format(value), 'Revenue']}
-                />
-                <Bar dataKey="revenue" fill="#2563EB" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ClickableCard to="/payments">
+          <Card className="h-full cursor-pointer transition-all hover:border-blue-200 hover:shadow-md">
+            <CardHeader>
+              <CardTitle>Revenue Trend</CardTitle>
+              <p className="text-sm text-muted">Paid accommodation revenue trend.</p>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dashboardData.charts.revenueTrend}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                  <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
+                  <YAxis tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px' }}
+                    formatter={(value) => [currencyFormatter.format(value), 'Revenue']}
+                  />
+                  <Bar dataKey="revenue" fill="#2563EB" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </ClickableCard>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <StatusDonut title="Booking Status" data={bookingStatusData} />
-        <StatusDonut title="Payment Status" data={paymentStatusData} />
+        <StatusDonut title="Booking Status" data={bookingStatusData} to="/bookings" />
+        <StatusDonut title="Payment Status" data={paymentStatusData} to="/payments" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-2">
         <CompactList
           title="Recent Bookings"
-          description="Latest reservations created in the system."
+          description="Latest 5 reservations only. Click to view all bookings."
           emptyText="No recent bookings found."
           items={dashboardData.lists.recentBookings}
+          to="/bookings"
           renderItem={(booking) => (
             <ListRow
               key={booking.bookingNo}
@@ -462,9 +496,10 @@ export default function Dashboard() {
 
         <CompactList
           title="Upcoming Check-ins"
-          description="Arrivals from today onward."
+          description="Next 5 arrivals from today onward. Click to open calendar."
           emptyText="No upcoming check-ins."
           items={dashboardData.lists.upcomingCheckIns}
+          to="/booking-calendar"
           renderItem={(booking) => (
             <ListRow
               key={booking.bookingNo}
@@ -479,9 +514,10 @@ export default function Dashboard() {
       <section className="grid gap-6 xl:grid-cols-2">
         <CompactList
           title="Recent Payments"
-          description="Latest payment activity."
+          description="Latest 5 payment records only. Click to view payments."
           emptyText="No payment records found."
           items={dashboardData.lists.recentPayments}
+          to="/payments"
           renderItem={(payment) => (
             <ListRow
               key={payment.transaction}
@@ -495,9 +531,10 @@ export default function Dashboard() {
 
         <CompactList
           title="Latest Messages"
-          description="Newest guest inquiries."
+          description="Latest 5 guest inquiries only. Click to view messages."
           emptyText="No messages found."
           items={dashboardData.lists.latestMessages}
+          to="/messages"
           renderItem={(message) => (
             <ListRow
               key={message.id}
