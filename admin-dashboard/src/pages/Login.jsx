@@ -120,7 +120,7 @@ export default function Login() {
             © 2026 Jebal Guest House. Admin control panel.
           </p>
 
-          <div className="flex flex-col items-end">
+          <div className="flex translate-y-10 flex-col items-end">
             <span className="text-[11px] uppercase tracking-[0.35em] text-blue-200/70">
               Powered by
             </span>
