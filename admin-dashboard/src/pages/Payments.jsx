@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
 import {
   Banknote,
   CreditCard,
@@ -15,11 +14,12 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
+import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
 const PAGE_SIZE = 6
 
@@ -112,6 +112,20 @@ function StatCard({ title, value, description, icon: Icon }) {
       </CardContent>
     </Card>
   )
+}
+
+
+function buildPaymentExportRows(payments) {
+  return payments.map((payment) => ({
+    'Payment ID': payment.payment_id || `PAY-${String(payment.id || '').padStart(4, '0')}`,
+    'Transaction ID': payment.transaction_id || '-',
+    'Booking No': payment.booking_no || '-',
+    Amount: Number(payment.amount || 0),
+    Method: payment.payment_method || '-',
+    Status: statusLabel[payment.payment_status] || payment.payment_status || '-',
+    'Paid Date': payment.paid_at || '-',
+    'Created Date': payment.created_at || '-',
+  }))
 }
 
 function PaymentStatusBadge({ status }) {
@@ -488,9 +502,6 @@ function Pagination({ page, totalPages, totalItems, onPageChange }) {
 }
 
 export default function Payments() {
-  const location = useLocation()
-  const focusReference = location.state?.notificationFocus?.referenceId || location.state?.notificationFocus?.paymentReference || ''
-  const [blinkReference, setBlinkReference] = useState('')
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [savingPayment, setSavingPayment] = useState(false)
@@ -526,39 +537,6 @@ export default function Payments() {
   useEffect(() => {
     loadPayments()
   }, [])
-
-  useEffect(() => {
-    if (!focusReference || payments.length === 0) return undefined
-
-    setSearchTerm('')
-    setStatusFilter('all')
-    setMethodFilter('all')
-    setDateFrom('')
-    setDateTo('')
-
-    const targetIndex = payments.findIndex((payment) => (
-      payment.booking_no === focusReference
-      || payment.transaction_id === focusReference
-      || payment.order_id === focusReference
-      || payment.payment_id === focusReference
-    ))
-    if (targetIndex >= 0) {
-      setCurrentPage(Math.floor(targetIndex / PAGE_SIZE) + 1)
-    }
-
-    setBlinkReference('')
-    const startTimer = window.setTimeout(() => {
-      setBlinkReference(focusReference)
-      const element = document.querySelector(`[data-payment-reference=\"${focusReference}\"]`) || document.querySelector(`[data-payment-booking=\"${focusReference}\"]`)
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 180)
-    const stopTimer = window.setTimeout(() => setBlinkReference(''), 1800)
-
-    return () => {
-      window.clearTimeout(startTimer)
-      window.clearTimeout(stopTimer)
-    }
-  }, [focusReference, payments])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -626,15 +604,52 @@ export default function Payments() {
     }
   }
 
+  const handleDownload = (format) => {
+    const rows = buildPaymentExportRows(filteredPayments)
+
+    if (rows.length === 0) {
+      showToast('No payment data available for download.', 'error')
+      return
+    }
+
+    const payload = {
+      fileName: 'jebal-guest-house-payments',
+      title: 'Jebal Guest House Payment Report',
+      rows,
+    }
+
+    if (format === 'csv') exportCsv(payload)
+    if (format === 'excel') exportExcel(payload)
+    if (format === 'pdf') exportPdf(payload)
+  }
+
   return (
     <div className="space-y-6">
       <Toast message={toast?.message} type={toast?.type} onClose={() => setToast(null)} />
 
       <PageHeader title="Payments" description="Track Jebal Guest House payment status and payment methods.">
-        <Button type="button" variant="outline" onClick={handleResetFilters}>
-          <Filter className="h-4 w-4" />
-          Clear Filters
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="outline" onClick={handleResetFilters}>
+            <Filter className="h-4 w-4" />
+            Clear Filters
+          </Button>
+          <Dropdown
+            trigger={
+              <Button type="button" variant="outline">
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            }
+          >
+            {(close) => (
+              <>
+                <DropdownItem onClick={() => { close(); handleDownload('excel') }}>Excel</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownload('csv') }}>CSV</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownload('pdf') }}>PDF</DropdownItem>
+              </>
+            )}
+          </Dropdown>
+        </div>
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -728,7 +743,7 @@ export default function Payments() {
                   <tr><td colSpan="7" className="px-3 py-8 text-center text-text-secondary">No payments found.</td></tr>
                 ) : (
                   paginatedPayments.map((payment) => (
-                    <tr key={payment.id} data-payment-reference={payment.transaction_id || payment.order_id || payment.payment_id || payment.booking_no} data-payment-booking={payment.booking_no} className={cn('border-b border-border last:border-0 hover:bg-blue-50/40', blinkReference && (payment.booking_no === blinkReference || payment.transaction_id === blinkReference || payment.order_id === blinkReference || payment.payment_id === blinkReference) && 'case-blink')}>
+                    <tr key={payment.id} className="border-b border-border last:border-0 hover:bg-blue-50/40">
                       <td className="px-3 py-4 font-semibold text-text-primary">{payment.transaction_id}</td>
                       <td className="px-3 py-4 text-text-secondary">{payment.booking_no}</td>
                       <td className="px-3 py-4 font-semibold text-text-primary">{formatCurrency(payment.amount)}</td>

@@ -13,6 +13,7 @@ import {
   Home,
   Layers,
   Building2,
+  Download,
 } from 'lucide-react'
 import {
   Area,
@@ -31,7 +32,10 @@ import {
 import { PageHeader } from '@/components/ui/page-header'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { fetchDashboardStats } from '@/services/dashboardApi'
+import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
 const TABLE_LIMIT = 5
 
@@ -156,6 +160,59 @@ function normalizeDistribution(items = []) {
     ...item,
     percentage: item.percentage ?? getPercentage(item.value, total),
   }))
+}
+
+
+function fillLastSixMonths(data = [], valueKey) {
+  const now = new Date()
+
+  const months = []
+
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+
+    months.push({
+      month: d.toLocaleString('en-US', { month: 'short' }),
+      [valueKey]: 0,
+    })
+  }
+
+  data.forEach((item) => {
+    const existing = months.find((m) => m.month === item.month)
+
+    if (existing) {
+      existing[valueKey] = Number(item[valueKey] || 0)
+    }
+  })
+
+  return months
+}
+
+
+function buildDashboardReportRows(data, monthlyBookingTrend, revenueTrend) {
+  const rows = [
+    { Section: 'Bookings', Metric: 'Total Bookings', Value: data.cards.totalBookings },
+    { Section: 'Bookings', Metric: 'Pending Bookings', Value: data.cards.pendingBookings },
+    { Section: 'Bookings', Metric: 'Confirmed Bookings', Value: data.cards.confirmedBookings },
+    { Section: 'Bookings', Metric: 'Cancelled Bookings', Value: data.cards.cancelledBookings },
+    { Section: 'Payments', Metric: 'Total Revenue', Value: currencyFormatter.format(data.cards.totalRevenue) },
+    { Section: 'Payments', Metric: 'Paid Bookings', Value: data.cards.paidBookings },
+    { Section: 'Payments', Metric: 'Payment Pending', Value: data.cards.paymentPendingBookings },
+    { Section: 'Messages', Metric: 'Total Enquiries', Value: data.cards.totalEnquiries },
+    { Section: 'Rooms', Metric: 'Total Rooms', Value: data.rooms.totalRooms },
+    { Section: 'Rooms', Metric: 'Available Rooms', Value: data.rooms.availableRooms },
+    { Section: 'Rooms', Metric: 'Occupancy Rate', Value: `${data.rooms.occupancyRate}%` },
+  ]
+
+  monthlyBookingTrend.forEach((item) => {
+    rows.push({ Section: 'Monthly Booking Trend', Metric: item.month, Value: item.bookings })
+  })
+
+  revenueTrend.forEach((item) => {
+    rows.push({ Section: 'Revenue Trend', Metric: item.month, Value: currencyFormatter.format(item.revenue) })
+  })
+
+  return rows
 }
 
 function ClickableCard({ to, children, className = '' }) {
@@ -360,6 +417,24 @@ export default function Dashboard() {
     [dashboardData.charts.paymentStatusDistribution]
   )
 
+  const monthlyBookingTrend = useMemo(
+    () =>
+      fillLastSixMonths(
+        dashboardData.charts.monthlyBookingTrend,
+        'bookings'
+      ),
+    [dashboardData.charts.monthlyBookingTrend]
+  )
+
+  const revenueTrend = useMemo(
+    () =>
+      fillLastSixMonths(
+        dashboardData.charts.revenueTrend,
+        'revenue'
+      ),
+    [dashboardData.charts.revenueTrend]
+  )
+
   const kpis = [
     { title: 'Total Bookings', value: dashboardData.cards.totalBookings, helper: 'All booking requests', icon: CalendarCheck, to: '/bookings' },
     { title: 'Pending Bookings', value: dashboardData.cards.pendingBookings, helper: 'Need confirmation', icon: TrendingUp, to: '/bookings' },
@@ -379,12 +454,41 @@ export default function Dashboard() {
     { label: 'Website Settings', to: '/website-settings', icon: Tag },
   ]
 
+  const handleDownloadReport = (format) => {
+    const payload = {
+      fileName: 'jebal-guest-house-dashboard-report',
+      title: 'Jebal Guest House Dashboard Report',
+      rows: buildDashboardReportRows(dashboardData, monthlyBookingTrend, revenueTrend),
+    }
+
+    if (format === 'csv') exportCsv(payload)
+    if (format === 'excel') exportExcel(payload)
+    if (format === 'pdf') exportPdf(payload)
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader
         title="Dashboard"
         description="Jebal Guest House overview for rooms, reservations, payments, messages, packages, and website content."
-      />
+      >
+        <Dropdown
+          trigger={
+            <Button type="button" variant="outline">
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+          }
+        >
+          {(close) => (
+            <>
+              <DropdownItem onClick={() => { close(); handleDownloadReport('excel') }}>Excel</DropdownItem>
+              <DropdownItem onClick={() => { close(); handleDownloadReport('csv') }}>CSV</DropdownItem>
+              <DropdownItem onClick={() => { close(); handleDownloadReport('pdf') }}>PDF</DropdownItem>
+            </>
+          )}
+        </Dropdown>
+      </PageHeader>
 
       {error ? (
         <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
@@ -449,7 +553,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={dashboardData.charts.monthlyBookingTrend}>
+                <AreaChart data={monthlyBookingTrend}>
                   <defs>
                     <linearGradient id="bookingTrend" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#2563EB" stopOpacity={0.32} />
@@ -475,7 +579,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={dashboardData.charts.revenueTrend}>
+                <BarChart data={revenueTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
                   <YAxis tick={{ fontSize: 12, fill: '#64748B' }} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />

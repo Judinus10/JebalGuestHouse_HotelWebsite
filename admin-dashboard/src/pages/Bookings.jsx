@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
 import {
   CalendarDays,
   CheckCircle2,
   CreditCard,
+  Download,
   Eye,
   Filter,
   Hotel,
@@ -21,12 +21,13 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
 import { bookingRooms, bookingStatuses, initialBookings, paymentStatuses } from '@/data/bookingData'
 import { listRooms } from '@/services/roomsApi'
+import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 import {
   createManualBooking,
   deleteBooking,
@@ -212,6 +213,26 @@ function errorClass(hasError) {
   return hasError
     ? 'border-red-500 bg-red-50 focus:border-red-500 focus:ring-red-500/20'
     : 'border-border bg-white focus:border-blue-500 focus:ring-blue-500/20'
+}
+
+
+function buildBookingExportRows(bookings) {
+  return bookings.map((booking) => ({
+    'Booking No': booking.booking_no || '-',
+    'Guest Name': booking.guest_name || '-',
+    Phone: booking.guest_phone || '-',
+    Email: booking.guest_email || '-',
+    Room: booking.room_name || '-',
+    'Check In': booking.check_in || '-',
+    'Check Out': booking.check_out || '-',
+    Nights: booking.total_nights || 0,
+    Guests: booking.guests || 0,
+    Amount: Number(booking.total_amount || 0),
+    'Booking Status': humanizeBookingStatus(booking.booking_status),
+    'Payment Status': humanizePaymentStatus(booking.payment_status),
+    'Payment Method': booking.payment_method || '-',
+    'Created Date': booking.created_at || '-',
+  }))
 }
 
 function FieldError({ message }) {
@@ -935,9 +956,6 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 }
 
 export default function Bookings() {
-  const location = useLocation()
-  const focusReference = location.state?.notificationFocus?.referenceId || ''
-  const [blinkReference, setBlinkReference] = useState('')
   const [bookings, setBookings] = useState(initialBookings)
   const [rooms, setRooms] = useState(bookingRooms)
   const [isLoading, setIsLoading] = useState(true)
@@ -986,34 +1004,6 @@ export default function Bookings() {
     loadRooms()
     loadBookings()
   }, [])
-
-  useEffect(() => {
-    if (!focusReference || bookings.length === 0) return undefined
-
-    setSearchTerm('')
-    setBookingStatusFilter('all')
-    setPaymentStatusFilter('all')
-    setDateFrom('')
-    setDateTo('')
-
-    const targetIndex = bookings.findIndex((booking) => booking.booking_no === focusReference)
-    if (targetIndex >= 0) {
-      setCurrentPage(Math.floor(targetIndex / BOOKINGS_PER_PAGE) + 1)
-    }
-
-    setBlinkReference('')
-    const startTimer = window.setTimeout(() => {
-      setBlinkReference(focusReference)
-      const element = document.querySelector(`[data-booking-reference=\"${focusReference}\"]`)
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 180)
-    const stopTimer = window.setTimeout(() => setBlinkReference(''), 1800)
-
-    return () => {
-      window.clearTimeout(startTimer)
-      window.clearTimeout(stopTimer)
-    }
-  }, [focusReference, bookings])
 
   const filteredBookings = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -1105,6 +1095,25 @@ export default function Bookings() {
     }
   }
 
+  const handleDownload = (format) => {
+    const rows = buildBookingExportRows(filteredBookings)
+
+    if (rows.length === 0) {
+      showToast('No booking data available for download.', 'error')
+      return
+    }
+
+    const payload = {
+      fileName: 'jebal-guest-house-bookings',
+      title: 'Jebal Guest House Booking Report',
+      rows,
+    }
+
+    if (format === 'csv') exportCsv(payload)
+    if (format === 'excel') exportExcel(payload)
+    if (format === 'pdf') exportPdf(payload)
+  }
+
   return (
     <div className="space-y-6 overflow-visible">
       <Toast toast={toast} onClose={() => setToast(null)} />
@@ -1112,6 +1121,22 @@ export default function Bookings() {
       <PageHeader title="Bookings" description="View, filter, and manage Jebal Guest House reservations.">
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={clearFilters}><Filter className="h-4 w-4" />Clear Filters</Button>
+          <Dropdown
+            trigger={
+              <Button type="button" variant="outline">
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            }
+          >
+            {(close) => (
+              <>
+                <DropdownItem onClick={() => { close(); handleDownload('excel') }}>Excel</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownload('csv') }}>CSV</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownload('pdf') }}>PDF</DropdownItem>
+              </>
+            )}
+          </Dropdown>
           <Button onClick={() => setIsAddBookingOpen(true)}><Plus className="h-4 w-4" />Add Booking</Button>
         </div>
       </PageHeader>
@@ -1178,7 +1203,7 @@ export default function Bookings() {
               <div className="divide-y divide-border">
                 {paginatedBookings.map((booking) => {
                   return (
-                    <div key={booking.id} data-booking-reference={booking.booking_no} className={cn('grid gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center', blinkReference && booking.booking_no === blinkReference && 'case-blink rounded-xl')}>
+                    <div key={booking.id} className="grid gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center">
                       <div>
                         <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Booking</p>
                         <p className="font-bold text-text-primary">{booking.booking_no}</p>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
 import {
   Clipboard,
+  Download,
   Eye,
   Inbox,
   Mail,
@@ -12,11 +12,12 @@ import {
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
 import { apiFetch } from '@/services/apiClient'
+import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
@@ -55,6 +56,22 @@ function formatDate(value) {
   }).format(new Date(value))
 }
 
+
+function buildMessageExportRows(inquiries) {
+  return inquiries.map((item) => ({
+    'Inquiry ID': item.inquiry_id || '-',
+    Name: item.name || '-',
+    Email: item.email || '-',
+    Phone: item.phone || '-',
+    Type: item.inquiry_type || '-',
+    Subject: item.subject || '-',
+    Message: item.message || '-',
+    Status: item.status || '-',
+    'Received Date': item.created_at || '-',
+    'Updated Date': item.updated_at || '-',
+  }))
+}
+
 function StatCard({ title, value, icon: Icon }) {
   return (
     <Card>
@@ -91,9 +108,6 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 
 
 export default function Messages() {
-  const location = useLocation()
-  const focusReference = location.state?.notificationFocus?.referenceId || ''
-  const [blinkReference, setBlinkReference] = useState('')
   const [inquiries, setInquiries] = useState([])
   const [selectedInquiry, setSelectedInquiry] = useState(null)
   const [search, setSearch] = useState('')
@@ -188,32 +202,6 @@ export default function Messages() {
   }, [])
 
   useEffect(() => {
-    if (!focusReference || inquiries.length === 0) return undefined
-
-    setSearch('')
-    setStatusFilter('all')
-    setTypeFilter('all')
-
-    const targetIndex = inquiries.findIndex((item) => item.inquiry_id === focusReference)
-    if (targetIndex >= 0) {
-      setCurrentPage(Math.floor(targetIndex / MESSAGES_PER_PAGE) + 1)
-    }
-
-    setBlinkReference('')
-    const startTimer = window.setTimeout(() => {
-      setBlinkReference(focusReference)
-      const element = document.querySelector(`[data-message-reference=\"${focusReference}\"]`)
-      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }, 180)
-    const stopTimer = window.setTimeout(() => setBlinkReference(''), 1800)
-
-    return () => {
-      window.clearTimeout(startTimer)
-      window.clearTimeout(stopTimer)
-    }
-  }, [focusReference, inquiries])
-
-  useEffect(() => {
     if (!openActionId) return
 
     const handleOutsideClick = (event) => {
@@ -285,12 +273,50 @@ export default function Messages() {
     }
   }
 
+  const handleDownload = (format) => {
+    const rows = buildMessageExportRows(filteredInquiries)
+
+    if (rows.length === 0) {
+      showToast('No inquiry data available for download.')
+      return
+    }
+
+    const payload = {
+      fileName: 'jebal-guest-house-inquiries',
+      title: 'Jebal Guest House Inquiry Report',
+      rows,
+    }
+
+    if (format === 'csv') exportCsv(payload)
+    if (format === 'excel') exportExcel(payload)
+    if (format === 'pdf') exportPdf(payload)
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Inquiry Management"
         description="Manage room, booking, and general website enquiries from guests."
-      />
+      >
+        <div className="flex flex-wrap gap-2">
+          <Dropdown
+            trigger={
+              <Button type="button" variant="outline">
+                <Download className="h-4 w-4" />
+                Download
+              </Button>
+            }
+          >
+            {(close) => (
+              <>
+                <DropdownItem onClick={() => { close(); handleDownload('excel') }}>Excel</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownload('csv') }}>CSV</DropdownItem>
+                <DropdownItem onClick={() => { close(); handleDownload('pdf') }}>PDF</DropdownItem>
+              </>
+            )}
+          </Dropdown>
+        </div>
+      </PageHeader>
 
       {toast && (
         <div className="fixed right-6 top-6 z-50 rounded-xl bg-slate-900 px-4 py-3 text-sm font-medium text-white shadow-lg">
@@ -366,7 +392,7 @@ export default function Messages() {
                 </thead>
                 <tbody className="divide-y divide-border bg-white">
                   {paginatedInquiries.map((item) => (
-                    <tr key={item.id} data-message-reference={item.inquiry_id} className={cn('hover:bg-blue-50/40', blinkReference && item.inquiry_id === blinkReference && 'case-blink')}>
+                    <tr key={item.id} className="hover:bg-blue-50/40">
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.inquiry_id}</td>
                       <td className="px-4 py-3">
                         <div className="min-w-[180px]">
