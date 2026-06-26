@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Mail } from 'lucide-react'
 import { FaFacebookF, FaInstagram } from 'react-icons/fa'
+import companyLogo from '../../assets/company_logo.png'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
@@ -116,6 +117,8 @@ export default function Footer() {
       {/* Bottom tier */}
       <div className="mx-auto max-w-7xl px-6 py-10">
         <div className="flex flex-col items-center gap-8 text-center md:flex-row md:justify-between md:text-left">
+
+          {/* Hotel Info - Unchanged */}
           <div>
             <p className="font-serif text-2xl">{settings.business_name}</p>
             <p className="mt-1 text-xs tracking-[0.3em] uppercase text-white/40">
@@ -123,6 +126,7 @@ export default function Footer() {
             </p>
           </div>
 
+          {/* Contact Info - Unchanged */}
           <div className="text-sm text-white/60">
             <p>{settings.address}</p>
             <p className="mt-1">
@@ -130,9 +134,25 @@ export default function Footer() {
             </p>
           </div>
 
-          <p className="text-xs text-white/40">
-            © {new Date().getFullYear()} {settings.business_name}. All rights reserved.
-          </p>
+          {/* Copyright + CompylX */}
+          <div className="text-center md:text-right">
+            <p className="text-xs text-white/40">
+              © {new Date().getFullYear()} {settings.business_name}. All rights reserved.
+            </p>
+
+            <div className="mt-4 flex flex-col items-center md:items-end">
+              <span className="text-[11px] uppercase tracking-[0.2em] text-white/40">
+                Powered by
+              </span>
+
+              <img
+                src={companyLogo}
+                alt="CompylX"
+                className="mt-2 w-16 h-auto object-contain opacity-90 transition-opacity duration-300 hover:opacity-100"
+              />
+            </div>
+          </div>
+
         </div>
       </div>
     </footer>

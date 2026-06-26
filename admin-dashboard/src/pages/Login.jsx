@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
-import { Eye, EyeOff, Hotel, Lock, Mail } from 'lucide-react'
+import { Eye, EyeOff, Lock, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input, Label } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/context/AuthContext'
+import logo from '@/assets/logo.jpeg'
+import companyLogo from '@/assets/company_logo.png'
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -84,39 +86,65 @@ export default function Login() {
         <div className="absolute -right-24 top-24 h-72 w-72 rounded-full bg-blue-400/20 blur-3xl" />
         <div className="absolute -bottom-24 -left-24 h-72 w-72 rounded-full bg-blue-900/40 blur-3xl" />
 
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/20 ring-1 ring-white/15">
-            <Hotel className="h-6 w-6 text-white" />
-          </div>
+        <div className="relative z-10 flex items-center gap-4">
+          <img
+            src={logo}
+            alt="Jebal Guest House"
+            className="h-16 w-auto rounded-xl bg-white p-2 shadow-lg"
+          />
+
           <div>
-            <p className="text-xl font-semibold tracking-tight">Hotel Management System</p>
-            <p className="text-xs font-medium uppercase tracking-widest text-blue-200">Admin Control Panel</p>
+            <p className="text-2xl font-bold tracking-tight">
+              Jebal Guest House
+            </p>
+            <p className="text-xs font-medium uppercase tracking-[0.25em] text-blue-200">
+              Admin Dashboard
+            </p>
           </div>
         </div>
 
         <div className="relative z-10 max-w-lg">
           <p className="mb-4 inline-flex rounded-full border border-white/10 bg-white/10 px-3 py-1 text-xs font-medium text-blue-100 backdrop-blur">
-            Secure frontend demo access
+            Secure administrator access
           </p>
           <h2 className="text-4xl font-bold leading-tight tracking-tight">
             Manage bookings, rooms, payments, and guests from one clean dashboard.
           </h2>
           <p className="mt-5 max-w-md text-sm leading-6 text-blue-100/80">
-            A modern SaaS-style hotel administration experience for daily property operations.
+            A modern hotel administration experience for daily guest house operations.
           </p>
         </div>
 
-        <p className="relative z-10 text-xs text-blue-100/50">
-          &copy; 2026 Hotel Management System. Frontend demo mode.
-        </p>
+        <div className="relative z-10 flex items-end justify-between gap-6">
+          <p className="text-xs text-blue-100/50">
+            © 2026 Jebal Guest House. Admin control panel.
+          </p>
+
+          <div className="flex flex-col items-end">
+            <span className="text-[11px] uppercase tracking-[0.35em] text-blue-200/70">
+              Powered by
+            </span>
+
+            <img
+              src={companyLogo}
+              alt="CompylX"
+              className="mt-3 h-14 w-auto object-contain"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-1 items-center justify-center p-6">
         <Card className="w-full max-w-md border-slate-200 shadow-xl shadow-slate-200/70">
           <CardHeader className="text-center">
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-700 lg:hidden">
-              <Hotel className="h-6 w-6 text-white" />
+            <div className="mx-auto mb-4 lg:hidden">
+              <img
+                src={logo}
+                alt="Jebal Guest House"
+                className="h-20 w-auto rounded-xl bg-white p-2 shadow-lg"
+              />
             </div>
+
             <CardTitle className="text-2xl font-bold tracking-tight">Welcome back</CardTitle>
             <CardDescription>Sign in to continue to your dashboard</CardDescription>
           </CardHeader>
@@ -202,8 +230,9 @@ export default function Login() {
               {errors.form && (
                 <p className="text-center text-xs font-medium text-red-600">{errors.form}</p>
               )}
+
               <p className="text-center text-xs text-slate-500">
-                Use your assigned Jebal Homes admin credentials.
+                Use your assigned Jebal Guest House administrator credentials.
               </p>
             </form>
           </CardContent>
