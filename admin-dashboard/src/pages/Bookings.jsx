@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   CalendarDays,
   CheckCircle2,
@@ -23,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { bookingRooms, bookingStatuses, initialBookings, paymentStatuses } from '@/data/bookingData'
 import { listRooms } from '@/services/roomsApi'
 import {
@@ -933,6 +935,9 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 }
 
 export default function Bookings() {
+  const location = useLocation()
+  const focusReference = location.state?.notificationFocus?.referenceId || ''
+  const [blinkReference, setBlinkReference] = useState('')
   const [bookings, setBookings] = useState(initialBookings)
   const [rooms, setRooms] = useState(bookingRooms)
   const [isLoading, setIsLoading] = useState(true)
@@ -981,6 +986,34 @@ export default function Bookings() {
     loadRooms()
     loadBookings()
   }, [])
+
+  useEffect(() => {
+    if (!focusReference || bookings.length === 0) return undefined
+
+    setSearchTerm('')
+    setBookingStatusFilter('all')
+    setPaymentStatusFilter('all')
+    setDateFrom('')
+    setDateTo('')
+
+    const targetIndex = bookings.findIndex((booking) => booking.booking_no === focusReference)
+    if (targetIndex >= 0) {
+      setCurrentPage(Math.floor(targetIndex / BOOKINGS_PER_PAGE) + 1)
+    }
+
+    setBlinkReference('')
+    const startTimer = window.setTimeout(() => {
+      setBlinkReference(focusReference)
+      const element = document.querySelector(`[data-booking-reference=\"${focusReference}\"]`)
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 180)
+    const stopTimer = window.setTimeout(() => setBlinkReference(''), 1800)
+
+    return () => {
+      window.clearTimeout(startTimer)
+      window.clearTimeout(stopTimer)
+    }
+  }, [focusReference, bookings])
 
   const filteredBookings = useMemo(() => {
     const query = searchTerm.trim().toLowerCase()
@@ -1145,7 +1178,7 @@ export default function Bookings() {
               <div className="divide-y divide-border">
                 {paginatedBookings.map((booking) => {
                   return (
-                    <div key={booking.id} className="grid gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center">
+                    <div key={booking.id} data-booking-reference={booking.booking_no} className={cn('grid gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center', blinkReference && booking.booking_no === blinkReference && 'case-blink rounded-xl')}>
                       <div>
                         <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Booking</p>
                         <p className="font-bold text-text-primary">{booking.booking_no}</p>

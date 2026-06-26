@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Clipboard,
   Eye,
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { apiFetch } from '@/services/apiClient'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
@@ -89,6 +91,9 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 
 
 export default function Messages() {
+  const location = useLocation()
+  const focusReference = location.state?.notificationFocus?.referenceId || ''
+  const [blinkReference, setBlinkReference] = useState('')
   const [inquiries, setInquiries] = useState([])
   const [selectedInquiry, setSelectedInquiry] = useState(null)
   const [search, setSearch] = useState('')
@@ -181,6 +186,32 @@ export default function Messages() {
   useEffect(() => {
     loadInquiries()
   }, [])
+
+  useEffect(() => {
+    if (!focusReference || inquiries.length === 0) return undefined
+
+    setSearch('')
+    setStatusFilter('all')
+    setTypeFilter('all')
+
+    const targetIndex = inquiries.findIndex((item) => item.inquiry_id === focusReference)
+    if (targetIndex >= 0) {
+      setCurrentPage(Math.floor(targetIndex / MESSAGES_PER_PAGE) + 1)
+    }
+
+    setBlinkReference('')
+    const startTimer = window.setTimeout(() => {
+      setBlinkReference(focusReference)
+      const element = document.querySelector(`[data-message-reference=\"${focusReference}\"]`)
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 180)
+    const stopTimer = window.setTimeout(() => setBlinkReference(''), 1800)
+
+    return () => {
+      window.clearTimeout(startTimer)
+      window.clearTimeout(stopTimer)
+    }
+  }, [focusReference, inquiries])
 
   useEffect(() => {
     if (!openActionId) return
@@ -335,7 +366,7 @@ export default function Messages() {
                 </thead>
                 <tbody className="divide-y divide-border bg-white">
                   {paginatedInquiries.map((item) => (
-                    <tr key={item.id} className="hover:bg-blue-50/40">
+                    <tr key={item.id} data-message-reference={item.inquiry_id} className={cn('hover:bg-blue-50/40', blinkReference && item.inquiry_id === blinkReference && 'case-blink')}>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.inquiry_id}</td>
                       <td className="px-4 py-3">
                         <div className="min-w-[180px]">

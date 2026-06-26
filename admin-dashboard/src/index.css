@@ -72,3 +72,18 @@
     border-radius: 9999px;
   }
 }
+
+@keyframes case-blink-pulse {
+  0%, 100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  50% {
+    background-color: rgba(148, 163, 184, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.35);
+  }
+}
+
+.case-blink {
+  animation: case-blink-pulse 0.45s ease-in-out 3;
+}

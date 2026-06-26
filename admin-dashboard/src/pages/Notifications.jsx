@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Bell,
@@ -18,7 +19,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 
-import { fetchNotificationActivities } from '@/services/notificationsApi'
+import { fetchNotificationActivities, getNotificationNavigation, markNotificationActivityRead } from '@/services/notificationsApi'
 
 const typeVariants = {
   Booking: 'default',
@@ -90,6 +91,7 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 
 
 export default function Notifications() {
+  const navigate = useNavigate()
   const [activities, setActivities] = useState([])
   const [selectedActivity, setSelectedActivity] = useState(null)
   const [search, setSearch] = useState('')
@@ -174,9 +176,16 @@ export default function Notifications() {
   }
 
   const markViewed = (id) => {
+    markNotificationActivityRead(id)
     setActivities((current) => current.map((item) => (item.id === id ? { ...item, status: 'Viewed' } : item)))
     setSelectedActivity((current) => (current?.id === id ? { ...current, status: 'Viewed' } : current))
     showToast('Notification marked as viewed.')
+  }
+
+  const goToRelatedCase = (activity) => {
+    markViewed(activity.id)
+    const target = getNotificationNavigation(activity)
+    navigate(target.pathname, { state: target.state })
   }
 
   const deleteActivity = (id) => {
@@ -301,6 +310,17 @@ export default function Notifications() {
                               <button
                                 type="button"
                                 onClick={() => {
+                                  goToRelatedCase(item)
+                                  setOpenActionId(null)
+                                }}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-text-primary hover:bg-blue-50"
+                              >
+                                <Eye className="h-4 w-4 text-primary-600" />
+                                Open Case
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
                                   markViewed(item.id)
                                   setOpenActionId(null)
                                 }}
@@ -372,6 +392,7 @@ export default function Notifications() {
               </div>
             </div>
             <div className="flex flex-col gap-2 border-t border-border p-6 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => goToRelatedCase(selectedActivity)}>Open Case</Button>
               <Button variant="outline" onClick={() => markViewed(selectedActivity.id)}>Mark Read</Button>
               <Button variant="outline" onClick={() => deleteActivity(selectedActivity.id)}>Delete</Button>
               <Button onClick={() => setSelectedActivity(null)}>Close</Button>

@@ -4,6 +4,50 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 const CONTACT_API_URL = buildApiUrl('/contact/list_enquiries.php')
 
+const READ_NOTIFICATIONS_KEY = 'jebal_read_notifications'
+
+function readStoredNotificationIds() {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const value = window.localStorage.getItem(READ_NOTIFICATIONS_KEY)
+    const parsed = value ? JSON.parse(value) : []
+    return new Set(Array.isArray(parsed) ? parsed : [])
+  } catch {
+    return new Set()
+  }
+}
+
+export function markNotificationActivityRead(id) {
+  if (typeof window === 'undefined' || !id) return
+  const ids = readStoredNotificationIds()
+  ids.add(String(id))
+  window.localStorage.setItem(READ_NOTIFICATIONS_KEY, JSON.stringify([...ids]))
+  window.dispatchEvent(new CustomEvent('notification-read-changed'))
+}
+
+function applyStoredReadStatus(activities) {
+  const ids = readStoredNotificationIds()
+  return activities.map((activity) => (ids.has(String(activity.id)) ? { ...activity, status: activity.status === 'Resolved' ? 'Resolved' : 'Viewed' } : activity))
+}
+
+function notificationRouteState(activity) {
+  return {
+    notificationFocus: {
+      id: activity.id,
+      type: activity.type,
+      referenceId: activity.related_booking !== '-' ? activity.related_booking : activity.reference_id,
+      paymentReference: activity.reference_id,
+    },
+  }
+}
+
+export function getNotificationNavigation(activity) {
+  return {
+    pathname: activity.route || '/notifications',
+    state: notificationRouteState(activity),
+  }
+}
+
 function asDate(value) {
   if (!value) return null
   const date = new Date(String(value).replace(' ', 'T'))
@@ -169,11 +213,11 @@ export async function fetchNotificationActivities() {
     fetchEnquiries().catch(() => []),
   ])
 
-  return [
+  return applyStoredReadStatus([
     ...activitiesFromBookings(bookings),
     ...activitiesFromPayments(payments),
     ...activitiesFromEnquiries(enquiries),
-  ].sort((a, b) => (asDate(b.created_at)?.getTime() || 0) - (asDate(a.created_at)?.getTime() || 0))
+  ].sort((a, b) => (asDate(b.created_at)?.getTime() || 0) - (asDate(a.created_at)?.getTime() || 0)))
 }
 
 export async function fetchTopbarSearchData() {

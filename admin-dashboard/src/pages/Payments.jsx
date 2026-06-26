@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Banknote,
   CreditCard,
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input, Label } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
 
 const PAGE_SIZE = 6
@@ -486,6 +488,9 @@ function Pagination({ page, totalPages, totalItems, onPageChange }) {
 }
 
 export default function Payments() {
+  const location = useLocation()
+  const focusReference = location.state?.notificationFocus?.referenceId || location.state?.notificationFocus?.paymentReference || ''
+  const [blinkReference, setBlinkReference] = useState('')
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [savingPayment, setSavingPayment] = useState(false)
@@ -521,6 +526,39 @@ export default function Payments() {
   useEffect(() => {
     loadPayments()
   }, [])
+
+  useEffect(() => {
+    if (!focusReference || payments.length === 0) return undefined
+
+    setSearchTerm('')
+    setStatusFilter('all')
+    setMethodFilter('all')
+    setDateFrom('')
+    setDateTo('')
+
+    const targetIndex = payments.findIndex((payment) => (
+      payment.booking_no === focusReference
+      || payment.transaction_id === focusReference
+      || payment.order_id === focusReference
+      || payment.payment_id === focusReference
+    ))
+    if (targetIndex >= 0) {
+      setCurrentPage(Math.floor(targetIndex / PAGE_SIZE) + 1)
+    }
+
+    setBlinkReference('')
+    const startTimer = window.setTimeout(() => {
+      setBlinkReference(focusReference)
+      const element = document.querySelector(`[data-payment-reference=\"${focusReference}\"]`) || document.querySelector(`[data-payment-booking=\"${focusReference}\"]`)
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 180)
+    const stopTimer = window.setTimeout(() => setBlinkReference(''), 1800)
+
+    return () => {
+      window.clearTimeout(startTimer)
+      window.clearTimeout(stopTimer)
+    }
+  }, [focusReference, payments])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -690,7 +728,7 @@ export default function Payments() {
                   <tr><td colSpan="7" className="px-3 py-8 text-center text-text-secondary">No payments found.</td></tr>
                 ) : (
                   paginatedPayments.map((payment) => (
-                    <tr key={payment.id} className="border-b border-border last:border-0 hover:bg-blue-50/40">
+                    <tr key={payment.id} data-payment-reference={payment.transaction_id || payment.order_id || payment.payment_id || payment.booking_no} data-payment-booking={payment.booking_no} className={cn('border-b border-border last:border-0 hover:bg-blue-50/40', blinkReference && (payment.booking_no === blinkReference || payment.transaction_id === blinkReference || payment.order_id === blinkReference || payment.payment_id === blinkReference) && 'case-blink')}>
                       <td className="px-3 py-4 font-semibold text-text-primary">{payment.transaction_id}</td>
                       <td className="px-3 py-4 text-text-secondary">{payment.booking_no}</td>
                       <td className="px-3 py-4 font-semibold text-text-primary">{formatCurrency(payment.amount)}</td>

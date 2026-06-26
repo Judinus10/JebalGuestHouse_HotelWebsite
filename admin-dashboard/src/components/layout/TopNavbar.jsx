@@ -18,7 +18,7 @@ import { Dropdown, DropdownItem, DropdownLabel, DropdownSeparator } from '@/comp
 import { Badge } from '@/components/ui/badge'
 import { pageTitles, pageDescriptions } from '@/config/navigation'
 import { cn } from '@/lib/utils'
-import { fetchNotificationActivities, fetchTopbarSearchData } from '@/services/notificationsApi'
+import { fetchNotificationActivities, fetchTopbarSearchData, getNotificationNavigation, markNotificationActivityRead } from '@/services/notificationsApi'
 
 function shortDate(value) {
   if (!value) return ''
@@ -134,12 +134,18 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
       if (active) setNotifications(data)
     }
     load()
+    window.addEventListener('notification-read-changed', load)
     const timer = window.setInterval(load, 60000)
-    return () => { active = false; window.clearInterval(timer) }
+    return () => {
+      active = false
+      window.clearInterval(timer)
+      window.removeEventListener('notification-read-changed', load)
+    }
   }, [])
 
-  const unreadCount = notifications.filter((n) => n.status === 'New').length
-  const recentNotifications = notifications.slice(0, 4)
+  const unreadNotifications = notifications.filter((n) => n.status === 'New')
+  const unreadCount = unreadNotifications.length
+  const dropdownNotifications = unreadCount > 0 ? unreadNotifications : notifications.slice(0, 6)
 
   const currentUser = user || {
     name: 'Hotel Administrator',
@@ -157,6 +163,19 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
+  }
+
+  const handleNotificationClick = (notif, close) => {
+    markNotificationActivityRead(notif.id)
+    setNotifications((current) => current.map((item) => (item.id === notif.id ? { ...item, status: 'Viewed' } : item)))
+
+    fetchNotificationActivities()
+      .then((data) => setNotifications(data))
+      .catch(() => {})
+
+    close()
+    const target = getNotificationNavigation(notif)
+    navigate(target.pathname, { state: target.state })
   }
 
   return (
@@ -199,13 +218,13 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
                   {unreadCount > 0 && <Badge variant="default">{unreadCount} new</Badge>}
                 </div>
                 <div className="max-h-72 overflow-y-auto">
-                  {recentNotifications.length === 0 ? (
+                  {dropdownNotifications.length === 0 ? (
                     <p className="px-4 py-5 text-sm text-slate-500">No live notifications found.</p>
-                  ) : recentNotifications.map((notif) => (
+                  ) : dropdownNotifications.map((notif) => (
                     <button
                       key={notif.id}
                       type="button"
-                      onClick={() => { close(); navigate(notif.route || '/notifications') }}
+                      onClick={() => handleNotificationClick(notif, close)}
                       className={cn('flex w-full flex-col gap-0.5 border-b border-slate-200 px-4 py-3 text-left transition-colors last:border-0 hover:bg-slate-100/60', notif.status === 'New' && 'bg-blue-600/5')}
                     >
                       <div className="flex items-center gap-2">
