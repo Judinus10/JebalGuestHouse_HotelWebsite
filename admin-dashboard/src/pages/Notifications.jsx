@@ -40,7 +40,7 @@ const statusVariants = {
 
 const types = ['All Types', 'Booking', 'Payment', 'Contact', 'Check-in', 'Check-out', 'Cancellation', 'Offer', 'System']
 const statuses = ['All Statuses', 'New', 'Viewed', 'Resolved']
-const NOTIFICATIONS_PER_PAGE = 6
+const NOTIFICATIONS_PER_PAGE = 8
 
 function formatDate(value) {
   if (!value) return '-'

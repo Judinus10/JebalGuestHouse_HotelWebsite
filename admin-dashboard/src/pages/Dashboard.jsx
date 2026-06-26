@@ -612,7 +612,7 @@ export default function Dashboard() {
               key={booking.bookingNo}
               title={`${booking.guest} • ${booking.room}`}
               subtitle={`${booking.bookingNo} • Check-in ${formatDate(booking.checkIn)}`}
-              right={currencyFormatter.format(booking.amount)}
+              // right={currencyFormatter.format(booking.amount)}
               badge={<Badge variant={statusVariant[booking.status] || 'secondary'}>{booking.status}</Badge>}
             />
           )}

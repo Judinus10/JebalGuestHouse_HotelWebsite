@@ -15,6 +15,11 @@ $data = read_request_data();
 $fullName = clean_string($data['full_name'] ?? '', 150);
 $email = strtolower(clean_string($data['email'] ?? '', 190));
 $phone = clean_string($data['phone'] ?? '', 50);
+$isBookingForOther = !empty($data['is_booking_for_other']) && filter_var($data['is_booking_for_other'], FILTER_VALIDATE_BOOLEAN);
+$stayingGuestName = clean_string($data['staying_guest_name'] ?? '', 150);
+$stayingGuestEmail = strtolower(clean_string($data['staying_guest_email'] ?? '', 190));
+$stayingGuestPhone = clean_string($data['staying_guest_phone'] ?? '', 50);
+$stayingGuestNote = clean_string($data['staying_guest_note'] ?? '', 3000);
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
@@ -27,6 +32,21 @@ if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $c
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     json_response(false, 'Please enter a valid email address.', 422);
+}
+
+if ($isBookingForOther && ($stayingGuestName === '' || $stayingGuestPhone === '')) {
+    json_response(false, 'Please fill in the staying guest name and phone number.', 422);
+}
+
+if ($stayingGuestEmail !== '' && !filter_var($stayingGuestEmail, FILTER_VALIDATE_EMAIL)) {
+    json_response(false, 'Please enter a valid staying guest email address.', 422);
+}
+
+if (!$isBookingForOther) {
+    $stayingGuestName = '';
+    $stayingGuestEmail = '';
+    $stayingGuestPhone = '';
+    $stayingGuestNote = '';
 }
 
 if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate)) {
@@ -96,14 +116,19 @@ try {
 
     $stmt = $pdo->prepare(
         'INSERT INTO bookings
-        (full_name, email, phone, room_name, check_in_date, check_out_date, guests, message, status, payment_status, amount, currency, ip_address, user_agent, created_at, updated_at)
+        (full_name, email, phone, is_booking_for_other, staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note, room_name, check_in_date, check_out_date, guests, message, status, payment_status, amount, currency, ip_address, user_agent, created_at, updated_at)
         VALUES
-        (:full_name, :email, :phone, :room_name, :check_in_date, :check_out_date, :guests, :message, :status, :payment_status, :amount, :currency, :ip_address, :user_agent, NOW(), NOW())'
+        (:full_name, :email, :phone, :is_booking_for_other, :staying_guest_name, :staying_guest_email, :staying_guest_phone, :staying_guest_note, :room_name, :check_in_date, :check_out_date, :guests, :message, :status, :payment_status, :amount, :currency, :ip_address, :user_agent, NOW(), NOW())'
     );
     $stmt->execute([
         ':full_name' => $fullName,
         ':email' => $email,
         ':phone' => $phone,
+        ':is_booking_for_other' => $isBookingForOther ? 1 : 0,
+        ':staying_guest_name' => $stayingGuestName !== '' ? $stayingGuestName : null,
+        ':staying_guest_email' => $stayingGuestEmail !== '' ? $stayingGuestEmail : null,
+        ':staying_guest_phone' => $stayingGuestPhone !== '' ? $stayingGuestPhone : null,
+        ':staying_guest_note' => $stayingGuestNote !== '' ? $stayingGuestNote : null,
         ':room_name' => $roomName,
         ':check_in_date' => $checkInDate,
         ':check_out_date' => $checkOutDate,

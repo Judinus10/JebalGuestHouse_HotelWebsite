@@ -516,3 +516,10 @@ CREATE TABLE IF NOT EXISTS admin_password_otps (
 
 ALTER TABLE admin_password_otps
 ADD COLUMN expires_at_epoch INT NOT NULL DEFAULT 0 AFTER expires_at;
+
+ALTER TABLE bookings
+  ADD COLUMN IF NOT EXISTS is_booking_for_other TINYINT(1) NOT NULL DEFAULT 0 AFTER phone,
+  ADD COLUMN IF NOT EXISTS staying_guest_name VARCHAR(150) DEFAULT NULL AFTER is_booking_for_other,
+  ADD COLUMN IF NOT EXISTS staying_guest_email VARCHAR(190) DEFAULT NULL AFTER staying_guest_name,
+  ADD COLUMN IF NOT EXISTS staying_guest_phone VARCHAR(50) DEFAULT NULL AFTER staying_guest_email,
+  ADD COLUMN IF NOT EXISTS staying_guest_note TEXT DEFAULT NULL AFTER staying_guest_phone;

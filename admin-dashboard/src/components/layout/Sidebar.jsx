@@ -163,7 +163,7 @@ export function Sidebar({
                     Need assistance?
                   </p>
                   <p className="mt-0.5 text-xs text-slate-300">
-                    support@jebalhomes.com
+                    support.compylx@gmail.com
                   </p>
                 </div>
               </div>

@@ -21,7 +21,7 @@ import { Input, Label } from '@/components/ui/input'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
-const PAGE_SIZE = 6
+const PAGE_SIZE = 8
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -302,10 +302,18 @@ function PaymentDetailsModal({ payment, onClose }) {
             <DetailCard label="Guests" value={guestText} />
           </DetailSection>
 
-          <DetailSection title="Guest Details">
+          <DetailSection title="Booker Details">
+            <DetailCard label="Booker Name" value={payment.booker_name || payment.guest_name} />
+            <DetailCard label="Phone" value={payment.booker_phone || payment.guest_phone || payment.phone} />
+            <DetailCard label="Email" value={payment.booker_email || payment.guest_email || payment.email} />
+          </DetailSection>
+
+          <DetailSection title="Staying Guest Details">
             <DetailCard label="Guest Name" value={payment.guest_name} />
             <DetailCard label="Phone" value={payment.guest_phone || payment.phone} />
             <DetailCard label="Email" value={payment.guest_email || payment.email} />
+            <DetailCard label="Booked For Other" value={payment.is_booking_for_other ? 'Yes' : 'No'} />
+            <DetailCard label="Guest Note" value={payment.staying_guest_note || '-'} />
             <DetailCard label="Special Request" value={payment.special_request || payment.notes || '-'} />
           </DetailSection>
 
@@ -474,27 +482,17 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
 }
 
 function Pagination({ page, totalPages, totalItems, onPageChange }) {
-  if (totalPages <= 1) return null
+  if (totalItems === 0) return null
 
   const start = (page - 1) * PAGE_SIZE + 1
   const end = Math.min(page * PAGE_SIZE, totalItems)
 
   return (
     <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-text-secondary">Showing {start}-{end} of {totalItems}</p>
-      <div className="flex justify-end gap-2">
+      <p className="text-sm font-medium text-text-secondary">Showing {start}-{end} of {totalItems}</p>
+      <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
-        {Array.from({ length: totalPages }, (_, index) => index + 1).map((item) => (
-          <Button
-            key={item}
-            type="button"
-            variant={item === page ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onPageChange(item)}
-          >
-            {item}
-          </Button>
-        ))}
+        <span className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-bold text-text-primary">{page} / {totalPages}</span>
         <Button type="button" variant="outline" size="sm" disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
       </div>
     </div>

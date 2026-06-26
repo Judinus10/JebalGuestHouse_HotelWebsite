@@ -28,6 +28,11 @@ export default function RoomDetails() {
     full_name: '',
     email: '',
     phone: '',
+    is_booking_for_other: false,
+    staying_guest_name: '',
+    staying_guest_email: '',
+    staying_guest_phone: '',
+    staying_guest_note: '',
     check_in_date: '',
     check_out_date: '',
     guests: '2',
@@ -160,7 +165,12 @@ export default function RoomDetails() {
   }
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value })
+    const { name, value, type, checked } = e.target
+
+    setFormData((current) => ({
+      ...current,
+      [name]: type === 'checkbox' ? checked : value,
+    }))
   }
 
   const handleSubmit = async (e) => {
@@ -224,6 +234,11 @@ export default function RoomDetails() {
         full_name: '',
         email: '',
         phone: '',
+        is_booking_for_other: false,
+        staying_guest_name: '',
+        staying_guest_email: '',
+        staying_guest_phone: '',
+        staying_guest_note: '',
         check_in_date: '',
         check_out_date: '',
         guests: '2',
@@ -376,6 +391,39 @@ export default function RoomDetails() {
                       <label className="text-xs tracking-wider uppercase text-muted">Phone</label>
                       <input type="tel" name="phone" required value={formData.phone} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
                     </div>
+
+                    <label className="flex items-start gap-3 text-sm text-charcoal">
+                      <input
+                        type="checkbox"
+                        name="is_booking_for_other"
+                        checked={formData.is_booking_for_other}
+                        onChange={handleChange}
+                        className="mt-1"
+                      />
+                      <span>I am booking for someone else</span>
+                    </label>
+
+                    {formData.is_booking_for_other && (
+                      <div className="space-y-4 border-y border-ice-dark py-4">
+                        <div>
+                          <label className="text-xs tracking-wider uppercase text-muted">Staying Guest Name</label>
+                          <input type="text" name="staying_guest_name" required value={formData.staying_guest_name} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                        </div>
+                        <div>
+                          <label className="text-xs tracking-wider uppercase text-muted">Staying Guest Phone</label>
+                          <input type="tel" name="staying_guest_phone" required value={formData.staying_guest_phone} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                        </div>
+                        <div>
+                          <label className="text-xs tracking-wider uppercase text-muted">Staying Guest Email</label>
+                          <input type="email" name="staying_guest_email" value={formData.staying_guest_email} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                        </div>
+                        <div>
+                          <label className="text-xs tracking-wider uppercase text-muted">Staying Guest Note</label>
+                          <textarea name="staying_guest_note" rows={2} value={formData.staying_guest_note} onChange={handleChange} className="mt-1 w-full resize-none border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">Check In</label>
                       <input type="date" name="check_in_date" required value={formData.check_in_date} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
