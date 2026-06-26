@@ -87,3 +87,22 @@
 .case-blink {
   animation: case-blink-pulse 0.45s ease-in-out 3;
 }
+
+@keyframes dashboardFocusFlash {
+  0%, 100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  20%, 65% {
+    background-color: rgba(148, 163, 184, 0.28);
+    box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.35);
+  }
+}
+
+.dashboard-focus-flash {
+  animation: dashboardFocusFlash 1.35s ease-in-out;
+}
+
+.dashboard-focus-flash > td {
+  animation: dashboardFocusFlash 1.35s ease-in-out;
+}

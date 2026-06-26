@@ -315,48 +315,56 @@ function CompactList({ title, description, items, emptyText, renderItem, to }) {
   const visibleItems = items.slice(0, TABLE_LIMIT)
 
   return (
-    <ClickableCard to={to}>
-      <Card className="h-full cursor-pointer transition-all hover:border-blue-200 hover:shadow-md">
-        <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle>{title}</CardTitle>
-              {description && <p className="mt-1 text-sm text-muted">{description}</p>}
-            </div>
-            {items.length > TABLE_LIMIT ? (
-              <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-                View all
-              </span>
-            ) : null}
+    <Card className="h-full transition-all hover:border-blue-200 hover:shadow-md">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <CardTitle>{title}</CardTitle>
+            {description && <p className="mt-1 text-sm text-muted">{description}</p>}
           </div>
-        </CardHeader>
-        <CardContent>
-          {visibleItems.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-muted">
-              {emptyText}
-            </div>
-          ) : (
-            <div className="space-y-2">{visibleItems.map(renderItem)}</div>
-          )}
-        </CardContent>
-      </Card>
-    </ClickableCard>
+          <Link to={to} className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+            View all
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {visibleItems.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border bg-slate-50 p-6 text-center text-sm text-muted">
+            {emptyText}
+          </div>
+        ) : (
+          <div className="space-y-2">{visibleItems.map(renderItem)}</div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
-function ListRow({ title, subtitle, right, badge }) {
+function ListRow({ title, subtitle, right, badge, to }) {
+  const content = (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <p className="line-clamp-1 font-semibold text-charcoal">{title}</p>
+        {subtitle && <p className="mt-1 line-clamp-1 text-sm text-muted">{subtitle}</p>}
+      </div>
+      <div className="flex shrink-0 items-center gap-2 text-right">
+        {badge}
+        {right && <span className="font-semibold text-charcoal">{right}</span>}
+      </div>
+    </div>
+  )
+
+  if (to) {
+    return (
+      <Link to={to} className="block rounded-xl border border-border px-4 py-3 transition-colors hover:bg-blue-50/40">
+        {content}
+      </Link>
+    )
+  }
+
   return (
     <div className="rounded-xl border border-border px-4 py-3 transition-colors hover:bg-blue-50/40">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="line-clamp-1 font-semibold text-charcoal">{title}</p>
-          {subtitle && <p className="mt-1 line-clamp-1 text-sm text-muted">{subtitle}</p>}
-        </div>
-        <div className="flex shrink-0 items-center gap-2 text-right">
-          {badge}
-          {right && <span className="font-semibold text-charcoal">{right}</span>}
-        </div>
-      </div>
+      {content}
     </div>
   )
 }
@@ -614,6 +622,7 @@ export default function Dashboard() {
               subtitle={`${booking.bookingNo} • Check-in ${formatDate(booking.checkIn)}`}
               // right={currencyFormatter.format(booking.amount)}
               badge={<Badge variant={statusVariant[booking.status] || 'secondary'}>{booking.status}</Badge>}
+              to={`/bookings?focus=${encodeURIComponent(booking.bookingNo)}`}
             />
           )}
         />
@@ -630,6 +639,7 @@ export default function Dashboard() {
               title={`${formatDate(booking.checkIn)} • ${booking.guest}`}
               subtitle={`${booking.room} • ${booking.nights} night${booking.nights > 1 ? 's' : ''}`}
               badge={<Badge variant={statusVariant[booking.status] || 'secondary'}>{booking.status}</Badge>}
+              to={`/bookings?focus=${encodeURIComponent(booking.bookingNo)}`}
             />
           )}
         />
@@ -649,6 +659,7 @@ export default function Dashboard() {
               subtitle={formatDate(payment.createdAt)}
               right={currencyFormatter.format(payment.amount)}
               badge={<Badge variant={statusVariant[payment.status] || 'secondary'}>{payment.status}</Badge>}
+              to={`/payments?focus=${encodeURIComponent(payment.transaction)}`}
             />
           )}
         />
@@ -665,6 +676,7 @@ export default function Dashboard() {
               title={message.subject}
               subtitle={`${message.from} • ${message.message}`}
               badge={<Badge variant={statusVariant[message.status] || 'secondary'}>{message.status}</Badge>}
+              to={`/messages?focus=${encodeURIComponent(message.id)}`}
             />
           )}
         />

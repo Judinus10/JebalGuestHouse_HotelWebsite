@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Banknote,
   CreditCard,
@@ -21,7 +22,7 @@ import { Input, Label } from '@/components/ui/input'
 import { fetchPayments, updateCombinedStatusByBooking } from '@/services/paymentsApi'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 6
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -302,18 +303,10 @@ function PaymentDetailsModal({ payment, onClose }) {
             <DetailCard label="Guests" value={guestText} />
           </DetailSection>
 
-          <DetailSection title="Booker Details">
-            <DetailCard label="Booker Name" value={payment.booker_name || payment.guest_name} />
-            <DetailCard label="Phone" value={payment.booker_phone || payment.guest_phone || payment.phone} />
-            <DetailCard label="Email" value={payment.booker_email || payment.guest_email || payment.email} />
-          </DetailSection>
-
-          <DetailSection title="Staying Guest Details">
+          <DetailSection title="Guest Details">
             <DetailCard label="Guest Name" value={payment.guest_name} />
             <DetailCard label="Phone" value={payment.guest_phone || payment.phone} />
             <DetailCard label="Email" value={payment.guest_email || payment.email} />
-            <DetailCard label="Booked For Other" value={payment.is_booking_for_other ? 'Yes' : 'No'} />
-            <DetailCard label="Guest Note" value={payment.staying_guest_note || '-'} />
             <DetailCard label="Special Request" value={payment.special_request || payment.notes || '-'} />
           </DetailSection>
 
@@ -482,17 +475,27 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
 }
 
 function Pagination({ page, totalPages, totalItems, onPageChange }) {
-  if (totalItems === 0) return null
+  if (totalPages <= 1) return null
 
   const start = (page - 1) * PAGE_SIZE + 1
   const end = Math.min(page * PAGE_SIZE, totalItems)
 
   return (
     <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm font-medium text-text-secondary">Showing {start}-{end} of {totalItems}</p>
-      <div className="flex items-center justify-end gap-2">
+      <p className="text-sm text-text-secondary">Showing {start}-{end} of {totalItems}</p>
+      <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
-        <span className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-bold text-text-primary">{page} / {totalPages}</span>
+        {Array.from({ length: totalPages }, (_, index) => index + 1).map((item) => (
+          <Button
+            key={item}
+            type="button"
+            variant={item === page ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onPageChange(item)}
+          >
+            {item}
+          </Button>
+        ))}
         <Button type="button" variant="outline" size="sm" disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
       </div>
     </div>
@@ -500,6 +503,10 @@ function Pagination({ page, totalPages, totalItems, onPageChange }) {
 }
 
 export default function Payments() {
+  const location = useLocation()
+  const focusRefs = useRef({})
+  const [focusedTransaction, setFocusedTransaction] = useState('')
+  const [flashTransaction, setFlashTransaction] = useState('')
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [savingPayment, setSavingPayment] = useState(false)
@@ -539,7 +546,6 @@ export default function Payments() {
   useEffect(() => {
     setCurrentPage(1)
   }, [searchTerm, statusFilter, methodFilter, dateFrom, dateTo])
-
   const methodOptions = useMemo(() => {
     const methods = payments.map((payment) => payment.payment_method).filter(Boolean)
     return Array.from(new Set([...defaultPaymentMethods, ...methods]))
@@ -565,6 +571,48 @@ export default function Payments() {
 
   const totalPages = Math.max(1, Math.ceil(filteredPayments.length / PAGE_SIZE))
   const paginatedPayments = filteredPayments.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+
+  useEffect(() => {
+    const focusValue = new URLSearchParams(location.search).get('focus')
+    if (!focusValue) return
+
+    setSearchTerm('')
+    setStatusFilter('all')
+    setMethodFilter('all')
+    setDateFrom('')
+    setDateTo('')
+    setFocusedTransaction(focusValue)
+  }, [location.search])
+
+  useEffect(() => {
+    if (!focusedTransaction || loading) return
+
+    const focusedIndex = filteredPayments.findIndex(
+      (payment) => String(payment.transaction_id) === String(focusedTransaction)
+    )
+
+    if (focusedIndex < 0) return
+
+    setCurrentPage(Math.floor(focusedIndex / PAGE_SIZE) + 1)
+  }, [focusedTransaction, filteredPayments, loading])
+
+  useEffect(() => {
+    if (!focusedTransaction || loading) return
+
+    const element = focusRefs.current[focusedTransaction]
+    if (!element) return
+
+    const timer = window.setTimeout(() => {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFlashTransaction(focusedTransaction)
+      window.setTimeout(() => setFlashTransaction(''), 1200)
+      setFocusedTransaction('')
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [focusedTransaction, paginatedPayments, loading])
+
+
 
   const summary = useMemo(() => {
     return payments.reduce(
@@ -741,7 +789,13 @@ export default function Payments() {
                   <tr><td colSpan="7" className="px-3 py-8 text-center text-text-secondary">No payments found.</td></tr>
                 ) : (
                   paginatedPayments.map((payment) => (
-                    <tr key={payment.id} className="border-b border-border last:border-0 hover:bg-blue-50/40">
+                    <tr
+                      key={payment.id}
+                      ref={(element) => {
+                        if (element) focusRefs.current[payment.transaction_id] = element
+                      }}
+                      className={`border-b border-border last:border-0 hover:bg-blue-50/40 ${flashTransaction === payment.transaction_id ? 'dashboard-focus-flash' : ''}`}
+                    >
                       <td className="px-3 py-4 font-semibold text-text-primary">{payment.transaction_id}</td>
                       <td className="px-3 py-4 text-text-secondary">{payment.booking_no}</td>
                       <td className="px-3 py-4 font-semibold text-text-primary">{formatCurrency(payment.amount)}</td>

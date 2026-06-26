@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   CalendarDays,
   CheckCircle2,
@@ -76,11 +77,6 @@ const emptyManualBooking = {
   full_name: '',
   email: '',
   phone: '',
-  is_booking_for_other: false,
-  staying_guest_name: '',
-  staying_guest_email: '',
-  staying_guest_phone: '',
-  staying_guest_note: '',
   room_name: '',
   check_in_date: '',
   check_out_date: '',
@@ -564,9 +560,6 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
     full_name: useRef(null),
     email: useRef(null),
     phone: useRef(null),
-    staying_guest_name: useRef(null),
-    staying_guest_phone: useRef(null),
-    staying_guest_email: useRef(null),
     guests: useRef(null),
     room_name: useRef(null),
     check_in_date: useRef(null),
@@ -641,18 +634,6 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
 
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       nextErrors.email = 'Please enter a valid email address.'
-    }
-
-    if (form.is_booking_for_other && !String(form.staying_guest_name || '').trim()) {
-      nextErrors.staying_guest_name = 'Please fill staying guest name.'
-    }
-
-    if (form.is_booking_for_other && !String(form.staying_guest_phone || '').trim()) {
-      nextErrors.staying_guest_phone = 'Please fill staying guest phone number.'
-    }
-
-    if (form.staying_guest_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.staying_guest_email.trim())) {
-      nextErrors.staying_guest_email = 'Please enter a valid staying guest email address.'
     }
 
     if (Number(form.guests || 0) < 1) {
@@ -761,69 +742,6 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
             <FieldError message={errors.guests} />
           </div>
         </div>
-
-        <label className="flex items-start gap-3 rounded-xl border border-border bg-slate-50 p-4 text-sm font-medium text-text-primary">
-          <input
-            type="checkbox"
-            checked={form.is_booking_for_other}
-            onChange={(event) => updateField('is_booking_for_other', event.target.checked)}
-            className="mt-1"
-          />
-          <span>This reservation is for someone else</span>
-        </label>
-
-        {form.is_booking_for_other ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label>Staying guest name *</Label>
-              <Input
-                ref={fieldRefs.staying_guest_name}
-                value={form.staying_guest_name}
-                onChange={(event) => updateField('staying_guest_name', event.target.value)}
-                placeholder="Actual guest full name"
-                className={errorClass(Boolean(errors.staying_guest_name))}
-                aria-invalid={Boolean(errors.staying_guest_name)}
-              />
-              <FieldError message={errors.staying_guest_name} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Staying guest phone *</Label>
-              <Input
-                ref={fieldRefs.staying_guest_phone}
-                value={form.staying_guest_phone}
-                onChange={(event) => updateField('staying_guest_phone', event.target.value)}
-                placeholder="Actual guest phone number"
-                className={errorClass(Boolean(errors.staying_guest_phone))}
-                aria-invalid={Boolean(errors.staying_guest_phone)}
-              />
-              <FieldError message={errors.staying_guest_phone} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Staying guest email</Label>
-              <Input
-                ref={fieldRefs.staying_guest_email}
-                type="email"
-                value={form.staying_guest_email}
-                onChange={(event) => updateField('staying_guest_email', event.target.value)}
-                placeholder="guest@email.com"
-                className={errorClass(Boolean(errors.staying_guest_email))}
-                aria-invalid={Boolean(errors.staying_guest_email)}
-              />
-              <FieldError message={errors.staying_guest_email} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Staying guest note</Label>
-              <Input
-                value={form.staying_guest_note}
-                onChange={(event) => updateField('staying_guest_note', event.target.value)}
-                placeholder="Optional relationship or check-in note"
-              />
-            </div>
-          </div>
-        ) : null}
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="space-y-2">
@@ -950,22 +868,11 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-5">
           <section className="rounded-2xl border border-border bg-white p-5">
-            <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-secondary">Booker information</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3"><UserRound className="h-4 w-4 text-blue-700" /><span className="font-semibold text-text-primary">{booking.booker_name || booking.guest_name}</span></div>
-              <div className="flex items-center gap-3 text-text-secondary"><Mail className="h-4 w-4 text-blue-700" /><span>{booking.booker_email || booking.guest_email}</span></div>
-              <div className="flex items-center gap-3 text-text-secondary"><Phone className="h-4 w-4 text-blue-700" /><span>{booking.booker_phone || booking.guest_phone}</span></div>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-white p-5">
-            <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-secondary">Staying guest information</h3>
+            <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-secondary">Guest information</h3>
             <div className="space-y-3 text-sm">
               <div className="flex items-center gap-3"><UserRound className="h-4 w-4 text-blue-700" /><span className="font-semibold text-text-primary">{booking.guest_name}</span></div>
-              <div className="flex items-center gap-3 text-text-secondary"><Mail className="h-4 w-4 text-blue-700" /><span>{booking.guest_email || '-'}</span></div>
-              <div className="flex items-center gap-3 text-text-secondary"><Phone className="h-4 w-4 text-blue-700" /><span>{booking.guest_phone || '-'}</span></div>
-              {booking.is_booking_for_other ? <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">Booked for another guest</p> : null}
-              {booking.staying_guest_note ? <p className="text-text-secondary">{booking.staying_guest_note}</p> : null}
+              <div className="flex items-center gap-3 text-text-secondary"><Mail className="h-4 w-4 text-blue-700" /><span>{booking.guest_email}</span></div>
+              <div className="flex items-center gap-3 text-text-secondary"><Phone className="h-4 w-4 text-blue-700" /><span>{booking.guest_phone}</span></div>
             </div>
           </section>
 
@@ -1050,6 +957,11 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 }
 
 export default function Bookings() {
+  const location = useLocation()
+  const focusRefs = useRef({})
+  const focusRequestRef = useRef('')
+  const [focusedBookingNo, setFocusedBookingNo] = useState('')
+  const [flashBookingNo, setFlashBookingNo] = useState('')
   const [bookings, setBookings] = useState(initialBookings)
   const [rooms, setRooms] = useState(bookingRooms)
   const [isLoading, setIsLoading] = useState(true)
@@ -1115,15 +1027,64 @@ export default function Bookings() {
   }, [bookings, searchTerm, bookingStatusFilter, paymentStatusFilter, dateFrom, dateTo])
 
   useEffect(() => {
+    if (focusRequestRef.current) return
     setCurrentPage(1)
   }, [searchTerm, bookingStatusFilter, paymentStatusFilter, dateFrom, dateTo])
-
   const totalPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKINGS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * BOOKINGS_PER_PAGE
   const paginatedBookings = filteredBookings.slice(startIndex, startIndex + BOOKINGS_PER_PAGE)
   const startItem = filteredBookings.length === 0 ? 0 : startIndex + 1
   const endItem = Math.min(startIndex + BOOKINGS_PER_PAGE, filteredBookings.length)
+
+  useEffect(() => {
+    const queryFocus = new URLSearchParams(location.search).get('focus')
+    const stateFocus = location.state?.notificationFocus?.referenceId || ''
+    const focusValue = queryFocus || stateFocus
+    if (!focusValue) return
+
+    focusRequestRef.current = String(focusValue)
+    setSearchTerm('')
+    setBookingStatusFilter('all')
+    setPaymentStatusFilter('all')
+    setDateFrom('')
+    setDateTo('')
+    setFocusedBookingNo(String(focusValue))
+  }, [location.search, location.state])
+
+  useEffect(() => {
+    if (!focusedBookingNo || isLoading) return
+
+    const focusedIndex = filteredBookings.findIndex((booking) => {
+      const values = [booking.booking_no, booking.bookingNo, booking.id]
+      return values.some((value) => String(value || '') === String(focusedBookingNo))
+    })
+
+    if (focusedIndex < 0) return
+
+    setCurrentPage(Math.floor(focusedIndex / BOOKINGS_PER_PAGE) + 1)
+  }, [focusedBookingNo, filteredBookings, isLoading])
+
+  useEffect(() => {
+    if (!focusedBookingNo || isLoading) return
+
+    const element = focusRefs.current[focusedBookingNo]
+    if (!element) return
+
+    const timer = window.setTimeout(() => {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFlashBookingNo(String(focusedBookingNo))
+      window.setTimeout(() => {
+        setFlashBookingNo('')
+        setFocusedBookingNo('')
+        focusRequestRef.current = ''
+      }, 1400)
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [focusedBookingNo, paginatedBookings, isLoading, currentPage])
+
+
 
   const summary = useMemo(() => {
     return bookings.reduce(
@@ -1296,8 +1257,25 @@ export default function Bookings() {
             <>
               <div className="divide-y divide-border">
                 {paginatedBookings.map((booking) => {
+                  const shouldFlashBooking = Boolean(
+                    flashBookingNo &&
+                    [booking.booking_no, booking.bookingNo, booking.id].some(
+                      (value) => value != null && String(value) === String(flashBookingNo)
+                    )
+                  )
+
                   return (
-                    <div key={booking.id} className="grid gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center">
+                    <div
+                      key={booking.id}
+                      ref={(element) => {
+                        if (element) {
+                          if (booking.booking_no) focusRefs.current[booking.booking_no] = element
+                          if (booking.bookingNo) focusRefs.current[booking.bookingNo] = element
+                          if (booking.id) focusRefs.current[booking.id] = element
+                        }
+                      }}
+                      className={`grid gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center ${shouldFlashBooking ? 'dashboard-focus-flash rounded-xl' : ''}`}
+                    >
                       <div>
                         <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Booking</p>
                         <p className="font-bold text-text-primary">{booking.booking_no}</p>

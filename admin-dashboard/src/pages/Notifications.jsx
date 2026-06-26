@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Bell,
@@ -40,7 +40,7 @@ const statusVariants = {
 
 const types = ['All Types', 'Booking', 'Payment', 'Contact', 'Check-in', 'Check-out', 'Cancellation', 'Offer', 'System']
 const statuses = ['All Statuses', 'New', 'Viewed', 'Resolved']
-const NOTIFICATIONS_PER_PAGE = 8
+const NOTIFICATIONS_PER_PAGE = 6
 
 function formatDate(value) {
   if (!value) return '-'
@@ -92,6 +92,9 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 
 export default function Notifications() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const focusRefs = useRef({})
+  const focusRequestRef = useRef('')
   const [activities, setActivities] = useState([])
   const [selectedActivity, setSelectedActivity] = useState(null)
   const [search, setSearch] = useState('')
@@ -101,6 +104,8 @@ export default function Notifications() {
   const [openActionId, setOpenActionId] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
+  const [focusedNotificationId, setFocusedNotificationId] = useState('')
+  const [flashNotificationId, setFlashNotificationId] = useState('')
 
   const loadActivities = async () => {
     setIsLoading(true)
@@ -146,6 +151,7 @@ export default function Notifications() {
 
 
   useEffect(() => {
+    if (focusRequestRef.current) return
     setCurrentPage(1)
   }, [search, typeFilter, statusFilter])
 
@@ -155,6 +161,51 @@ export default function Notifications() {
   const paginatedActivities = filteredActivities.slice(startIndex, startIndex + NOTIFICATIONS_PER_PAGE)
   const startItem = filteredActivities.length === 0 ? 0 : startIndex + 1
   const endItem = Math.min(startIndex + NOTIFICATIONS_PER_PAGE, filteredActivities.length)
+
+  useEffect(() => {
+    const queryFocus = new URLSearchParams(location.search).get('focus')
+    const stateFocus = location.state?.notificationFocus?.id || ''
+    const focusValue = queryFocus || stateFocus
+    if (!focusValue) return
+
+    focusRequestRef.current = String(focusValue)
+    setSearch('')
+    setTypeFilter('All Types')
+    setStatusFilter('All Statuses')
+    setFocusedNotificationId(String(focusValue))
+  }, [location.search, location.state])
+
+  useEffect(() => {
+    if (!focusedNotificationId || isLoading) return
+
+    const focusedIndex = filteredActivities.findIndex((item) => {
+      const values = [item.id, item.reference_id, item.related_booking]
+      return values.some((value) => value != null && String(value) === String(focusedNotificationId))
+    })
+
+    if (focusedIndex < 0) return
+
+    setCurrentPage(Math.floor(focusedIndex / NOTIFICATIONS_PER_PAGE) + 1)
+  }, [focusedNotificationId, filteredActivities, isLoading])
+
+  useEffect(() => {
+    if (!focusedNotificationId || isLoading) return
+
+    const element = focusRefs.current[focusedNotificationId]
+    if (!element) return
+
+    const timer = window.setTimeout(() => {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFlashNotificationId(String(focusedNotificationId))
+      window.setTimeout(() => {
+        setFlashNotificationId('')
+        setFocusedNotificationId('')
+        focusRequestRef.current = ''
+      }, 1400)
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [focusedNotificationId, paginatedActivities, isLoading, currentPage])
 
 
   useEffect(() => {
@@ -268,8 +319,26 @@ export default function Notifications() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-white">
-                  {paginatedActivities.map((item) => (
-                    <tr key={item.id} className="align-middle hover:bg-blue-50/40">
+                  {paginatedActivities.map((item) => {
+                    const shouldFlashNotification = Boolean(
+                      flashNotificationId &&
+                      [item.id, item.reference_id, item.related_booking].some(
+                        (value) => value != null && String(value) === String(flashNotificationId)
+                      )
+                    )
+
+                    return (
+                    <tr
+                      key={item.id}
+                      ref={(element) => {
+                        if (element) {
+                          if (item.id) focusRefs.current[item.id] = element
+                          if (item.reference_id) focusRefs.current[item.reference_id] = element
+                          if (item.related_booking) focusRefs.current[item.related_booking] = element
+                        }
+                      }}
+                      className={`align-middle hover:bg-blue-50/40 ${shouldFlashNotification ? 'dashboard-focus-flash' : ''}`}
+                    >
                       <td className="whitespace-nowrap px-4 py-3"><Badge variant={typeVariants[item.type] || 'outline'}>{item.type}</Badge></td>
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.reference_id}</td>
                       <td className="px-4 py-3 text-text-primary">
@@ -345,7 +414,8 @@ export default function Notifications() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
               <Pagination page={safeCurrentPage} totalPages={totalPages} totalItems={filteredActivities.length} startItem={startItem} endItem={endItem} onPageChange={setCurrentPage} />

@@ -42,9 +42,17 @@ function notificationRouteState(activity) {
 }
 
 export function getNotificationNavigation(activity) {
+  const state = notificationRouteState(activity)
+  const basePath = activity.route || '/notifications'
+  const focusValue = basePath === '/payments'
+    ? state.notificationFocus.paymentReference
+    : state.notificationFocus.referenceId
+
   return {
-    pathname: activity.route || '/notifications',
-    state: notificationRouteState(activity),
+    pathname: focusValue
+      ? `${basePath}?focus=${encodeURIComponent(focusValue)}`
+      : basePath,
+    state,
   }
 }
 

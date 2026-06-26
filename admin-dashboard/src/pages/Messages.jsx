@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import {
   Clipboard,
   Download,
@@ -108,6 +109,11 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
 
 
 export default function Messages() {
+  const location = useLocation()
+  const focusRefs = useRef({})
+  const focusRequestRef = useRef('')
+  const [focusedInquiryId, setFocusedInquiryId] = useState('')
+  const [flashInquiryId, setFlashInquiryId] = useState('')
   const [inquiries, setInquiries] = useState([])
   const [selectedInquiry, setSelectedInquiry] = useState(null)
   const [search, setSearch] = useState('')
@@ -148,15 +154,62 @@ export default function Messages() {
 
 
   useEffect(() => {
+    if (focusRequestRef.current) return
     setCurrentPage(1)
   }, [search, statusFilter, typeFilter])
-
   const totalPages = Math.max(1, Math.ceil(filteredInquiries.length / MESSAGES_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * MESSAGES_PER_PAGE
   const paginatedInquiries = filteredInquiries.slice(startIndex, startIndex + MESSAGES_PER_PAGE)
   const startItem = filteredInquiries.length === 0 ? 0 : startIndex + 1
   const endItem = Math.min(startIndex + MESSAGES_PER_PAGE, filteredInquiries.length)
+
+  useEffect(() => {
+    const queryFocus = new URLSearchParams(location.search).get('focus')
+    const stateFocus = location.state?.notificationFocus?.referenceId || ''
+    const focusValue = queryFocus || stateFocus
+    if (!focusValue) return
+
+    focusRequestRef.current = String(focusValue)
+    setSearch('')
+    setStatusFilter('All Statuses')
+    setTypeFilter('All Types')
+    setFocusedInquiryId(String(focusValue))
+  }, [location.search, location.state])
+
+  useEffect(() => {
+    if (!focusedInquiryId || isLoading) return
+
+    const focusedIndex = filteredInquiries.findIndex((item) => {
+      const values = [item.id, item.inquiry_id]
+      return values.some((value) => String(value || '') === String(focusedInquiryId))
+    })
+
+    if (focusedIndex < 0) return
+
+    setCurrentPage(Math.floor(focusedIndex / MESSAGES_PER_PAGE) + 1)
+  }, [focusedInquiryId, filteredInquiries, isLoading])
+
+  useEffect(() => {
+    if (!focusedInquiryId || isLoading) return
+
+    const element = focusRefs.current[focusedInquiryId]
+    if (!element) return
+
+    const timer = window.setTimeout(() => {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setFlashInquiryId(String(focusedInquiryId))
+      window.setTimeout(() => {
+        setFlashInquiryId('')
+        setFocusedInquiryId('')
+        focusRequestRef.current = ''
+      }, 1400)
+    }, 300)
+
+    return () => window.clearTimeout(timer)
+  }, [focusedInquiryId, paginatedInquiries, isLoading, currentPage])
+
+
 
   const showToast = (message) => {
     setToast(message)
@@ -391,8 +444,25 @@ export default function Messages() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-white">
-                  {paginatedInquiries.map((item) => (
-                    <tr key={item.id} className="hover:bg-blue-50/40">
+                  {paginatedInquiries.map((item) => {
+                    const shouldFlashInquiry = Boolean(
+                      flashInquiryId &&
+                      [item.id, item.inquiry_id].some(
+                        (value) => value != null && String(value) === String(flashInquiryId)
+                      )
+                    )
+
+                    return (
+                    <tr
+                      key={item.id}
+                      ref={(element) => {
+                        if (element) {
+                          if (item.id) focusRefs.current[item.id] = element
+                          if (item.inquiry_id) focusRefs.current[item.inquiry_id] = element
+                        }
+                      }}
+                      className={`hover:bg-blue-50/40 ${shouldFlashInquiry ? 'dashboard-focus-flash' : ''}`}
+                    >
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.inquiry_id}</td>
                       <td className="px-4 py-3">
                         <div className="min-w-[180px]">
@@ -476,7 +546,8 @@ export default function Messages() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
               <Pagination page={safeCurrentPage} totalPages={totalPages} totalItems={filteredInquiries.length} startItem={startItem} endItem={endItem} onPageChange={setCurrentPage} />
