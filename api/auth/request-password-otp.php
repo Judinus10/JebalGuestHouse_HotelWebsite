@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 
@@ -84,10 +85,10 @@ try {
     $requestToken = bin2hex(random_bytes(32));
     $expiresAtEpoch = time() + 60;
 
-    $subject = 'Admin password OTP - Jebal Homes';
-    $message = "Your Jebal Homes admin password change OTP is: {$otp}\n\nThis OTP is valid for 1 minute.\n\nIf you did not request this, ignore this email.";
+    $subject = 'Admin password OTP - Jebal Guest House';
+    $message = otp_email_html('Admin password OTP', $otp, 1);
 
-    $sent = send_plain_email($recipientEmail, $subject, $message);
+    $sent = send_html_email($recipientEmail, $subject, $message);
 
     if (!$sent) {
         error_log('Admin password OTP email failed for admin user ID ' . (int) $admin['id'] . ' to ' . $recipientEmail);

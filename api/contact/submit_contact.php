@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 
@@ -45,24 +46,7 @@ try {
 
     $id = (int) $pdo->lastInsertId();
     $ref = 'INQ-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
-    $adminEmail = defined('ADMIN_EMAIL') ? ADMIN_EMAIL : (getenv('ADMIN_EMAIL') ?: 'admin@localhost');
-
-    send_plain_email($adminEmail, 'New Contact Enquiry - ' . $ref, "New contact enquiry received.
-
-Ref: {$ref}
-Name: {$name}
-Email: {$email}
-Phone: {$phone}
-Subject: {$subject}
-
-Message:
-{$message}", $email);
-    send_plain_email($email, 'We received your message - Jebal Homes', "Dear {$name},
-
-Thank you for contacting Jebal Homes. Your enquiry reference is {$ref}.
-
-Regards,
-Jebal Homes");
+    send_contact_enquiry_emails($pdo, $id, $name, $email, $phone, $subject, $message);
 
     json_response(true, 'Your message has been sent successfully.', 201, [
         'data' => ['id' => $id, 'inquiry_id' => $ref],

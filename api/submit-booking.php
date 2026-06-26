@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/mail/email-helper.php';
 
 apply_cors_headers();
 
@@ -144,8 +145,27 @@ try {
 
     $bookingId = (int) $pdo->lastInsertId();
 
-    send_plain_email(ADMIN_EMAIL, 'New Booking Inquiry - BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT), "A new booking inquiry has been received.\n\nGuest: {$fullName}\nEmail: {$email}\nPhone: {$phone}\nRoom: {$roomName}\nCheck-in: {$checkInDate}\nCheck-out: {$checkOutDate}\nGuests: {$guests}", $email);
-    send_plain_email($email, 'Booking Inquiry Received - Jebal Homes', "Dear {$fullName},\n\nWe received your booking inquiry for {$roomName}. Please complete the payment step to confirm your reservation.\n\nRegards,\nJebal Homes");
+    send_booking_received_emails($pdo, [
+        'id' => $bookingId,
+        'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
+        'full_name' => $fullName,
+        'email' => $email,
+        'phone' => $phone,
+        'is_booking_for_other' => $isBookingForOther ? 1 : 0,
+        'staying_guest_name' => $stayingGuestName,
+        'staying_guest_email' => $stayingGuestEmail,
+        'staying_guest_phone' => $stayingGuestPhone,
+        'staying_guest_note' => $stayingGuestNote,
+        'room_name' => $roomName,
+        'check_in_date' => $checkInDate,
+        'check_out_date' => $checkOutDate,
+        'guests' => $guests,
+        'message' => $message,
+        'status' => 'Pending',
+        'payment_status' => 'Payment Pending',
+        'amount' => $amount,
+        'currency' => PAYMENT_CURRENCY,
+    ]);
 
     json_response(true, 'Booking inquiry submitted successfully.', 201, [
         'inquiry_id' => $bookingId,
