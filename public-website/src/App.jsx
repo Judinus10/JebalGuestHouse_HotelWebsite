@@ -4,6 +4,7 @@ import Layout from './components/layout/Layout'
 import Home from './pages/Home'
 import Rooms from './pages/Rooms'
 import RoomDetails from './pages/RoomDetails'
+import BookingBill from './pages/BookingBill'
 import Contact from './pages/Contact'
 import Gallery from './pages/Gallery'
 import Experience from './pages/Experience'
@@ -26,6 +27,7 @@ function App() {
           <Route path="/rooms" element={<Rooms />} />
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/rooms/:id" element={<RoomDetails />} />
+          <Route path="/booking-bill" element={<BookingBill />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/experience" element={<Experience />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />

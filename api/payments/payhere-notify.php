@@ -67,7 +67,7 @@ $statusMap = [
 ];
 
 $paymentStatus = $statusMap[$statusCode] ?? 'Failed';
-$bookingStatus = $paymentStatus === 'Paid' ? 'Confirmed' : null;
+$bookingStatus = $paymentStatus === 'Paid' ? 'Confirmed' : 'Pending';
 $booking = null;
 
 try {
@@ -102,7 +102,7 @@ try {
         if (!hash_equals($expectedAmount, $payhereAmount) || !hash_equals($expectedCurrency, $payhereCurrency)) {
             error_log('PayHere notify amount/currency mismatch for order ' . $orderId . '. Expected ' . $expectedAmount . ' ' . $expectedCurrency . ', received ' . $payhereAmount . ' ' . $payhereCurrency);
             $paymentStatus = 'Failed';
-            $bookingStatus = null;
+            $bookingStatus = 'Pending';
             $statusMessage = trim($statusMessage . ' Amount or currency mismatch.');
         }
     }
@@ -220,7 +220,7 @@ if ($bookingId > 0) {
                     'method' => $method ?: 'PayHere',
                     'invoice' => $invoice,
                 ]);
-            } elseif ($paymentStatus === 'Failed') {
+            } elseif (in_array($paymentStatus, ['Failed', 'Cancelled'], true)) {
                 send_payment_failed_email($pdo, $freshBooking);
             }
         }

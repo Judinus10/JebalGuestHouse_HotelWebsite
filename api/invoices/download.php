@@ -1,7 +1,7 @@
 <?php
 /**
  * Invoice download endpoint.
- * Admins can download using bearer auth.
+ * Admins can download using bearer/session auth.
  * Guests can download using signed token links:
  * /api/invoices/download.php?id=BOOKING_ID&token=SIGNED_TOKEN
  */
@@ -16,8 +16,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
-
-require_admin_auth();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     json_response(false, 'Only GET requests are allowed.', 405);
@@ -46,7 +44,7 @@ try {
     $pdo = get_db_connection();
 
     $stmt = $pdo->prepare(
-        'SELECT invoice_file_path, invoice_number
+        'SELECT invoice_file_path, invoice_number, payment_status
          FROM bookings
          WHERE id = :id
          LIMIT 1'
@@ -57,6 +55,11 @@ try {
     if (!$booking || empty($booking['invoice_file_path'])) {
         header('Content-Type: application/json; charset=utf-8');
         json_response(false, 'Invoice not found.', 404);
+    }
+
+    if ($hasGuestToken && (string) ($booking['payment_status'] ?? '') !== 'Paid') {
+        header('Content-Type: application/json; charset=utf-8');
+        json_response(false, 'Invoice is available only after successful payment.', 403);
     }
 
     $filePath = realpath(__DIR__ . '/../' . $booking['invoice_file_path']);

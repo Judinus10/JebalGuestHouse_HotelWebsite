@@ -90,10 +90,18 @@ $defaultRoomRates = [
 ];
 
 jebal_define('APP_ENV', (string) jebal_env_value('APP_ENV', 'local'));
-jebal_define('APP_BASE_URL', rtrim((string) jebal_env_value('APP_BASE_URL', ''), '/'));
-
+$frontendUrl = rtrim((string) jebal_env_value('FRONTEND_URL', jebal_env_value('PUBLIC_APP_URL', jebal_env_value('APP_BASE_URL', ''))), '/');
+$publicAppUrl = $frontendUrl;
+$adminAppUrl = rtrim((string) jebal_env_value('ADMIN_APP_URL', $publicAppUrl), '/');
 $apiBaseUrl = rtrim((string) jebal_env_value('API_BASE_URL', ''), '/');
+$assetBaseUrl = rtrim((string) jebal_env_value('ASSET_BASE_URL', ''), '/');
+
+jebal_define('FRONTEND_URL', $frontendUrl);
+jebal_define('APP_BASE_URL', $publicAppUrl);
+jebal_define('PUBLIC_APP_URL', $publicAppUrl);
+jebal_define('ADMIN_APP_URL', $adminAppUrl);
 jebal_define('API_BASE_URL', $apiBaseUrl);
+jebal_define('ASSET_BASE_URL', $assetBaseUrl !== '' ? $assetBaseUrl : ($apiBaseUrl !== '' ? $apiBaseUrl : 'http://localhost/HotelWebsite/api'));
 
 jebal_define('DB_HOST', (string) jebal_env_value('DB_HOST', 'localhost'));
 jebal_define('DB_NAME', (string) jebal_env_value('DB_NAME', 'hotel_jebal'));

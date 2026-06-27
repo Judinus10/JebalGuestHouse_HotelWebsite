@@ -27,6 +27,59 @@ function create_checkout_token(string $orderId, int $bookingId, string $amount):
     return hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
 }
 
+function get_public_base_url(): string
+{
+    $publicBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
+        ? FRONTEND_URL
+        : (defined('PUBLIC_APP_URL') && PUBLIC_APP_URL !== '' ? PUBLIC_APP_URL : APP_BASE_URL);
+
+    return rtrim((string) $publicBaseUrl, '/');
+}
+
+function build_room_details_url(PDO $pdo, string $roomName, int $bookingId, string $orderId, string $paymentState): string
+{
+    $publicBaseUrl = get_public_base_url();
+    $roomPath = '/rooms';
+
+    try {
+        $roomStmt = $pdo->prepare('SELECT slug, id FROM rooms WHERE room_name = :room_name LIMIT 1');
+        $roomStmt->execute([':room_name' => $roomName]);
+        $room = $roomStmt->fetch();
+
+        if ($room) {
+            $roomIdentifier = trim((string) ($room['slug'] ?? ''));
+            if ($roomIdentifier === '') {
+                $roomIdentifier = (string) ($room['id'] ?? '');
+            }
+
+            if ($roomIdentifier !== '') {
+                $roomPath = '/rooms/' . rawurlencode($roomIdentifier);
+            }
+        }
+    } catch (Throwable $exception) {
+        error_log('Unable to build room redirect URL: ' . $exception->getMessage());
+    }
+
+    $query = http_build_query([
+        'payment' => $paymentState,
+        'booking_id' => $bookingId,
+        'order_id' => $orderId,
+    ]);
+
+    return $publicBaseUrl . $roomPath . '?' . $query;
+}
+
+function build_booking_bill_url(int $bookingId, string $orderId, string $token): string
+{
+    $query = http_build_query([
+        'booking_id' => $bookingId,
+        'order_id' => $orderId,
+        'token' => $token,
+    ]);
+
+    return get_public_base_url() . '/booking-bill?' . $query;
+}
+
 $data = read_request_data();
 $bookingId = (int) ($data['booking_id'] ?? $data['inquiry_id'] ?? 0);
 
@@ -85,11 +138,16 @@ try {
     $currency = PAYMENT_CURRENCY;
     $orderId = 'JH-' . date('YmdHis') . '-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
 
+    $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
+    $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
+    $cancelUrl = build_room_details_url($pdo, $roomName, $bookingId, $orderId, 'failed');
+    $notifyUrl = (API_BASE_URL !== '' ? API_BASE_URL : '') . '/payments/payhere-notify.php';
+
     $checkoutPayload = [
         'merchant_id' => PAYHERE_MERCHANT_ID,
-        'return_url' => (APP_BASE_URL !== '' ? APP_BASE_URL : '') . '/rooms',
-        'cancel_url' => (APP_BASE_URL !== '' ? APP_BASE_URL : '') . '/rooms',
-        'notify_url' => (API_BASE_URL !== '' ? API_BASE_URL : '') . '/payments/payhere-notify.php',
+        'return_url' => $returnUrl,
+        'cancel_url' => $cancelUrl,
+        'notify_url' => $notifyUrl,
         'order_id' => $orderId,
         'items' => 'Jebal Homes booking #' . $bookingId . ' - ' . $roomName,
         'currency' => $currency,
@@ -140,9 +198,8 @@ try {
 
     $pdo->commit();
 
-    $token = create_checkout_token($orderId, $bookingId, $amountFormatted);
     $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
-    $checkoutUrl = $baseApiUrl . '/payments/payhere-redirect.php?order_id=' . rawurlencode($orderId) . '&booking_id=' . $bookingId . '&token=' . rawurlencode($token);
+    $checkoutUrl = $baseApiUrl . '/payments/payhere-redirect.php?order_id=' . rawurlencode($orderId) . '&booking_id=' . $bookingId . '&token=' . rawurlencode($checkoutToken);
 
     json_response(true, 'PayHere checkout session created.', 200, [
         'checkout_url' => $checkoutUrl,

@@ -148,6 +148,10 @@ export default function RoomDetails() {
 
   const images = room.images?.length ? room.images : [room.main_image].filter(Boolean)
   const isRoomUnavailable = Boolean(availabilityWarning)
+  const paymentState = (searchParams.get('payment') || '').toLowerCase()
+  const paymentMessage = paymentState === 'failed' || paymentState === 'cancelled'
+    ? 'Payment failed. Your booking is still pending. The hotel side will contact you shortly.'
+    : ''
 
   const showPreviousImage = () => {
     if (!images.length) return
@@ -377,6 +381,15 @@ export default function RoomDetails() {
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+                    {paymentMessage && (
+                      <div className="border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+                          <p>{paymentMessage}</p>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">
                         Full Name

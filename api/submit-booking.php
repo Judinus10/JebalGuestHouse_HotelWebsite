@@ -99,8 +99,8 @@ try {
         "SELECT id, check_in_date, check_out_date
          FROM bookings
          WHERE room_name = :room_name
-           AND status IN ('Confirmed', 'Pending')
-           AND COALESCE(payment_status, '') NOT IN ('Failed', 'Cancelled', 'Refunded')
+           AND status = 'Confirmed'
+           AND COALESCE(payment_status, '') = 'Paid'
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
@@ -115,47 +115,18 @@ try {
         json_response(false, 'Sorry, this room is not available for the selected dates.', 409, ['available' => false]);
     }
 
-    $stmt = $pdo->prepare(
-        'INSERT INTO bookings
-        (full_name, email, phone, is_booking_for_other, staying_guest_name, staying_guest_email, staying_guest_phone, staying_guest_note, room_name, check_in_date, check_out_date, guests, message, status, payment_status, amount, currency, ip_address, user_agent, created_at, updated_at)
-        VALUES
-        (:full_name, :email, :phone, :is_booking_for_other, :staying_guest_name, :staying_guest_email, :staying_guest_phone, :staying_guest_note, :room_name, :check_in_date, :check_out_date, :guests, :message, :status, :payment_status, :amount, :currency, :ip_address, :user_agent, NOW(), NOW())'
-    );
-    $stmt->execute([
-        ':full_name' => $fullName,
-        ':email' => $email,
-        ':phone' => $phone,
-        ':is_booking_for_other' => $isBookingForOther ? 1 : 0,
-        ':staying_guest_name' => $stayingGuestName !== '' ? $stayingGuestName : null,
-        ':staying_guest_email' => $stayingGuestEmail !== '' ? $stayingGuestEmail : null,
-        ':staying_guest_phone' => $stayingGuestPhone !== '' ? $stayingGuestPhone : null,
-        ':staying_guest_note' => $stayingGuestNote !== '' ? $stayingGuestNote : null,
-        ':room_name' => $roomName,
-        ':check_in_date' => $checkInDate,
-        ':check_out_date' => $checkOutDate,
-        ':guests' => $guests,
-        ':message' => $message,
-        ':status' => 'Pending',
-        ':payment_status' => 'Payment Pending',
-        ':amount' => $amount,
-        ':currency' => PAYMENT_CURRENCY,
-        ':ip_address' => get_client_ip(),
-        ':user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
-    ]);
+    $columnStmt = $pdo->query('SHOW COLUMNS FROM bookings');
+    $bookingColumns = array_flip(array_column($columnStmt->fetchAll(), 'Field'));
 
-    $bookingId = (int) $pdo->lastInsertId();
-
-    send_booking_received_emails($pdo, [
-        'id' => $bookingId,
-        'booking_no' => 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
+    $bookingValues = [
         'full_name' => $fullName,
         'email' => $email,
         'phone' => $phone,
         'is_booking_for_other' => $isBookingForOther ? 1 : 0,
-        'staying_guest_name' => $stayingGuestName,
-        'staying_guest_email' => $stayingGuestEmail,
-        'staying_guest_phone' => $stayingGuestPhone,
-        'staying_guest_note' => $stayingGuestNote,
+        'staying_guest_name' => $stayingGuestName !== '' ? $stayingGuestName : null,
+        'staying_guest_email' => $stayingGuestEmail !== '' ? $stayingGuestEmail : null,
+        'staying_guest_phone' => $stayingGuestPhone !== '' ? $stayingGuestPhone : null,
+        'staying_guest_note' => $stayingGuestNote !== '' ? $stayingGuestNote : null,
         'room_name' => $roomName,
         'check_in_date' => $checkInDate,
         'check_out_date' => $checkOutDate,
@@ -165,7 +136,36 @@ try {
         'payment_status' => 'Payment Pending',
         'amount' => $amount,
         'currency' => PAYMENT_CURRENCY,
-    ]);
+        'ip_address' => get_client_ip(),
+        'user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
+    ];
+
+    $insertColumns = [];
+    $insertPlaceholders = [];
+    $insertParams = [];
+
+    foreach ($bookingValues as $column => $value) {
+        if (isset($bookingColumns[$column])) {
+            $insertColumns[] = $column;
+            $insertPlaceholders[] = ':' . $column;
+            $insertParams[':' . $column] = $value;
+        }
+    }
+
+    $insertColumns[] = 'created_at';
+    $insertPlaceholders[] = 'NOW()';
+    $insertColumns[] = 'updated_at';
+    $insertPlaceholders[] = 'NOW()';
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO bookings (' . implode(', ', $insertColumns) . ') VALUES (' . implode(', ', $insertPlaceholders) . ')'
+    );
+    $stmt->execute($insertParams);
+
+    $bookingId = (int) $pdo->lastInsertId();
+
+    // Do not send user/admin confirmation emails here.
+    // Payment is not verified yet. Success/failed emails are sent only from payments/payhere-notify.php.
 
     json_response(true, 'Booking inquiry submitted successfully.', 201, [
         'inquiry_id' => $bookingId,
