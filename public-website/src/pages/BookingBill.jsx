@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, Download, Share2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Clock, Share2 } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import Button from '../components/ui/Button'
@@ -63,7 +63,6 @@ export default function BookingBill() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [bill, setBill] = useState(null)
-  const [thermalMode, setThermalMode] = useState(false)
 
   const statusUrl = useMemo(() => {
     const params = new URLSearchParams({ booking_id: bookingId, order_id: orderId, token })
@@ -118,11 +117,11 @@ export default function BookingBill() {
     alert('Bill link copied to clipboard.')
   }
 
-  const handlePrint = () => window.print()
-
   const roomTotal = Number(bill?.amount || 0)
   const roomPaid = bill?.payment_status === 'Paid' ? roomTotal : 0
   const roomBalance = Math.max(roomTotal - roomPaid, 0)
+  const hotelPhone = bill?.hotel_phone || bill?.contact_phone || HOTEL_PHONE
+  const hotelEmail = bill?.hotel_email || bill?.contact_email || HOTEL_EMAIL
   const nights = bill ? nightsBetween(bill.check_in_date, bill.check_out_date) : 1
   const generatedAt = formatDateTime(new Date().toISOString())
 
@@ -154,7 +153,7 @@ export default function BookingBill() {
               </div>
             ) : (
               <>
-                <div className={`relative mx-auto overflow-hidden rounded-2xl bg-white shadow-xl print:rounded-none print:shadow-none ${thermalMode ? 'max-w-sm' : 'max-w-4xl'}`}>
+                <div className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl print:rounded-none print:shadow-none">
                   <img
                     src={logo}
                     alt=""
@@ -170,14 +169,13 @@ export default function BookingBill() {
                         </div>
                         <div>
                           <h1 className="text-xl font-extrabold leading-tight">{HOTEL_NAME}</h1>
-                          <p className="text-sm text-white/90">{HOTEL_PHONE} • {HOTEL_EMAIL}</p>
+                          <p className="text-sm text-white/90">{hotelPhone} • {hotelEmail}</p>
                         </div>
                       </div>
 
                       <div className="text-left text-sm sm:text-right">
                         <p>Generated: {generatedAt}</p>
                         <p>Booking ID: <span className="font-semibold">BK-{String(bill.id).padStart(6, '0')}</span></p>
-                        {bill.invoice_number && <p>Invoice: <span className="font-semibold">{bill.invoice_number}</span></p>}
                       </div>
                     </div>
                   </div>
@@ -228,21 +226,6 @@ export default function BookingBill() {
                       </div>
                     </div>
 
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <div className="flex items-center justify-between rounded-xl border border-blue-200 bg-blue-50 px-5 py-3">
-                        <span className="text-sm text-slate-800">Room Total</span>
-                        <strong className="text-sm text-slate-950">{formatMoney(roomTotal, bill.currency)}</strong>
-                      </div>
-                      <div className="flex items-center justify-between rounded-xl border border-green-200 bg-green-50 px-5 py-3">
-                        <span className="text-sm text-slate-800">Room Paid</span>
-                        <strong className="text-sm text-green-700">{formatMoney(roomPaid, bill.currency)}</strong>
-                      </div>
-                      <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-5 py-3">
-                        <span className="text-sm text-slate-800">Room Balance</span>
-                        <strong className="text-sm text-red-600">{formatMoney(roomBalance, bill.currency)}</strong>
-                      </div>
-                    </div>
-
                     <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-5">
                       <div className="flex items-center justify-between gap-4">
                         <p className="font-bold text-slate-950">Total Charges</p>
@@ -262,43 +245,20 @@ export default function BookingBill() {
                       <p className="font-bold text-slate-950">Notes:</p>
                       <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-800">
                         <li>Please keep this bill for your records.</li>
-                        <li>Your booking is confirmed only when payment status is marked as paid.</li>
-                        <li>For billing queries, contact the front desk at {HOTEL_PHONE}.</li>
+                        <li>The room is booked from check-in day morning 11:30 AM to check-out day morning 11:00 AM.</li>
+                        <li>For billing queries, contact the front desk at {hotelPhone}.</li>
                       </ul>
-                    </div>
-
-                    <div className="mt-16 grid grid-cols-2 gap-6 text-center text-xs text-slate-500">
-                      <div>
-                        <div className="border-t border-slate-900 pt-2">Guest Signature</div>
-                      </div>
-                      <div>
-                        <div className="border-t border-slate-900 pt-2">Authorized Signature</div>
-                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-3 rounded-b-2xl bg-slate-100 p-4 shadow-xl print:hidden">
-                  <button type="button" onClick={() => setThermalMode(false)} className="rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
-                    A4 Mode
-                  </button>
-                  <button type="button" onClick={() => setThermalMode(true)} className="rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
-                    80mm Thermal
-                  </button>
-                  <button type="button" onClick={handlePrint} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-blue-700 to-sky-500 px-5 py-3 text-sm font-extrabold text-white shadow-sm hover:opacity-90">
-                    <Download size={16} />
-                    Print / Save PDF
-                  </button>
                   <button type="button" onClick={handleShare} className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
                     <Share2 size={16} />
                     Share
                   </button>
-                  <a href={bill.room_url || '/rooms'} className="rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
-                    Room Details
-                  </a>
                   {bill.invoice_download_url && bill.payment_status === 'Paid' && (
-                    <a href={bill.invoice_download_url} className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
-                      <CheckCircle2 size={16} />
+                    <a href={bill.invoice_download_url} className="rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
                       Download Bill
                     </a>
                   )}
