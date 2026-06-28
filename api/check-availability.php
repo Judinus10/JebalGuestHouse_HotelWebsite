@@ -21,8 +21,13 @@ if (($roomId < 1 && $roomName === '') || $checkInDate === '' || $checkOutDate ==
     json_response(false, 'Room, check-in date, and check-out date are required.', 422);
 }
 
-if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate) || strtotime($checkOutDate) <= strtotime($checkInDate)) {
+if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate) || strtotime($checkOutDate) < strtotime($checkInDate)) {
     json_response(false, 'Enter valid check-in and check-out dates.', 422);
+}
+
+$availabilityCheckOutDate = $checkOutDate;
+if ($checkOutDate === $checkInDate) {
+    $availabilityCheckOutDate = (new DateTimeImmutable($checkInDate))->modify('+1 day')->format('Y-m-d');
 }
 
 try {
@@ -53,7 +58,7 @@ try {
     $stmt->execute([
         ':room_name' => $roomName,
         ':requested_check_in' => $checkInDate,
-        ':requested_check_out' => $checkOutDate,
+        ':requested_check_out' => $availabilityCheckOutDate,
     ]);
     $conflict = $stmt->fetch();
 

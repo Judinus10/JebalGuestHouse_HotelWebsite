@@ -1,16 +1,39 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Clock, Share2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Clock, Download, Share2 } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import Button from '../components/ui/Button'
 import logo from '../assets/logo.png'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+
+function resolveApiBaseUrl() {
+  const baseUrl = String(RAW_API_BASE_URL || '/api').replace(/\/$/, '')
+
+  if (/^https?:\/\//i.test(baseUrl)) {
+    return baseUrl
+  }
+
+  const isLocalFrontend = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+  const isVitePort = ['5173', '5174'].includes(window.location.port)
+
+  if (isLocalFrontend && isVitePort && baseUrl.startsWith('/HotelWebsite/api')) {
+    return `http://${window.location.hostname}${baseUrl}`
+  }
+
+  return baseUrl
+}
+
+const API_BASE_URL = resolveApiBaseUrl()
 const PAYMENT_STATUS_API_URL = `${API_BASE_URL}/payments/status.php`
-const HOTEL_NAME = 'Jebal Guest House'
-const HOTEL_PHONE = '0707894862'
-const HOTEL_EMAIL = 'jebalguesthouse@gmail.com'
+const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
+
+const FALLBACK_HOTEL_NAME = 'Jebal Guest House'
+const FALLBACK_HOTEL_PHONE = '0707894862'
+const FALLBACK_HOTEL_EMAIL = 'jebalguesthouse@gmail.com'
 
 function formatMoney(amount, currency = 'LKR') {
   const value = Number(amount || 0)
@@ -54,6 +77,61 @@ function nightsBetween(checkIn, checkOut) {
   return nights > 0 ? nights : 1
 }
 
+function cleanContactValue(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
+
+function getBookingNumber(bill, orderId) {
+  if (bill?.id) return `BK-${String(bill.id).padStart(6, '0')}`
+  return orderId || 'booking-bill'
+}
+
+function getPdfFileName(bill, orderId) {
+  return `Booking_${getBookingNumber(bill, orderId)}.pdf`.replace(/[^a-zA-Z0-9_.-]/g, '_')
+}
+
+async function imageToBase64(imageUrl) {
+  try {
+    const response = await fetch(imageUrl)
+    const blob = await response.blob()
+
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return ''
+  }
+}
+
+
+function pdfText(value) {
+  return String(value ?? '-')
+    .replace(/[‐-―−]/g, '-')
+    .replace(/[→⟶➔]/g, ' to ')
+    .replace(/[•]/g, '-')
+    .replace(/[ ]/g, ' ')
+    .replace(/[^ -~]/g, '')
+}
+
+function stayDateRange(checkIn, checkOut) {
+  return `${checkIn || '-'} to ${checkOut || '-'}`
+}
+
+function drawPdfBox(pdf, x, y, width, height, options = {}) {
+  const {
+    fill = [248, 250, 252],
+    border = [226, 232, 240],
+    radius = 3,
+  } = options
+
+  pdf.setFillColor(...fill)
+  pdf.setDrawColor(...border)
+  pdf.roundedRect(x, y, width, height, radius, radius, 'FD')
+}
+
 export default function BookingBill() {
   const [searchParams] = useSearchParams()
   const bookingId = searchParams.get('booking_id') || ''
@@ -63,6 +141,8 @@ export default function BookingBill() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [bill, setBill] = useState(null)
+  const [contactSettings, setContactSettings] = useState(null)
+  const [pdfBusy, setPdfBusy] = useState(false)
 
   const statusUrl = useMemo(() => {
     const params = new URLSearchParams({ booking_id: bookingId, order_id: orderId, token })
@@ -89,9 +169,29 @@ export default function BookingBill() {
     }
   }, [bookingId, orderId, statusUrl, token])
 
+  const loadContactSettings = useCallback(async () => {
+    try {
+      const response = await fetch(CONTACT_SETTINGS_API_URL, { headers: { Accept: 'application/json' } })
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Unable to load contact settings.')
+      }
+
+      setContactSettings(result.data || null)
+    } catch (err) {
+      console.warn('Contact settings fallback used:', err)
+      setContactSettings(null)
+    }
+  }, [])
+
   useEffect(() => {
     loadBill()
   }, [loadBill])
+
+  useEffect(() => {
+    loadContactSettings()
+  }, [loadContactSettings])
 
   useEffect(() => {
     if (!bill || bill.payment_status !== 'Payment Pending') return
@@ -103,27 +203,247 @@ export default function BookingBill() {
     return <Navigate to="/rooms" replace />
   }
 
-  const handleShare = async () => {
-    const shareText = bill
-      ? `${HOTEL_NAME} booking bill - ${bill.room_name} - ${bill.payment_status}`
-      : `${HOTEL_NAME} booking bill`
+  const hotelName = cleanContactValue(contactSettings?.business_name)
+    || cleanContactValue(contactSettings?.hotel_name)
+    || cleanContactValue(contactSettings?.name)
+    || cleanContactValue(bill?.hotel_name)
+    || FALLBACK_HOTEL_NAME
 
-    if (navigator.share) {
-      await navigator.share({ title: `${HOTEL_NAME} Booking Bill`, text: shareText, url: window.location.href })
-      return
-    }
+  const hotelPhone = cleanContactValue(contactSettings?.phone)
+    || cleanContactValue(contactSettings?.reception_contact_number)
+    || cleanContactValue(contactSettings?.whatsapp_reservation_number)
+    || cleanContactValue(contactSettings?.contact_number)
+    || cleanContactValue(bill?.hotel_phone)
+    || cleanContactValue(bill?.contact_phone)
+    || FALLBACK_HOTEL_PHONE
 
-    await navigator.clipboard.writeText(window.location.href)
-    alert('Bill link copied to clipboard.')
-  }
+  const hotelEmail = cleanContactValue(contactSettings?.email)
+    || cleanContactValue(contactSettings?.contact_email)
+    || cleanContactValue(bill?.hotel_email)
+    || cleanContactValue(bill?.contact_email)
+    || FALLBACK_HOTEL_EMAIL
 
   const roomTotal = Number(bill?.amount || 0)
   const roomPaid = bill?.payment_status === 'Paid' ? roomTotal : 0
   const roomBalance = Math.max(roomTotal - roomPaid, 0)
-  const hotelPhone = bill?.hotel_phone || bill?.contact_phone || HOTEL_PHONE
-  const hotelEmail = bill?.hotel_email || bill?.contact_email || HOTEL_EMAIL
   const nights = bill ? nightsBetween(bill.check_in_date, bill.check_out_date) : 1
+  const bookingNumber = getBookingNumber(bill, orderId)
   const generatedAt = formatDateTime(new Date().toISOString())
+
+  const createBillPdfBlob = async () => {
+    if (!bill) throw new Error('Bill data is not ready.')
+
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const margin = 14
+    const contentWidth = pageWidth - margin * 2
+    const logoBase64 = await imageToBase64(logo)
+
+    pdf.setFillColor(30, 58, 138)
+    pdf.rect(0, 0, pageWidth, 36, 'F')
+
+    if (logoBase64) {
+      pdf.addImage(logoBase64, 'PNG', margin, 8, 18, 18)
+    }
+
+    pdf.setTextColor(255, 255, 255)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(18)
+    pdf.text(pdfText(hotelName), logoBase64 ? margin + 23 : margin, 16)
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(10)
+    pdf.text(pdfText(`${hotelPhone} - ${hotelEmail}`), logoBase64 ? margin + 23 : margin, 23)
+
+    pdf.setFontSize(9)
+    pdf.text(pdfText(`Generated: ${generatedAt}`), pageWidth - margin, 14, { align: 'right' })
+    pdf.text(pdfText(`Booking ID: ${bookingNumber}`), pageWidth - margin, 21, { align: 'right' })
+
+    let y = 46
+
+    if (bill.payment_status === 'Payment Pending') {
+      drawPdfBox(pdf, margin, y, contentWidth, 12, {
+        fill: [254, 252, 232],
+        border: [254, 240, 138],
+      })
+      pdf.setTextColor(133, 77, 14)
+      pdf.setFontSize(9)
+      pdf.text('Payment notification is still being verified. This page will refresh automatically.', margin + 4, y + 8)
+      y += 18
+    }
+
+    if (bill.payment_status === 'Failed' || bill.payment_status === 'Cancelled') {
+      drawPdfBox(pdf, margin, y, contentWidth, 12, {
+        fill: [254, 242, 242],
+        border: [254, 202, 202],
+      })
+      pdf.setTextColor(185, 28, 28)
+      pdf.setFontSize(9)
+      pdf.text('Payment failed. Your booking is still pending. The hotel team will contact you shortly.', margin + 4, y + 8)
+      y += 18
+    }
+
+    const cardGap = 4
+    const cardWidth = (contentWidth - cardGap * 2) / 3
+    const cardHeight = 45
+
+    drawPdfBox(pdf, margin, y, cardWidth, cardHeight)
+    drawPdfBox(pdf, margin + cardWidth + cardGap, y, cardWidth, cardHeight)
+    drawPdfBox(pdf, margin + (cardWidth + cardGap) * 2, y, cardWidth, cardHeight)
+
+    pdf.setTextColor(100, 116, 139)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(8)
+    pdf.text('GUEST', margin + 5, y + 8)
+    pdf.text('STAY', margin + cardWidth + cardGap + 5, y + 8)
+    pdf.text('PAYMENT', margin + (cardWidth + cardGap) * 2 + 5, y + 8)
+
+    pdf.setTextColor(15, 23, 42)
+    pdf.setFontSize(10)
+    pdf.text(pdfText(bill.full_name || '-'), margin + 5, y + 20)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9)
+    pdf.text(pdfText(`Phone: ${bill.phone || '-'}`), margin + 5, y + 27)
+    pdf.text(pdfText(`Email: ${bill.email || '-'}`), margin + 5, y + 34, { maxWidth: cardWidth - 10 })
+
+    const stayX = margin + cardWidth + cardGap + 5
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(9)
+    pdf.text(pdfText(stayDateRange(bill.check_in_date, bill.check_out_date)), stayX, y + 20)
+    pdf.setFont('helvetica', 'normal')
+    pdf.text(pdfText(`${nights} night${nights === 1 ? '' : 's'} - Guests: ${bill.guests || 1}`), stayX, y + 27)
+    pdf.text(pdfText(`Room: ${bill.room_name || '-'}`), stayX, y + 34, { maxWidth: cardWidth - 10 })
+    pdf.text(pdfText(`Method: ${bill.payment_method || 'PayHere'}`), stayX, y + 41)
+
+    const payX = margin + (cardWidth + cardGap) * 2 + 5
+    pdf.setTextColor(15, 23, 42)
+    pdf.setFont('helvetica', 'bold')
+    pdf.text(pdfText(statusLabel(bill.payment_status)), payX, y + 20)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setTextColor(51, 65, 85)
+    pdf.text(
+      pdfText(
+        bill.payment_status === 'Paid'
+          ? 'Thank you for your payment.'
+          : bill.payment_status === 'Payment Pending'
+            ? 'Payment verification is pending.'
+            : 'Payment was not successful.'
+      ),
+      payX,
+      y + 30,
+      { maxWidth: cardWidth - 10 }
+    )
+
+    y += cardHeight + 10
+
+    autoTable(pdf, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      theme: 'plain',
+      styles: {
+        font: 'helvetica',
+        fontSize: 11,
+        cellPadding: 3,
+        textColor: [15, 23, 42],
+      },
+      body: [
+        ['Total Charges', formatMoney(roomTotal, bill.currency)],
+        ['Paid', formatMoney(roomPaid, bill.currency)],
+        ['Balance', formatMoney(roomBalance, bill.currency)],
+      ],
+      columnStyles: {
+        0: { fontStyle: 'bold' },
+        1: { halign: 'right', fontStyle: 'bold' },
+      },
+      didParseCell: (data) => {
+        if (data.column.index === 1 && data.row.index === 0) data.cell.styles.textColor = [29, 78, 216]
+        if (data.column.index === 1 && data.row.index === 1) data.cell.styles.textColor = [21, 128, 61]
+        if (data.column.index === 1 && data.row.index === 2) data.cell.styles.textColor = [220, 38, 38]
+      },
+      didDrawPage: () => {
+        pdf.setDrawColor(226, 232, 240)
+        pdf.roundedRect(margin, y - 1, contentWidth, 29, 3, 3)
+      },
+    })
+
+    y = pdf.lastAutoTable.finalY + 12
+
+    drawPdfBox(pdf, margin, y, contentWidth, 40, {
+      fill: [255, 255, 255],
+      border: [226, 232, 240],
+    })
+
+    pdf.setTextColor(15, 23, 42)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(11)
+    pdf.text('Notes:', margin + 5, y + 9)
+
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(9)
+    pdf.setTextColor(51, 65, 85)
+    pdf.text('- Please keep this bill for your records.', margin + 8, y + 18)
+    pdf.text('- The room is booked from check-in day morning 11:30 AM to check-out day morning 11:00 AM.', margin + 8, y + 25)
+    pdf.text(pdfText(`- For billing queries, contact the front desk at ${hotelPhone}.`), margin + 8, y + 32)
+
+    return pdf.output('blob')
+  }
+
+  const handleDownloadBill = async () => {
+    if (!bill || pdfBusy) return
+
+    try {
+      setPdfBusy(true)
+      const blob = await createBillPdfBlob()
+      const fileName = getPdfFileName(bill, orderId)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      alert(err.message || 'Unable to download bill PDF.')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
+
+  const handleShare = async () => {
+    if (!bill || pdfBusy) return
+
+    try {
+      setPdfBusy(true)
+      const blob = await createBillPdfBlob()
+      const fileName = getPdfFileName(bill, orderId)
+      const file = new File([blob], fileName, { type: 'application/pdf' })
+
+      if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+        await navigator.share({
+          title: `${hotelName} Booking Bill`,
+          text: `${hotelName} booking bill - ${bill.room_name} - ${bill.payment_status}`,
+          files: [file],
+        })
+        return
+      }
+
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      alert('PDF file sharing is not supported in this browser. The bill PDF was downloaded instead.')
+    } catch (err) {
+      alert(err.message || 'Unable to share bill PDF.')
+    } finally {
+      setPdfBusy(false)
+    }
+  }
 
   return (
     <PageTransition>
@@ -153,7 +473,7 @@ export default function BookingBill() {
               </div>
             ) : (
               <>
-                <div className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl print:rounded-none print:shadow-none">
+                <div id="booking-bill-print-area" className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl bg-white shadow-xl print:rounded-none print:shadow-none">
                   <img
                     src={logo}
                     alt=""
@@ -165,17 +485,17 @@ export default function BookingBill() {
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div className="flex items-center gap-4">
                         <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-xl bg-white/15 ring-1 ring-white/25">
-                          <img src={logo} alt={HOTEL_NAME} className="h-full w-full object-cover" />
+                          <img src={logo} alt={hotelName} className="h-full w-full object-cover" />
                         </div>
                         <div>
-                          <h1 className="text-xl font-extrabold leading-tight">{HOTEL_NAME}</h1>
+                          <h1 className="text-xl font-extrabold leading-tight">{hotelName}</h1>
                           <p className="text-sm text-white/90">{hotelPhone} • {hotelEmail}</p>
                         </div>
                       </div>
 
                       <div className="text-left text-sm sm:text-right">
                         <p>Generated: {generatedAt}</p>
-                        <p>Booking ID: <span className="font-semibold">BK-{String(bill.id).padStart(6, '0')}</span></p>
+                        <p>Booking ID: <span className="font-semibold">{bookingNumber}</span></p>
                       </div>
                     </div>
                   </div>
@@ -253,15 +573,15 @@ export default function BookingBill() {
                 </div>
 
                 <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-3 rounded-b-2xl bg-slate-100 p-4 shadow-xl print:hidden">
-                  <button type="button" onClick={handleShare} className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
+                  <button type="button" onClick={handleShare} disabled={pdfBusy} className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70">
                     <Share2 size={16} />
-                    Share
+                    {pdfBusy ? 'Preparing PDF...' : 'Share PDF'}
                   </button>
-                  {bill.invoice_download_url && bill.payment_status === 'Paid' && (
-                    <a href={bill.invoice_download_url} className="rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50">
-                      Download Bill
-                    </a>
-                  )}
+
+                  <button type="button" onClick={handleDownloadBill} disabled={pdfBusy} className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70">
+                    <Download size={16} />
+                    {pdfBusy ? 'Preparing PDF...' : 'Download Bill'}
+                  </button>
                 </div>
               </>
             )}

@@ -37,7 +37,7 @@ try {
     if (($checkInDate !== '' || $checkOutDate !== '') && (
         !is_valid_date($checkInDate)
         || !is_valid_date($checkOutDate)
-        || strtotime($checkOutDate) <= strtotime($checkInDate)
+        || strtotime($checkOutDate) < strtotime($checkInDate)
     )) {
         json_response(false, 'Enter valid check-in and check-out dates.', 422);
     }
@@ -53,7 +53,12 @@ try {
     }
 
     if ($checkInDate !== '' && $checkOutDate !== '') {
-        $rooms = array_values(array_filter($rooms, static fn(array $room): bool => room_is_available_for_dates($pdo, (string) $room['name'], $checkInDate, $checkOutDate)));
+        $availabilityCheckOutDate = $checkOutDate;
+        if ($checkOutDate === $checkInDate) {
+            $availabilityCheckOutDate = (new DateTimeImmutable($checkInDate))->modify('+1 day')->format('Y-m-d');
+        }
+
+        $rooms = array_values(array_filter($rooms, static fn(array $room): bool => room_is_available_for_dates($pdo, (string) $room['name'], $checkInDate, $availabilityCheckOutDate)));
     }
 
     json_response(true, 'Rooms loaded.', 200, [

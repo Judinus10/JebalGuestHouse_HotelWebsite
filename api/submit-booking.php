@@ -66,8 +66,13 @@ if ($checkIn < $today) {
     json_response(false, 'Check-in date cannot be in the past.', 422);
 }
 
-if ($checkOut <= $checkIn) {
-    json_response(false, 'Check-out date must be after check-in date.', 422);
+if ($checkOut < $checkIn) {
+    json_response(false, 'Check-out date cannot be before check-in date.', 422);
+}
+
+if ($checkOutDate === $checkInDate) {
+    $checkOutDate = $checkIn->modify('+1 day')->format('Y-m-d');
+    $checkOut = DateTimeImmutable::createFromFormat('Y-m-d', $checkOutDate);
 }
 
 if ($guests > 20) {

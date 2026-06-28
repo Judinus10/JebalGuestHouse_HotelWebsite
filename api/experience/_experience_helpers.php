@@ -36,18 +36,44 @@ function experience_upload_dir(): string
 
 function experience_public_base(): string
 {
-    return 'http://localhost/HotelWebsite/api/uploads/experience';
+    $base = '';
+
+    if (defined('ASSET_BASE_URL') && trim((string) ASSET_BASE_URL) !== '') {
+        $base = (string) ASSET_BASE_URL;
+    } elseif (defined('API_BASE_URL') && trim((string) API_BASE_URL) !== '') {
+        $base = (string) API_BASE_URL;
+    }
+
+    if ($base === '') {
+        $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/api/experience'));
+        $apiDir = preg_replace('#/experience$#', '', $scriptDir);
+        $base = $scheme . '://' . $host . $apiDir;
+    }
+
+    return rtrim($base, '/') . '/uploads/experience';
 }
 
 function experience_image_url(?string $path): string
 {
-    if (!$path) return '';
+    $path = trim((string) $path);
 
-    if (preg_match('/^https?:\/\//i', $path)) {
-        return $path;
+    if ($path === '') {
+        return '';
     }
 
-    return experience_public_base() . '/' . ltrim($path, '/');
+    // Old records may contain the full localhost upload URL.
+    // Do not return that old URL on live. Keep only the filename and rebuild it using ASSET_BASE_URL/API_BASE_URL.
+    if (preg_match('#^https?://#i', $path)) {
+        $parsedPath = parse_url($path, PHP_URL_PATH);
+        $path = basename((string) $parsedPath);
+    }
+
+    // Also handle stored paths like /api/uploads/experience/file.jpg or uploads/experience/file.jpg.
+    $path = basename($path);
+
+    return experience_public_base() . '/' . rawurlencode($path);
 }
 
 function experience_normalize(array $row): array

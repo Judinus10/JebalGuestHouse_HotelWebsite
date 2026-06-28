@@ -64,9 +64,9 @@ try {
         redirect_error('Checkout payload is missing.', 500);
     }
 
-    $payhereUrl = APP_ENV === 'production'
-        ? 'https://www.payhere.lk/pay/checkout'
-        : 'https://sandbox.payhere.lk/pay/checkout';
+    $payhereUrl = (strtolower((string) jebal_env_value('PAYHERE_MODE', 'sandbox')) === 'live')
+    ? 'https://www.payhere.lk/pay/checkout'
+    : 'https://sandbox.payhere.lk/pay/checkout';
 
     header('Content-Type: text/html; charset=utf-8');
 } catch (Throwable $e) {
