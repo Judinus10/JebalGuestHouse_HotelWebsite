@@ -31,6 +31,29 @@ try {
     exit('Backend environment file is missing or invalid. Copy api/.env.example to api/.env and configure it.');
 }
 
+/*
+ |--------------------------------------------------------------------------
+ | Application timezone
+ |--------------------------------------------------------------------------
+ | Booking holds, session expiry, rate limits, invoice timestamps, and any
+ | PHP DateTime calculations must use the same timezone as the hotel/database.
+ | Without this, pending booking holds can stay locked much longer than the
+ | intended 15 minutes.
+ */
+$appTimezone = (string) ($_ENV['APP_TIMEZONE'] ?? $_SERVER['APP_TIMEZONE'] ?? 'Asia/Colombo');
+
+if ($appTimezone === '') {
+    $appTimezone = 'Asia/Colombo';
+}
+
+try {
+    new DateTimeZone($appTimezone);
+} catch (Throwable $exception) {
+    $appTimezone = 'Asia/Colombo';
+}
+
+date_default_timezone_set($appTimezone);
+
 function jebal_env_value(string $key, mixed $default = null): mixed
 {
     if (array_key_exists($key, $_ENV)) {
@@ -90,6 +113,7 @@ $defaultRoomRates = [
 ];
 
 jebal_define('APP_ENV', (string) jebal_env_value('APP_ENV', 'local'));
+jebal_define('APP_TIMEZONE', $appTimezone);
 $frontendUrl = rtrim((string) jebal_env_value('FRONTEND_URL', jebal_env_value('PUBLIC_APP_URL', jebal_env_value('APP_BASE_URL', ''))), '/');
 $publicAppUrl = $frontendUrl;
 $adminAppUrl = rtrim((string) jebal_env_value('ADMIN_APP_URL', $publicAppUrl), '/');

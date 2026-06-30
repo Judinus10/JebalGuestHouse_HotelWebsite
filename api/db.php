@@ -19,5 +19,9 @@ function get_db_connection(): PDO
         PDO::ATTR_EMULATE_PREPARES => false,
     ]);
 
+    // Keep MySQL NOW() / timestamp comparisons aligned with PHP DateTime.
+    // Asia/Colombo is UTC+05:30 and does not use daylight saving time.
+    $pdo->exec("SET time_zone = '+05:30'");
+
     return $pdo;
 }
