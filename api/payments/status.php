@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
+require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 
@@ -105,6 +106,30 @@ try {
     }
 
     $paymentStatus = (string) ($record['gateway_payment_status'] ?: $record['payment_status'] ?: 'Payment Pending');
+
+    if ($paymentStatus === 'Payment Pending') {
+        try {
+            $publicBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
+                ? FRONTEND_URL
+                : (defined('PUBLIC_APP_URL') && PUBLIC_APP_URL !== '' ? PUBLIC_APP_URL : APP_BASE_URL);
+            $publicBaseUrl = rtrim((string) $publicBaseUrl, '/');
+            $billUrl = $publicBaseUrl . '/booking-bill?' . http_build_query([
+                'booking_id' => $bookingId,
+                'order_id' => $orderId,
+                'token' => $token,
+            ]);
+
+            send_booking_payment_pending_emails_once($pdo, $record, [
+                'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
+                'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
+                'order_id' => $orderId,
+                'status' => $paymentStatus,
+                'bill_url' => $billUrl,
+            ]);
+        } catch (Throwable $exception) {
+            error_log('Public payment status pending email failed: ' . $exception->getMessage());
+        }
+    }
 
     if ($paymentStatus === 'Paid' && (empty($record['invoice_id']) || empty($record['invoice_file_path']))) {
         try {

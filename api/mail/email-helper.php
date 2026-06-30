@@ -539,6 +539,120 @@ function send_booking_confirmed_email(PDO $pdo, array $booking): void
     }
 }
 
+
+function booking_email_sent(PDO $pdo, int $bookingId, array $emailTypes): bool
+{
+    if ($bookingId < 1 || empty($emailTypes)) {
+        return false;
+    }
+
+    try {
+        $placeholders = [];
+        $params = [':booking_id' => $bookingId];
+
+        foreach (array_values($emailTypes) as $index => $emailType) {
+            $key = ':type_' . $index;
+            $placeholders[] = $key;
+            $params[$key] = $emailType;
+        }
+
+        $sql = 'SELECT COUNT(*) FROM email_logs
+                WHERE booking_id = :booking_id
+                  AND status = \'Sent\'
+                  AND email_type IN (' . implode(',', $placeholders) . ')';
+
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+
+        return (int) $stmt->fetchColumn() > 0;
+    } catch (Throwable $e) {
+        error_log('Booking email duplicate check failed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, array $payment = []): void
+{
+    $bookingId = (int) ($booking['id'] ?? 0);
+
+    if ($bookingId < 1) {
+        return;
+    }
+
+    $paymentStatus = (string) ($booking['payment_status'] ?? $payment['status'] ?? 'Payment Pending');
+
+    if ($paymentStatus !== 'Payment Pending') {
+        return;
+    }
+
+    $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
+    $orderId = trim((string) ($payment['order_id'] ?? $booking['order_id'] ?? ''));
+    $billUrl = trim((string) ($payment['bill_url'] ?? ''));
+    $billButton = $billUrl !== '' ? email_button('View Booking Bill', $billUrl) : '';
+
+    $customerType = 'booking_payment_pending_customer';
+    $adminType = 'booking_payment_pending_admin';
+
+    if (!booking_email_sent($pdo, $bookingId, [$customerType])) {
+        $bodyCustomer = email_shell(
+            'Booking received - payment pending',
+            '<p style="margin:0 0 14px;">Dear ' . email_safe($booking['full_name'] ?? 'Guest') . ',</p>
+            <p style="margin:0 0 16px;">We received your booking details. Your booking is currently waiting for payment confirmation.</p>' .
+            email_badge('Payment pending', 'gold') .
+            email_info_table([
+                'Booking Reference' => 'BK-' . str_pad((string) $bookingId, 6, '0', STR_PAD_LEFT),
+                'Order ID' => $orderId !== '' ? $orderId : '-',
+                'Amount Due' => $amount,
+                'Payment Status' => 'Payment Pending',
+            ]) .
+            booking_details_html($booking) .
+            $billButton .
+            '<p style="margin:16px 0 0;color:#6b7280;font-size:14px;">This is not a payment confirmation. Your booking will be confirmed only after successful payment.</p>',
+            'We received your booking details. Payment is still pending.'
+        );
+
+        send_tracked_email(
+            $pdo,
+            'booking',
+            $bookingId,
+            (string) ($booking['email'] ?? ''),
+            'Booking received - payment pending - Jebal Guest House #' . $bookingId,
+            $bodyCustomer,
+            $customerType
+        );
+    }
+
+    if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
+        $bodyAdmin = email_shell(
+            'New booking received - payment pending',
+            '<p style="margin:0 0 16px;">A customer reached the booking bill page. Payment is still pending.</p>' .
+            email_badge('Payment pending', 'gold') .
+            email_info_table([
+                'Booking Reference' => 'BK-' . str_pad((string) $bookingId, 6, '0', STR_PAD_LEFT),
+                'Order ID' => $orderId !== '' ? $orderId : '-',
+                'Amount Due' => $amount,
+                'Payment Status' => 'Payment Pending',
+            ]) .
+            booking_details_html($booking) .
+            $billButton,
+            'A new booking reached the bill page. Payment is pending.'
+        );
+
+        send_tracked_email(
+            $pdo,
+            'booking',
+            $bookingId,
+            ADMIN_EMAIL,
+            'New booking received - payment pending - Jebal Guest House #' . $bookingId,
+            $bodyAdmin,
+            $adminType,
+            $booking['email'] ?? null
+        );
+    }
+
+    update_booking_email_status($pdo, $bookingId, 'Payment Pending Email Sent');
+}
+
 function send_booking_cancelled_emails(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
@@ -611,18 +725,44 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
 function send_payment_failed_email(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
-    $body = email_shell(
-        'Payment failed',
-        '<p style="margin:0 0 14px;">Dear ' . email_safe($booking['full_name'] ?? 'Guest') . ',</p>
-        <p style="margin:0 0 16px;">Your payment could not be completed. Please try again or contact Jebal Guest House for help.</p>' .
-        email_badge('Payment failed', 'red') .
-        booking_details_html($booking),
-        'Your payment could not be completed.'
-    );
 
-    $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment failed - Jebal Guest House #' . $bookingId, $body, 'payment_failed');
-    if ($bookingId > 0) {
+    if ($bookingId < 1) {
+        return;
+    }
+
+    if (!booking_email_sent($pdo, $bookingId, ['payment_failed'])) {
+        $body = email_shell(
+            'Payment failed',
+            '<p style="margin:0 0 14px;">Dear ' . email_safe($booking['full_name'] ?? 'Guest') . ',</p>
+            <p style="margin:0 0 16px;">Your payment could not be completed. Please try again or contact Jebal Guest House for help.</p>' .
+            email_badge('Payment failed', 'red') .
+            booking_details_html($booking),
+            'Your payment could not be completed.'
+        );
+
+        $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment failed - Jebal Guest House #' . $bookingId, $body, 'payment_failed');
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
+    }
+
+    if (!booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
+        $adminBody = email_shell(
+            'Payment failed',
+            '<p style="margin:0 0 16px;">A customer payment failed or was cancelled.</p>' .
+            email_badge('Payment failed', 'red') .
+            booking_details_html($booking),
+            'A customer payment failed or was cancelled.'
+        );
+
+        send_tracked_email(
+            $pdo,
+            'booking',
+            $bookingId,
+            ADMIN_EMAIL,
+            'Payment failed - Jebal Guest House #' . $bookingId,
+            $adminBody,
+            'admin_payment_failed',
+            $booking['email'] ?? null
+        );
     }
 }
 
