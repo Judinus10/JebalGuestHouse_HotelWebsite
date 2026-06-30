@@ -57,24 +57,32 @@ function formatDateTime(value) {
   })
 }
 
+function normalizePaymentStatus(status) {
+  const value = String(status || '').toLowerCase()
+
+  if (value.includes('paid') || value.includes('success') || value.includes('complete')) return 'Paid'
+  if (value.includes('fail') || value.includes('cancel') || value.includes('declin') || value.includes('reject')) return 'Failed'
+  return 'Pending'
+}
+
+function normalizeBookingStatus(status, paymentStatus) {
+  const bookingValue = String(status || '').toLowerCase()
+  const paymentValue = normalizePaymentStatus(paymentStatus)
+
+  if (bookingValue.includes('confirm') || bookingValue.includes('booked')) return 'Confirmed'
+  if (bookingValue.includes('cancel') || bookingValue.includes('expire') || bookingValue.includes('fail') || paymentValue === 'Failed') return 'Not Booked'
+  if (paymentValue === 'Paid') return 'Confirmed'
+  return 'Awaiting Payment'
+}
+
 function statusBadgeClass(status) {
-  if (status === 'Paid') return 'border-green-200 bg-green-50 text-green-700'
-  if (status === 'Failed' || status === 'Cancelled') return 'border-red-200 bg-red-50 text-red-700'
+  if (status === 'Paid' || status === 'Confirmed') return 'border-green-200 bg-green-50 text-green-700'
+  if (status === 'Failed' || status === 'Not Booked' || status === 'Cancelled') return 'border-red-200 bg-red-50 text-red-700'
   return 'border-yellow-200 bg-yellow-50 text-yellow-700'
 }
 
-function statusLabel(status) {
-  if (status === 'Paid') return 'Booking Confirmed'
-  if (status === 'Failed') return 'Payment Failed'
-  if (status === 'Cancelled') return 'Booking Cancelled'
-  return 'Booking Received - Awaiting Payment'
-}
-
 function shortStatusLabel(status) {
-  if (status === 'Paid') return 'CONFIRMED'
-  if (status === 'Failed') return 'FAILED'
-  if (status === 'Cancelled') return 'CANCELLED'
-  return 'AWAITING PAYMENT'
+  return String(status || 'Pending').toUpperCase()
 }
 
 function nightsBetween(checkIn, checkOut) {
@@ -266,6 +274,8 @@ export default function BookingBill() {
   const bookingNumber = getBookingNumber(bill, orderId)
   const generatedAt = formatDateTime(new Date().toISOString())
   const paymentHistory = Array.isArray(bill?.payment_history) ? bill.payment_history : []
+  const displayPaymentStatus = normalizePaymentStatus(bill?.payment_status)
+  const displayBookingStatus = normalizeBookingStatus(bill?.booking_status, bill?.payment_status)
 
   const createBillPdfBlob = async () => {
     if (!bill) throw new Error('Bill data is not ready.')
@@ -333,7 +343,7 @@ export default function BookingBill() {
     pdf.setFontSize(8)
     pdf.text('GUEST', margin + 5, y + 8)
     pdf.text('STAY', margin + cardWidth + cardGap + 5, y + 8)
-    pdf.text('PAYMENT', margin + (cardWidth + cardGap) * 2 + 5, y + 8)
+    pdf.text('STATUS', margin + (cardWidth + cardGap) * 2 + 5, y + 8)
 
     pdf.setTextColor(15, 23, 42)
     pdf.setFontSize(10)
@@ -353,23 +363,20 @@ export default function BookingBill() {
     pdf.text(pdfText(`Method: ${bill.payment_method || 'PayHere'}`), stayX, y + 41)
 
     const payX = margin + (cardWidth + cardGap) * 2 + 5
-    pdf.setTextColor(15, 23, 42)
+    pdf.setTextColor(100, 116, 139)
     pdf.setFont('helvetica', 'bold')
-    pdf.text(pdfText(shortStatusLabel(bill.payment_status)), payX, y + 20)
-    pdf.setFont('helvetica', 'normal')
-    pdf.setTextColor(51, 65, 85)
-    pdf.text(
-      pdfText(
-        bill.payment_status === 'Paid'
-          ? 'Thank you for your payment.'
-          : bill.payment_status === 'Payment Pending'
-            ? 'Payment verification is pending.'
-            : 'Payment was not successful.'
-      ),
-      payX,
-      y + 30,
-      { maxWidth: cardWidth - 10 }
-    )
+    pdf.setFontSize(8)
+    pdf.text('BOOKING', payX, y + 20)
+    pdf.setTextColor(15, 23, 42)
+    pdf.setFontSize(10)
+    pdf.text(pdfText(shortStatusLabel(displayBookingStatus)), payX + 22, y + 20)
+
+    pdf.setTextColor(100, 116, 139)
+    pdf.setFontSize(8)
+    pdf.text('PAYMENT', payX, y + 33)
+    pdf.setTextColor(15, 23, 42)
+    pdf.setFontSize(10)
+    pdf.text(pdfText(shortStatusLabel(displayPaymentStatus)), payX + 22, y + 33)
 
     y += cardHeight + 10
 
@@ -600,19 +607,21 @@ export default function BookingBill() {
                       </div>
 
                       <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="text-xs font-extrabold tracking-wider text-slate-500 uppercase">Payment</p>
-                          <span className={`rounded-full border px-3 py-1 text-xs font-extrabold ${statusBadgeClass(bill.payment_status)}`}>
-                            {shortStatusLabel(bill.payment_status)}
-                          </span>
+                        <div className="space-y-5">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-extrabold tracking-wider text-slate-500 uppercase">Booking</p>
+                            <span className={`rounded-full border px-3 py-1 text-xs font-extrabold ${statusBadgeClass(displayBookingStatus)}`}>
+                              {shortStatusLabel(displayBookingStatus)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-extrabold tracking-wider text-slate-500 uppercase">Payment</p>
+                            <span className={`rounded-full border px-3 py-1 text-xs font-extrabold ${statusBadgeClass(displayPaymentStatus)}`}>
+                              {shortStatusLabel(displayPaymentStatus)}
+                            </span>
+                          </div>
                         </div>
-                        <p className="mt-8 text-sm text-slate-800">
-                          {bill.payment_status === 'Paid'
-                            ? 'Booking confirmed. Payment has been verified.'
-                            : bill.payment_status === 'Payment Pending'
-                              ? 'Booking received. Awaiting payment confirmation.'
-                              : 'Payment was not completed. You may retry if the room is still available.'}
-                        </p>
                       </div>
                     </div>
 
@@ -646,8 +655,8 @@ export default function BookingBill() {
                                 <p className="text-xs text-slate-500">Created: {formatDateTime(payment.created_at)}</p>
                               </div>
                               <div className="text-left sm:text-right">
-                                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-extrabold ${statusBadgeClass(payment.status)}`}>
-                                  {shortStatusLabel(payment.status)}
+                                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-extrabold ${statusBadgeClass(normalizePaymentStatus(payment.status))}`}>
+                                  {shortStatusLabel(normalizePaymentStatus(payment.status))}
                                 </span>
                                 <p className="mt-2 text-sm font-bold text-slate-900">{formatMoney(payment.amount, payment.currency)}</p>
                               </div>
