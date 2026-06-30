@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom'
 import { Users, Maximize2, BedDouble, Check, ArrowLeft, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
@@ -44,6 +44,8 @@ export default function RoomDetails() {
   const [availabilityWarning, setAvailabilityWarning] = useState('')
   const [checkingAvailability, setCheckingAvailability] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
+  const submittingRef = useRef(false)
+  const redirectingRef = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -182,7 +184,9 @@ export default function RoomDetails() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (loading) return
+    if (loading || submittingRef.current || redirectingRef.current) return
+
+    submittingRef.current = true
     setLoading(true)
     setError('')
     setAvailabilityWarning('')
@@ -239,7 +243,8 @@ export default function RoomDetails() {
       }
 
       if (paymentResult.checkout_url) {
-        window.location.href = paymentResult.checkout_url
+        redirectingRef.current = true
+        window.location.assign(paymentResult.checkout_url)
         return
       }
 
@@ -261,7 +266,10 @@ export default function RoomDetails() {
     } catch (err) {
       setError(err.message || 'Unable to send booking inquiry. Please try again.')
     } finally {
-      setLoading(false)
+      if (!redirectingRef.current) {
+        submittingRef.current = false
+        setLoading(false)
+      }
     }
   }
 

@@ -24,6 +24,20 @@ function payhere_format_amount(float $amount): string
     return number_format($amount, 2, '.', '');
 }
 
+function generate_payhere_order_id(int $bookingId): string
+{
+    $bookingPart = str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $microtimePart = str_replace('.', '', sprintf('%.6F', microtime(true)));
+
+    try {
+        $randomPart = strtoupper(bin2hex(random_bytes(3)));
+    } catch (Throwable $exception) {
+        $randomPart = strtoupper(substr(hash('sha256', uniqid((string) $bookingId, true)), 0, 6));
+    }
+
+    return 'JH-' . date('YmdHis') . '-' . $bookingPart . '-' . substr($microtimePart, -6) . '-' . $randomPart;
+}
+
 function create_checkout_token(string $orderId, int $bookingId, string $amount): string
 {
     return hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
@@ -171,7 +185,7 @@ try {
 
     $amountFormatted = payhere_format_amount($amount);
     $currency = PAYMENT_CURRENCY;
-    $orderId = 'JH-' . date('YmdHis') . '-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $orderId = generate_payhere_order_id($bookingId);
 
     $checkoutToken = create_checkout_token($orderId, $bookingId, $amountFormatted);
     $returnUrl = build_booking_bill_url($bookingId, $orderId, $checkoutToken);
@@ -257,10 +271,15 @@ try {
         'currency' => $currency,
     ]);
 } catch (Throwable $e) {
-    if (isset($pdo) && $pdo->inTransaction()) {
-        $pdo->rollBack();
+    error_log('Create checkout session error: ' . $e->getMessage());
+
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        try {
+            $pdo->rollBack();
+        } catch (Throwable $rollbackException) {
+            error_log('Create checkout session rollback failed: ' . $rollbackException->getMessage());
+        }
     }
 
-    error_log('Create checkout session error: ' . $e->getMessage());
     json_response(false, 'Unable to start payment checkout.', 500);
 }
