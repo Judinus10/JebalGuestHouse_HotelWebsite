@@ -5,12 +5,13 @@ import FadeUp from './FadeUp'
 /**
  * Reusable room card with hover zoom image effect.
  */
-export default function RoomCard({ room, index = 0, variant = 'default' }) {
+export default function RoomCard({ room, index = 0, variant = 'default', searchQuery = '' }) {
   const isCompact = variant === 'compact'
+  const roomUrl = `/rooms/${room.slug || room.id}${searchQuery ? `?${searchQuery}` : ''}`
 
   return (
     <FadeUp delay={index * 0.1}>
-      <Link to={`/rooms/${room.slug || room.id}`} className="group block">
+      <Link to={roomUrl} className="group block">
         <div className="image-zoom relative aspect-[4/5] overflow-hidden bg-ice">
           <img
             src={(room.images && room.images[0]) || room.main_image}

@@ -39,8 +39,8 @@ export default function BookingBar() {
 
     const params = new URLSearchParams()
 
-    if (checkIn) params.set('check_in_date', checkIn)
-    if (checkOut) params.set('check_out_date', checkOut)
+    if (checkIn) params.set('checkin', checkIn)
+    if (checkOut) params.set('checkout', checkOut)
     if (guests) params.set('guests', guests)
     if (roomType && roomType !== 'All Rooms') params.set('room_type', roomType)
 

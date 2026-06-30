@@ -12,13 +12,49 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
 const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
 
+function readBookingParams(searchParams) {
+  return {
+    check_in_date: searchParams.get('checkin') || searchParams.get('check_in_date') || searchParams.get('check_in') || '',
+    check_out_date: searchParams.get('checkout') || searchParams.get('check_out_date') || searchParams.get('check_out') || '',
+    guests: searchParams.get('guests') || '',
+  }
+}
+
+function buildBookingQuery({ check_in_date, check_out_date, guests }) {
+  const params = new URLSearchParams()
+
+  if (check_in_date) params.set('checkin', check_in_date)
+  if (check_out_date) params.set('checkout', check_out_date)
+  if (guests) params.set('guests', guests)
+
+  return params.toString()
+}
+
+
+function calculateNights(checkInDate, checkOutDate) {
+  if (!checkInDate || !checkOutDate) return 0
+
+  const checkIn = new Date(`${checkInDate}T00:00:00`)
+  const checkOut = new Date(`${checkOutDate}T00:00:00`)
+  const diffMs = checkOut.getTime() - checkIn.getTime()
+
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return 0
+
+  return Math.round(diffMs / (1000 * 60 * 60 * 24))
+}
+
+function formatRoomPrice(currency, amount) {
+  const safeAmount = Number(amount || 0)
+  return `${currency || 'LKR'} ${safeAmount.toLocaleString()}`
+}
+
 /**
  * Individual room details page with gallery, amenities, and booking CTA.
  * UI and animation classes are intentionally kept from the finalized version.
  */
 export default function RoomDetails() {
   const { id } = useParams()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [room, setRoom] = useState(null)
   const [rooms, setRooms] = useState([])
   const [pageLoading, setPageLoading] = useState(true)
@@ -79,17 +115,15 @@ export default function RoomDetails() {
   }, [id])
 
   useEffect(() => {
-    const checkInDate = searchParams.get('check_in_date') || ''
-    const checkOutDate = searchParams.get('check_out_date') || ''
-    const guests = searchParams.get('guests') || ''
+    const bookingParams = readBookingParams(searchParams)
 
-    if (!checkInDate && !checkOutDate && !guests) return
+    if (!bookingParams.check_in_date && !bookingParams.check_out_date && !bookingParams.guests) return
 
     setFormData((current) => ({
       ...current,
-      check_in_date: checkInDate || current.check_in_date,
-      check_out_date: checkOutDate || current.check_out_date,
-      guests: guests || current.guests,
+      check_in_date: bookingParams.check_in_date || current.check_in_date,
+      check_out_date: bookingParams.check_out_date || current.check_out_date,
+      guests: bookingParams.guests || current.guests,
     }))
   }, [searchParams])
 
@@ -139,6 +173,26 @@ export default function RoomDetails() {
     return rooms.filter((r) => Number(r.id) !== Number(room.id)).slice(0, 3)
   }, [room, rooms])
 
+  const currentRoomSearchQuery = useMemo(() => buildBookingQuery({
+    check_in_date: formData.check_in_date,
+    check_out_date: formData.check_out_date,
+    guests: formData.guests,
+  }), [formData.check_in_date, formData.check_out_date, formData.guests])
+
+  const roomsBackUrl = `/rooms${currentRoomSearchQuery ? `?${currentRoomSearchQuery}` : ''}`
+
+  const bookingTotal = useMemo(() => {
+    const nights = calculateNights(formData.check_in_date, formData.check_out_date)
+    const nightlyPrice = Number(room?.price || 0)
+
+    return {
+      nights,
+      nightlyPrice,
+      total: nights * nightlyPrice,
+      hasValidDates: nights > 0,
+    }
+  }, [room?.price, formData.check_in_date, formData.check_out_date])
+
   if (pageLoading) {
     return (
       <PageTransition>
@@ -175,11 +229,25 @@ export default function RoomDetails() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
+    const nextValue = type === 'checkbox' ? checked : value
 
-    setFormData((current) => ({
-      ...current,
-      [name]: type === 'checkbox' ? checked : value,
-    }))
+    setFormData((current) => {
+      const next = {
+        ...current,
+        [name]: nextValue,
+      }
+
+      if (['check_in_date', 'check_out_date', 'guests'].includes(name)) {
+        const query = buildBookingQuery({
+          check_in_date: next.check_in_date,
+          check_out_date: next.check_out_date,
+          guests: next.guests,
+        })
+        setSearchParams(query ? new URLSearchParams(query) : new URLSearchParams(), { replace: true })
+      }
+
+      return next
+    })
   }
 
   const handleSubmit = async (e) => {
@@ -286,13 +354,6 @@ export default function RoomDetails() {
         <div className="absolute bottom-0 left-0 w-full px-6 pb-10">
           <div className="mx-auto max-w-7xl">
             <FadeUp>
-              <Link
-                to="/rooms"
-                className="mb-4 inline-flex items-center gap-2 text-xs tracking-wider uppercase text-white/80 hover:text-white"
-              >
-                <ArrowLeft size={14} />
-                Back to Rooms
-              </Link>
               <p className="text-xs tracking-[0.2em] uppercase text-gold-light">
                 {room.type}
               </p>
@@ -471,6 +532,7 @@ export default function RoomDetails() {
                         ))}
                       </select>
                     </div>
+
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">Message</label>
                       <textarea name="message" rows={3} value={formData.message} onChange={handleChange} className="mt-1 w-full resize-none border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
@@ -487,10 +549,10 @@ export default function RoomDetails() {
                           <div>
                             <p>{availabilityWarning}</p>
                             <Link
-                              to="/"
+                              to={roomsBackUrl}
                               className="mt-2 inline-block text-xs font-medium tracking-wider uppercase underline"
                             >
-                              View available rooms from home search
+                              View available rooms for these dates
                             </Link>
                           </div>
                         </div>
@@ -515,6 +577,20 @@ export default function RoomDetails() {
       </section>
 
 
+      {bookingTotal.hasValidDates && !submitted && (
+        <div className="fixed bottom-10 left-1/2 z-40 w-[min(90vw,380px)] -translate-x-1/2 px-4">
+          <div className="mx-auto rounded-full bg-charcoal px-8 py-3 text-center text-white shadow-2xl">
+            <p className="text-sm font-semibold tracking-wide">
+              Total: {formatRoomPrice(room.currency, bookingTotal.total)}
+            </p>
+
+            <p className="mt-1 text-[11px] text-white/75">
+              {bookingTotal.nights} night{bookingTotal.nights > 1 ? 's' : ''} ×{' '}
+              {formatRoomPrice(room.currency, bookingTotal.nightlyPrice)} per night
+            </p>
+          </div>
+        </div>
+      )}
 
       {lightboxOpen && images[activeImage] && (
         <div
@@ -591,7 +667,7 @@ export default function RoomDetails() {
           </FadeUp>
           <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
             {relatedRooms.map((r, i) => (
-              <RoomCard key={r.id} room={r} index={i} variant="compact" />
+              <RoomCard key={r.id} room={r} index={i} variant="compact" searchQuery={currentRoomSearchQuery} />
             ))}
           </div>
         </div>
