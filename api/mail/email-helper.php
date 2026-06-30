@@ -41,7 +41,7 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
         $mail->Host = $smtpHost;
         $mail->SMTPAuth = true;
         // Prevent public/notification requests from hanging for a full PHP timeout when SMTP is slow.
-        $mail->Timeout = 5;
+        $mail->Timeout = 30;
         $mail->SMTPKeepAlive = false;
         $mail->Username = $smtpUser;
         $mail->Password = $smtpPass;
