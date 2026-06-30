@@ -8,6 +8,7 @@ import Button from '../components/ui/Button'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
+const CONTACT_SUBMIT_TIMEOUT_MS = 10000
 
 const fallbackContactDetails = {
   address: 'Jebal Guest House, Jaffna, Sri Lanka',
@@ -92,8 +93,12 @@ export default function Contact() {
     setIsSubmitting(true)
 
     try {
+      const controller = new AbortController()
+      const timeoutId = window.setTimeout(() => controller.abort(), CONTACT_SUBMIT_TIMEOUT_MS)
+
       const response = await fetch(CONTACT_API_URL, {
         method: 'POST',
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
@@ -107,6 +112,8 @@ export default function Contact() {
         }),
       })
 
+      window.clearTimeout(timeoutId)
+
       const result = await response.json().catch(() => null)
 
       if (!response.ok || !result?.success) {
@@ -115,7 +122,8 @@ export default function Contact() {
 
       setSubmitted(true)
     } catch (error) {
-      setErrorMessage(error.message || 'Could not send your message. Please try again.')
+      const isTimeout = error?.name === 'AbortError'
+      setErrorMessage(isTimeout ? 'The request timed out. Please try again.' : (error.message || 'Could not send your message. Please try again.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -157,10 +165,10 @@ export default function Contact() {
                   <div className="flex h-full flex-col items-center justify-center bg-ice p-8 text-center md:p-12">
                     <Send className="text-gold" size={40} />
                     <h3 className="mt-6 font-serif text-2xl text-charcoal">
-                      Message Sent
+                      Message Received
                     </h3>
                     <p className="mt-3 text-sm text-muted">
-                      Thank you for reaching out. Our team will respond as soon as possible.
+                      Thank you for reaching out. Your enquiry has been saved and our team will respond as soon as possible.
                     </p>
                     <Button
                       variant="outline"

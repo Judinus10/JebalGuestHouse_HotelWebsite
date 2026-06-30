@@ -41,7 +41,8 @@ function admin_payment_status_for_db_unified(mixed $status): string
     $value = str_replace([' ', '-'], '_', $value);
 
     return match ($value) {
-        'paid' => 'Paid',
+        // Online PayHere payment must be marked Paid only by api/payments/payhere-notify.php.
+        'paid' => 'Payment Pending',
         'cancelled', 'canceled' => 'Cancelled',
         'refunded' => 'Refunded',
         'no_pay', 'nopay', 'no_payment' => 'No Pay',
@@ -76,7 +77,14 @@ try {
 
     $sendEmail = !array_key_exists('send_email', $data) || filter_var($data['send_email'], FILTER_VALIDATE_BOOLEAN);
     $bookingStatus = admin_booking_status_for_db($data['booking_status'] ?? $data['status'] ?? 'Pending');
-    $paymentStatus = admin_payment_status_for_db_unified($data['payment_status'] ?? 'Payment Pending');
+    $requestedPaymentStatusRaw = (string) ($data['payment_status'] ?? 'Payment Pending');
+    $requestedPaymentStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedPaymentStatusRaw)));
+
+    if (in_array($requestedPaymentStatusNormalized, ['paid', 'payment_paid'], true)) {
+        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 403);
+    }
+
+    $paymentStatus = admin_payment_status_for_db_unified($requestedPaymentStatusRaw);
     $paymentMethod = admin_payment_method_for_db_unified($data['payment_method'] ?? 'Manual');
     $reference = clean_string($data['transaction_reference'] ?? $data['reference'] ?? '', 100);
     $remarks = clean_string($data['remarks'] ?? '', 1000);
@@ -95,6 +103,11 @@ try {
 
     $oldBookingStatus = (string) ($booking['status'] ?? 'Pending');
     $oldPaymentStatus = (string) ($booking['payment_status'] ?? 'Payment Pending');
+
+    if ($bookingStatus === 'Confirmed' && (string) ($booking['payment_status'] ?? '') !== 'Paid') {
+        $pdo->rollBack();
+        json_response(false, 'Confirmed status is locked until PayHere verifies the payment as Paid.', 403);
+    }
 
     if ($bookingStatus === 'Confirmed' && strcasecmp($oldBookingStatus, $bookingStatus) !== 0) {
         $conflict = $pdo->prepare(

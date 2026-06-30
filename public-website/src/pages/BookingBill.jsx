@@ -29,6 +29,7 @@ function resolveApiBaseUrl() {
 
 const API_BASE_URL = resolveApiBaseUrl()
 const PAYMENT_STATUS_API_URL = `${API_BASE_URL}/payments/status.php`
+const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 
 const FALLBACK_HOTEL_NAME = 'Jebal Guest House'
@@ -63,10 +64,17 @@ function statusBadgeClass(status) {
 }
 
 function statusLabel(status) {
-  if (status === 'Paid') return 'PAID'
+  if (status === 'Paid') return 'Booking Confirmed'
+  if (status === 'Failed') return 'Payment Failed'
+  if (status === 'Cancelled') return 'Booking Cancelled'
+  return 'Booking Received - Awaiting Payment'
+}
+
+function shortStatusLabel(status) {
+  if (status === 'Paid') return 'CONFIRMED'
   if (status === 'Failed') return 'FAILED'
   if (status === 'Cancelled') return 'CANCELLED'
-  return 'DUE'
+  return 'AWAITING PAYMENT'
 }
 
 function nightsBetween(checkIn, checkOut) {
@@ -120,6 +128,23 @@ function stayDateRange(checkIn, checkOut) {
   return `${checkIn || '-'} to ${checkOut || '-'}`
 }
 
+function formatCountdown(seconds) {
+  const safeSeconds = Math.max(0, Math.floor(Number(seconds || 0)))
+  const hours = Math.floor(safeSeconds / 3600)
+  const minutes = Math.floor((safeSeconds % 3600) / 60)
+  const remainingSeconds = safeSeconds % 60
+
+  if (hours > 0) {
+    return `${hours} hr ${minutes} min ${remainingSeconds} sec`
+  }
+
+  if (minutes > 0) {
+    return `${minutes} min ${remainingSeconds} sec`
+  }
+
+  return `${remainingSeconds} sec`
+}
+
 function drawPdfBox(pdf, x, y, width, height, options = {}) {
   const {
     fill = [248, 250, 252],
@@ -143,6 +168,8 @@ export default function BookingBill() {
   const [bill, setBill] = useState(null)
   const [contactSettings, setContactSettings] = useState(null)
   const [pdfBusy, setPdfBusy] = useState(false)
+  const [retryBusy, setRetryBusy] = useState(false)
+  const [secondsRemaining, setSecondsRemaining] = useState(0)
 
   const statusUrl = useMemo(() => {
     const params = new URLSearchParams({ booking_id: bookingId, order_id: orderId, token })
@@ -161,6 +188,7 @@ export default function BookingBill() {
       }
 
       setBill(result.booking)
+      setSecondsRemaining(Number(result.booking?.seconds_remaining || 0))
       setError('')
     } catch (err) {
       setError(err.message || 'Unable to load booking bill.')
@@ -199,6 +227,14 @@ export default function BookingBill() {
     return () => window.clearInterval(timer)
   }, [bill, loadBill])
 
+  useEffect(() => {
+    if (!bill || bill.payment_status !== 'Payment Pending') return undefined
+    const timer = window.setInterval(() => {
+      setSecondsRemaining((current) => Math.max(0, current - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [bill])
+
   if (!bookingId || !orderId || !token) {
     return <Navigate to="/rooms" replace />
   }
@@ -229,6 +265,7 @@ export default function BookingBill() {
   const nights = bill ? nightsBetween(bill.check_in_date, bill.check_out_date) : 1
   const bookingNumber = getBookingNumber(bill, orderId)
   const generatedAt = formatDateTime(new Date().toISOString())
+  const paymentHistory = Array.isArray(bill?.payment_history) ? bill.payment_history : []
 
   const createBillPdfBlob = async () => {
     if (!bill) throw new Error('Bill data is not ready.')
@@ -268,7 +305,7 @@ export default function BookingBill() {
       })
       pdf.setTextColor(133, 77, 14)
       pdf.setFontSize(9)
-      pdf.text('Payment notification is still being verified. This page will refresh automatically.', margin + 4, y + 8)
+      pdf.text('Payment notification is still being verified. Complete payment soon to keep this room reserved.', margin + 4, y + 8)
       y += 18
     }
 
@@ -279,7 +316,7 @@ export default function BookingBill() {
       })
       pdf.setTextColor(185, 28, 28)
       pdf.setFontSize(9)
-      pdf.text('Payment failed. Your booking is still pending. The hotel team will contact you shortly.', margin + 4, y + 8)
+      pdf.text('Payment was not completed. You can retry payment if the room is still available.', margin + 4, y + 8)
       y += 18
     }
 
@@ -318,7 +355,7 @@ export default function BookingBill() {
     const payX = margin + (cardWidth + cardGap) * 2 + 5
     pdf.setTextColor(15, 23, 42)
     pdf.setFont('helvetica', 'bold')
-    pdf.text(pdfText(statusLabel(bill.payment_status)), payX, y + 20)
+    pdf.text(pdfText(shortStatusLabel(bill.payment_status)), payX, y + 20)
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor(51, 65, 85)
     pdf.text(
@@ -408,6 +445,39 @@ export default function BookingBill() {
       alert(err.message || 'Unable to download bill PDF.')
     } finally {
       setPdfBusy(false)
+    }
+  }
+
+  const handleRetryPayment = async () => {
+    if (!bill || retryBusy) return
+
+    try {
+      setRetryBusy(true)
+      setError('')
+
+      const response = await fetch(PAYMENT_INIT_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: JSON.stringify({ booking_id: bill.id }),
+      })
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Unable to restart payment.')
+      }
+
+      if (!result.checkout_url) {
+        throw new Error('Payment checkout URL was not returned.')
+      }
+
+      window.location.href = result.checkout_url
+    } catch (err) {
+      setError(err.message || 'Unable to restart payment.')
+    } finally {
+      setRetryBusy(false)
     }
   }
 
@@ -503,13 +573,13 @@ export default function BookingBill() {
                   <div className="relative z-10 p-6">
                     {bill.payment_status === 'Payment Pending' && (
                       <div className="mb-5 rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
-                        Payment notification is still being verified. This page will refresh automatically.
+                        Payment notification is still being verified. Complete payment within {formatCountdown(secondsRemaining)} to keep this room reserved.
                       </div>
                     )}
 
                     {(bill.payment_status === 'Failed' || bill.payment_status === 'Cancelled') && (
                       <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        Payment failed. Your booking is still pending. The hotel team will contact you shortly.
+                        Payment was not completed. You can retry payment if the room is still available.
                       </div>
                     )}
 
@@ -533,15 +603,15 @@ export default function BookingBill() {
                         <div className="flex items-start justify-between gap-3">
                           <p className="text-xs font-extrabold tracking-wider text-slate-500 uppercase">Payment</p>
                           <span className={`rounded-full border px-3 py-1 text-xs font-extrabold ${statusBadgeClass(bill.payment_status)}`}>
-                            {statusLabel(bill.payment_status)}
+                            {shortStatusLabel(bill.payment_status)}
                           </span>
                         </div>
                         <p className="mt-8 text-sm text-slate-800">
                           {bill.payment_status === 'Paid'
-                            ? 'Thank you for your payment.'
+                            ? 'Booking confirmed. Payment has been verified.'
                             : bill.payment_status === 'Payment Pending'
-                              ? 'Payment verification is pending.'
-                              : 'Payment was not successful.'}
+                              ? 'Booking received. Awaiting payment confirmation.'
+                              : 'Payment was not completed. You may retry if the room is still available.'}
                         </p>
                       </div>
                     </div>
@@ -561,6 +631,33 @@ export default function BookingBill() {
                       </div>
                     </div>
 
+                    {paymentHistory.length > 0 && (
+                      <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/80 p-5">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-bold text-slate-950">Payment History</p>
+                          <p className="text-xs font-semibold text-slate-500">{paymentHistory.length} attempt{paymentHistory.length === 1 ? '' : 's'}</p>
+                        </div>
+                        <div className="mt-4 space-y-3">
+                          {paymentHistory.map((payment) => (
+                            <div key={`${payment.attempt}-${payment.order_id}`} className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+                              <div>
+                                <p className="text-sm font-extrabold text-slate-900">Payment Attempt {payment.attempt}</p>
+                                <p className="text-xs text-slate-500">Order: {payment.order_id || '-'}</p>
+                                <p className="text-xs text-slate-500">Created: {formatDateTime(payment.created_at)}</p>
+                              </div>
+                              <div className="text-left sm:text-right">
+                                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-extrabold ${statusBadgeClass(payment.status)}`}>
+                                  {shortStatusLabel(payment.status)}
+                                </span>
+                                <p className="mt-2 text-sm font-bold text-slate-900">{formatMoney(payment.amount, payment.currency)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+
                     <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-white/70 p-5">
                       <p className="font-bold text-slate-950">Notes:</p>
                       <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-800">
@@ -573,6 +670,12 @@ export default function BookingBill() {
                 </div>
 
                 <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-3 rounded-b-2xl bg-slate-100 p-4 shadow-xl print:hidden">
+                  {bill.can_retry_payment && (
+                    <button type="button" onClick={handleRetryPayment} disabled={retryBusy} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-70">
+                      {retryBusy ? 'Starting Payment...' : bill.payment_status === 'Payment Pending' ? 'Resume Payment' : 'Retry Payment'}
+                    </button>
+                  )}
+
                   <button type="button" onClick={handleShare} disabled={pdfBusy} className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-extrabold text-slate-900 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70">
                     <Share2 size={16} />
                     {pdfBusy ? 'Preparing PDF...' : 'Share PDF'}

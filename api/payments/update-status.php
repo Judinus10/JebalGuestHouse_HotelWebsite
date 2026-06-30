@@ -28,7 +28,9 @@ function admin_payment_status_for_db(mixed $status): string
     $value = preg_replace('/^payment_/', '', $value) ?? '';
 
     return match ($value) {
-        'paid' => 'Paid',
+        // Online PayHere payment must be marked Paid only by api/payments/payhere-notify.php.
+        // Admin may still use Cancelled/Refunded/No Pay for non-success adjustments.
+        'paid' => 'Payment Pending',
         'cancelled', 'canceled' => 'Cancelled',
         'refunded' => 'Refunded',
         'no_pay', 'nopay', 'no_payment' => 'No Pay',
@@ -62,7 +64,14 @@ try {
         json_response(false, 'Payment ID is required.', 422);
     }
 
-    $paymentStatus = admin_payment_status_for_db($data['payment_status'] ?? $data['status'] ?? 'Payment Pending');
+    $requestedStatusRaw = (string) ($data['payment_status'] ?? $data['status'] ?? 'Payment Pending');
+    $requestedStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedStatusRaw)));
+
+    if (in_array($requestedStatusNormalized, ['paid', 'payment_paid'], true)) {
+        json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 403);
+    }
+
+    $paymentStatus = admin_payment_status_for_db($requestedStatusRaw);
     $paymentMethod = admin_payment_method_for_db($data['payment_method'] ?? $data['method'] ?? 'PayHere');
     $reference = clean_string($data['transaction_reference'] ?? $data['reference'] ?? '', 100);
 

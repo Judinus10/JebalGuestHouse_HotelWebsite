@@ -8,7 +8,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
-require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 
 apply_cors_headers();
 
@@ -29,6 +30,35 @@ function public_checkout_token(string $orderId, int $bookingId, string $amount):
 function public_invoice_download_token(int $bookingId): string
 {
     return hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET);
+}
+
+
+function load_payment_history(PDO $pdo, int $bookingId): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT order_id, payment_id, amount, currency, status, method, invoice_number, created_at, updated_at
+         FROM payments
+         WHERE booking_id = :booking_id
+         ORDER BY created_at ASC, id ASC'
+    );
+    $stmt->execute([':booking_id' => $bookingId]);
+
+    $attempt = 0;
+    return array_map(static function (array $payment) use (&$attempt): array {
+        $attempt++;
+        return [
+            'attempt' => $attempt,
+            'order_id' => (string) ($payment['order_id'] ?? ''),
+            'payment_id' => (string) ($payment['payment_id'] ?? ''),
+            'amount' => (float) ($payment['amount'] ?? 0),
+            'currency' => (string) ($payment['currency'] ?? PAYMENT_CURRENCY),
+            'status' => (string) ($payment['status'] ?? 'Payment Pending'),
+            'method' => (string) ($payment['method'] ?? 'PayHere'),
+            'invoice_number' => (string) ($payment['invoice_number'] ?? ''),
+            'created_at' => (string) ($payment['created_at'] ?? ''),
+            'updated_at' => (string) ($payment['updated_at'] ?? ''),
+        ];
+    }, $stmt->fetchAll() ?: []);
 }
 
 function public_room_url(PDO $pdo, string $roomName): string
@@ -70,6 +100,7 @@ if ($bookingId < 1 || $orderId === '' || $token === '') {
 
 try {
     $pdo = get_db_connection();
+    expire_pending_bookings($pdo, $bookingId, true);
 
     $stmt = $pdo->prepare(
         'SELECT
@@ -107,32 +138,15 @@ try {
 
     $paymentStatus = (string) ($record['gateway_payment_status'] ?: $record['payment_status'] ?: 'Payment Pending');
 
-    if ($paymentStatus === 'Payment Pending') {
-        try {
-            $publicBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
-                ? FRONTEND_URL
-                : (defined('PUBLIC_APP_URL') && PUBLIC_APP_URL !== '' ? PUBLIC_APP_URL : APP_BASE_URL);
-            $publicBaseUrl = rtrim((string) $publicBaseUrl, '/');
-            $billUrl = $publicBaseUrl . '/booking-bill?' . http_build_query([
-                'booking_id' => $bookingId,
-                'order_id' => $orderId,
-                'token' => $token,
-            ]);
+    // Keep this endpoint read-only for pending payments.
+    // Do not send emails or write audit logs from the bill/status page;
+    // slow SMTP calls here make the customer page hang and can trigger duplicates.
 
-            send_booking_payment_pending_emails_once($pdo, $record, [
-                'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
-                'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
-                'order_id' => $orderId,
-                'status' => $paymentStatus,
-                'bill_url' => $billUrl,
-            ]);
-        } catch (Throwable $exception) {
-            error_log('Public payment status pending email failed: ' . $exception->getMessage());
-        }
-    }
 
     if ($paymentStatus === 'Paid' && (empty($record['invoice_id']) || empty($record['invoice_file_path']))) {
         try {
+            booking_audit_log($pdo, $bookingId, 'invoice_generation_started', 'Invoice Generation Started', 'Invoice generation was triggered from the bill page.', ['order_id' => $orderId]);
+
             generate_invoice_for_booking($pdo, $bookingId, [
                 'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
                 'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
@@ -150,6 +164,13 @@ try {
             error_log('Public payment status invoice generation failed: ' . $exception->getMessage());
         }
     }
+
+    $paymentHistory = load_payment_history($pdo, $bookingId);
+
+    $expiresAt = booking_expires_at($record);
+    $secondsRemaining = $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
+    $canRetryPayment = in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
+        && (string) ($record['status'] ?? '') !== 'Confirmed';
 
     $invoiceDownloadUrl = null;
     if ($paymentStatus === 'Paid' && !empty($record['invoice_file_path'])) {
@@ -180,6 +201,11 @@ try {
             'payment_method' => (string) ($record['payment_method'] ?? 'PayHere'),
             'room_url' => public_room_url($pdo, (string) ($record['room_name'] ?? '')),
             'invoice_download_url' => $invoiceDownloadUrl,
+            'hold_minutes' => booking_hold_minutes(),
+            'expires_at' => $expiresAt,
+            'seconds_remaining' => $secondsRemaining,
+            'can_retry_payment' => $canRetryPayment,
+            'payment_history' => $paymentHistory,
         ],
     ]);
 } catch (Throwable $exception) {

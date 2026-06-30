@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/bookings/booking-expiry-helper.php';
 
 apply_cors_headers();
 
@@ -32,6 +33,7 @@ if ($checkOutDate === $checkInDate) {
 
 try {
     $pdo = get_db_connection();
+    expire_pending_bookings($pdo, null, false);
 
     if ($roomId > 0) {
         $roomStmt = $pdo->prepare('SELECT room_name FROM rooms WHERE id = :id LIMIT 1');
@@ -46,17 +48,17 @@ try {
     }
 
     $stmt = $pdo->prepare(
-        "SELECT id, check_in_date, check_out_date, status, payment_status
+        "SELECT id, check_in_date, check_out_date, status, payment_status, created_at
          FROM bookings
          WHERE room_name = :room_name
-           AND status IN ('Confirmed', 'Pending')
-           AND COALESCE(payment_status, '') NOT IN ('Failed', 'Cancelled', 'Refunded')
+           " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $stmt->execute([
         ':room_name' => $roomName,
+        ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $availabilityCheckOutDate,
     ]);

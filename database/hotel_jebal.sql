@@ -523,3 +523,21 @@ ALTER TABLE bookings
   ADD COLUMN IF NOT EXISTS staying_guest_email VARCHAR(190) DEFAULT NULL AFTER staying_guest_name,
   ADD COLUMN IF NOT EXISTS staying_guest_phone VARCHAR(50) DEFAULT NULL AFTER staying_guest_email,
   ADD COLUMN IF NOT EXISTS staying_guest_note TEXT DEFAULT NULL AFTER staying_guest_phone;
+
+
+-- Optional manual migration. The PHP helper also creates this table automatically.
+CREATE TABLE IF NOT EXISTS booking_audit_logs (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    booking_id INT UNSIGNED NOT NULL,
+    payment_id INT UNSIGNED NULL,
+    order_id VARCHAR(120) NULL,
+    event_type VARCHAR(80) NOT NULL,
+    event_title VARCHAR(160) NOT NULL,
+    event_message TEXT NULL,
+    metadata JSON NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_booking_audit_booking_id (booking_id),
+    KEY idx_booking_audit_event_type (event_type),
+    KEY idx_booking_audit_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

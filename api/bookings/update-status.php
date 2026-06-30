@@ -46,6 +46,10 @@ try {
         ]);
     }
 
+    if ($status === 'confirmed' && (string) ($booking['payment_status'] ?? '') !== 'Paid') {
+        json_response(false, 'Confirmed status is locked until PayHere verifies the payment as Paid.', 403);
+    }
+
     if ($status === 'confirmed') {
         $conflict = $pdo->prepare(
             "SELECT id

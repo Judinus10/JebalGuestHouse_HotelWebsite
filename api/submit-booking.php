@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/mail/email-helper.php';
+require_once __DIR__ . '/bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/bookings/booking-audit-helper.php';
 
 apply_cors_headers();
 
@@ -87,6 +89,7 @@ if ($amount <= 0) {
 
 try {
     $pdo = get_db_connection();
+    expire_pending_bookings($pdo, null, true);
 
     $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1");
     $roomStmt->execute([':room_name' => $roomName]);
@@ -104,14 +107,14 @@ try {
         "SELECT id, check_in_date, check_out_date
          FROM bookings
          WHERE room_name = :room_name
-           AND status = 'Confirmed'
-           AND COALESCE(payment_status, '') = 'Paid'
+           " . active_booking_conflict_sql() . "
            AND :requested_check_in < check_out_date
            AND :requested_check_out > check_in_date
          LIMIT 1"
     );
     $conflict->execute([
         ':room_name' => $roomName,
+        ':hold_cutoff' => booking_hold_cutoff_datetime(),
         ':requested_check_in' => $checkInDate,
         ':requested_check_out' => $checkOutDate,
     ]);
@@ -168,6 +171,12 @@ try {
     $stmt->execute($insertParams);
 
     $bookingId = (int) $pdo->lastInsertId();
+
+    booking_audit_log($pdo, $bookingId, 'booking_created', 'Booking Created', 'Customer submitted booking details and a pending booking was created.', [
+        'room_name' => $roomName,
+        'amount' => $amount,
+        'currency' => PAYMENT_CURRENCY,
+    ]);
 
     // Do not send user/admin confirmation emails here.
     // Payment is not verified yet. Success/failed emails are sent only from payments/payhere-notify.php.

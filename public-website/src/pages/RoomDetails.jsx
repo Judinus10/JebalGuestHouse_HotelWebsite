@@ -99,7 +99,10 @@ export default function RoomDetails() {
 
       if (!room || !formData.check_in_date || !formData.check_out_date) return
 
-      if (formData.check_out_date <= formData.check_in_date) return
+      if (formData.check_out_date <= formData.check_in_date) {
+        setAvailabilityWarning('Check-out date must be after check-in date. Minimum stay is 1 night.')
+        return
+      }
 
       try {
         setCheckingAvailability(true)
@@ -150,7 +153,7 @@ export default function RoomDetails() {
   const isRoomUnavailable = Boolean(availabilityWarning)
   const paymentState = (searchParams.get('payment') || '').toLowerCase()
   const paymentMessage = paymentState === 'failed' || paymentState === 'cancelled'
-    ? 'Payment failed. Your booking is still pending. The hotel side will contact you shortly.'
+    ? 'Payment was not completed. You can try booking again or contact the hotel for help.'
     : ''
 
   const showPreviousImage = () => {
@@ -179,11 +182,18 @@ export default function RoomDetails() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (loading) return
     setLoading(true)
     setError('')
     setAvailabilityWarning('')
 
     try {
+      if (formData.check_out_date <= formData.check_in_date) {
+        setAvailabilityWarning('Check-out date must be after check-in date. Minimum stay is 1 night.')
+        setLoading(false)
+        return
+      }
+
       const availability = await checkRoomAvailability({
         roomId: room.id,
         roomName: room.name,
@@ -439,11 +449,11 @@ export default function RoomDetails() {
 
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">Check In</label>
-                      <input type="date" name="check_in_date" required value={formData.check_in_date} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <input type="date" name="check_in_date" required min={new Date().toISOString().slice(0, 10)} value={formData.check_in_date} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
                     </div>
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">Check Out</label>
-                      <input type="date" name="check_out_date" required value={formData.check_out_date} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                      <input type="date" name="check_out_date" required min={formData.check_in_date || new Date().toISOString().slice(0, 10)} value={formData.check_out_date} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
                     </div>
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">Guests</label>
@@ -482,13 +492,13 @@ export default function RoomDetails() {
                     {error && <p className="text-xs text-red-600">{error}</p>}
 
                     <Button type="submit" className="w-full" disabled={loading || checkingAvailability || isRoomUnavailable}>
-                      {loading ? 'Processing...' : checkingAvailability ? 'Checking...' : 'Send Inquiry & Pay'}
+                      {loading ? 'Processing...' : checkingAvailability ? 'Checking...' : 'Continue to Payment'}
                     </Button>
                   </form>
                 )}
 
                 <p className="mt-4 text-center text-xs text-muted">
-                  Contact us to confirm room availability before arrival
+                  Your room hold starts only after you continue to payment
                 </p>
               </div>
             </ImageReveal>

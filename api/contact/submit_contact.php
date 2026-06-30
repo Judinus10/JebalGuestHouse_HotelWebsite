@@ -2,7 +2,6 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
-require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
 
@@ -46,9 +45,11 @@ try {
 
     $id = (int) $pdo->lastInsertId();
     $ref = 'INQ-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
-    send_contact_enquiry_emails($pdo, $id, $name, $email, $phone, $subject, $message);
 
-    json_response(true, 'Your message has been sent successfully.', 201, [
+    // IMPORTANT:
+    // Do not send SMTP email here. SMTP is slow/failure-prone and makes the contact page hang.
+    // Emails are sent by api/contact/send-contact-emails.php, which should be run by cron/task scheduler.
+    json_response(true, 'Your message has been received. Our team will respond as soon as possible.', 201, [
         'data' => ['id' => $id, 'inquiry_id' => $ref],
     ]);
 } catch (Throwable $e) {

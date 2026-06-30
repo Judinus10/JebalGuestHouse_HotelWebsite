@@ -8,6 +8,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 
 apply_cors_headers();
 
@@ -93,6 +95,8 @@ if (PAYHERE_MERCHANT_ID === '' || PAYHERE_MERCHANT_SECRET === '' || PAYHERE_MERC
 
 try {
     $pdo = get_db_connection();
+    expire_pending_bookings($pdo, $bookingId, true);
+    ensure_booking_audit_table($pdo);
     $pdo->beginTransaction();
 
     $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
@@ -107,6 +111,14 @@ try {
     if (($booking['payment_status'] ?? '') === 'Paid') {
         $pdo->rollBack();
         json_response(false, 'This booking has already been paid.', 409);
+    }
+
+    if (booking_hold_is_expired($booking)) {
+        $pdo->rollBack();
+        json_response(false, 'This payment hold has expired. Please retry payment to create a fresh checkout.', 409, [
+            'expired' => true,
+            'can_retry_payment' => true,
+        ]);
     }
 
     $roomName = (string) ($booking['room_name'] ?? '');
@@ -132,6 +144,29 @@ try {
     if ($amount <= 0) {
         $pdo->rollBack();
         json_response(false, 'Unable to calculate payment amount.', 422);
+    }
+
+    $conflict = $pdo->prepare(
+        "SELECT id
+         FROM bookings
+         WHERE id <> :booking_id
+           AND room_name = :room_name
+           " . active_booking_conflict_sql() . "
+           AND :requested_check_in < check_out_date
+           AND :requested_check_out > check_in_date
+         LIMIT 1"
+    );
+    $conflict->execute([
+        ':booking_id' => $bookingId,
+        ':room_name' => $roomName,
+        ':hold_cutoff' => booking_hold_cutoff_datetime(),
+        ':requested_check_in' => $checkInDate,
+        ':requested_check_out' => $checkOutDate,
+    ]);
+
+    if ($conflict->fetch()) {
+        $pdo->rollBack();
+        json_response(false, 'Sorry, this room is no longer available for the selected dates.', 409, ['available' => false]);
     }
 
     $amountFormatted = payhere_format_amount($amount);
@@ -188,12 +223,26 @@ try {
         ], JSON_UNESCAPED_SLASHES),
     ]);
 
-    $updateBooking = $pdo->prepare('UPDATE bookings SET amount = :amount, currency = :currency, payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
+    $paymentRowId = (int) $pdo->lastInsertId();
+
+    booking_audit_log($pdo, $bookingId, 'payment_started', 'Payment Started', 'A PayHere checkout session was created.', [
+        'order_id' => $orderId,
+        'payment_row_id' => $paymentRowId,
+        'amount' => $amountFormatted,
+        'currency' => $currency,
+    ]);
+
+    $updateBooking = $pdo->prepare("UPDATE bookings SET amount = :amount, currency = :currency, status = 'Pending', payment_status = :payment_status, updated_at = NOW() WHERE id = :id");
     $updateBooking->execute([
         ':amount' => $amount,
         ':currency' => $currency,
         ':payment_status' => 'Payment Pending',
         ':id' => $bookingId,
+    ]);
+
+    booking_audit_log($pdo, $bookingId, 'booking_payment_hold_refreshed', 'Booking Payment Hold Active', 'Booking remains reserved while awaiting payment.', [
+        'order_id' => $orderId,
+        'hold_minutes' => booking_hold_minutes(),
     ]);
 
     $pdo->commit();
