@@ -10,6 +10,7 @@ import Gallery from './pages/Gallery'
 import Experience from './pages/Experience'
 import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
+import NotFound from './pages/NotFound'
 import ScrollToTop from './components/layout/ScrollToTop'
 
 /**
@@ -32,6 +33,7 @@ function App() {
           <Route path="/experience" element={<Experience />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AnimatePresence>
     </Layout>
