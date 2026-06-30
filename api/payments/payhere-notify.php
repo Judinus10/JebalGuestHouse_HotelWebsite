@@ -199,7 +199,6 @@ try {
                ON blocker.room_name = current_booking.room_name
               AND blocker.id <> current_booking.id
               AND blocker.status = 'Confirmed'
-              AND COALESCE(blocker.payment_status, '') = 'Paid'
               AND current_booking.check_in_date < blocker.check_out_date
               AND current_booking.check_out_date > blocker.check_in_date
              WHERE current_booking.id = :booking_id

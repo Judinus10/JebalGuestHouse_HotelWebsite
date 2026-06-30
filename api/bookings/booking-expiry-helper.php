@@ -139,7 +139,7 @@ function expire_pending_bookings(PDO $pdo, ?int $bookingId = null, bool $sendEma
 function active_booking_conflict_sql(): string
 {
     return "AND (
-                (status = 'Confirmed' AND COALESCE(payment_status, '') = 'Paid')
+                status = 'Confirmed'
                 OR
                 (status = 'Pending' AND COALESCE(payment_status, '') = 'Payment Pending' AND created_at >= :hold_cutoff)
             )";
