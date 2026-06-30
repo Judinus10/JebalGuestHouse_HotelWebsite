@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 
+// Experience endpoints were missing the shared CORS bootstrap.
+// This is required when the admin portal runs from a different subdomain,
+// for example https://portal.jebalguesthouse.com calling https://jebalguesthouse.com/api.
+apply_cors_headers();
+
 function experience_json(array $data, int $code = 200): void
 {
     http_response_code($code);
