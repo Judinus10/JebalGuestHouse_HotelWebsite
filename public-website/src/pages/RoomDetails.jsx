@@ -54,7 +54,7 @@ function formatRoomPrice(currency, amount) {
  */
 export default function RoomDetails() {
   const { id } = useParams()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams] = useSearchParams()
   const [room, setRoom] = useState(null)
   const [rooms, setRooms] = useState([])
   const [pageLoading, setPageLoading] = useState(true)
@@ -235,15 +235,6 @@ export default function RoomDetails() {
       const next = {
         ...current,
         [name]: nextValue,
-      }
-
-      if (['check_in_date', 'check_out_date', 'guests'].includes(name)) {
-        const query = buildBookingQuery({
-          check_in_date: next.check_in_date,
-          check_out_date: next.check_out_date,
-          guests: next.guests,
-        })
-        setSearchParams(query ? new URLSearchParams(query) : new URLSearchParams(), { replace: true })
       }
 
       return next

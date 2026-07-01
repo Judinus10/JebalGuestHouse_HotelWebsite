@@ -8,7 +8,7 @@ import Button from '../components/ui/Button'
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
-const CONTACT_SUBMIT_TIMEOUT_MS = 10000
+const CONTACT_SUBMIT_TIMEOUT_MS = 8000
 
 const fallbackContactDetails = {
   address: 'Jebal Guest House, Jaffna, Sri Lanka',
@@ -123,7 +123,7 @@ export default function Contact() {
       setSubmitted(true)
     } catch (error) {
       const isTimeout = error?.name === 'AbortError'
-      setErrorMessage(isTimeout ? 'The request timed out. Please try again.' : (error.message || 'Could not send your message. Please try again.'))
+      setErrorMessage(isTimeout ? 'The server is taking too long to respond. Please do not submit again immediately; your enquiry may already be saved.' : (error.message || 'Could not send your message. Please try again.'))
     } finally {
       setIsSubmitting(false)
     }
@@ -168,7 +168,7 @@ export default function Contact() {
                       Message Received
                     </h3>
                     <p className="mt-3 text-sm text-muted">
-                      Thank you for reaching out. Your enquiry has been saved and our team will respond as soon as possible.
+                      Your message has been received successfully. Our team will respond as soon as possible.
                     </p>
                     <Button
                       variant="outline"

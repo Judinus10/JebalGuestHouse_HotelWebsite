@@ -541,3 +541,33 @@ CREATE TABLE IF NOT EXISTS booking_audit_logs (
     KEY idx_booking_audit_event_type (event_type),
     KEY idx_booking_audit_created_at (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS email_queue (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    related_type VARCHAR(40) NULL,
+    related_id INT UNSIGNED NULL,
+    recipient_email VARCHAR(190) NOT NULL,
+    reply_to_email VARCHAR(190) NULL,
+    subject VARCHAR(255) NOT NULL,
+    body_html MEDIUMTEXT NOT NULL,
+    email_type VARCHAR(80) NOT NULL,
+    status ENUM('pending','processing','sent','failed') NOT NULL DEFAULT 'pending',
+    attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3,
+    last_error TEXT NULL,
+    available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    locked_at DATETIME NULL,
+    sent_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_email_queue_job (related_type, related_id, email_type, recipient_email),
+    KEY idx_email_queue_status_available (status, available_at, id),
+    KEY idx_email_queue_related (related_type, related_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Fix older email_queue tables that were created before the cron worker fields existed.
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS reply_to_email VARCHAR(190) NULL AFTER recipient_email;
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS body_html MEDIUMTEXT NULL AFTER subject;
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3 AFTER attempts;
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS locked_at DATETIME NULL AFTER available_at;
+ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS sent_at DATETIME NULL AFTER locked_at;

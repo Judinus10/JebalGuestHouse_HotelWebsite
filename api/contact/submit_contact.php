@@ -29,6 +29,7 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 try {
     $pdo = get_db_connection();
+
     $stmt = $pdo->prepare(
         'INSERT INTO enquiries (name, email, phone, subject, message, status, ip_address, user_agent, created_at, updated_at)
          VALUES (:name, :email, :phone, :subject, :message, :status, :ip_address, :user_agent, NOW(), NOW())'
@@ -46,10 +47,10 @@ try {
 
     $id = (int) $pdo->lastInsertId();
     $ref = 'INQ-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
-    $emailSent = false;
+    $queuedCount = 0;
 
     try {
-        send_contact_enquiry_emails(
+        $queuedCount = queue_contact_enquiry_emails(
             $pdo,
             $id,
             $name,
@@ -58,17 +59,17 @@ try {
             $subject,
             $message
         );
-        $emailSent = true;
-    } catch (Throwable $emailError) {
-        // The enquiry is already saved. Do not fail the public contact form because SMTP failed.
-        error_log('Contact direct email send failed for enquiry #' . $id . ': ' . $emailError->getMessage());
+    } catch (Throwable $queueError) {
+        // The enquiry is saved. Never make the visitor wait/fail because queue insert had a problem.
+        error_log('Contact email queue insert failed for enquiry #' . $id . ': ' . $queueError->getMessage());
     }
 
-    json_response(true, 'Your message has been received. Our team will respond as soon as possible.', 201, [
+    json_response(true, 'Your message has been received successfully. Our team will respond as soon as possible.', 201, [
         'data' => [
             'id' => $id,
             'inquiry_id' => $ref,
-            'email_sent' => $emailSent,
+            'email_queued' => $queuedCount > 0,
+            'queued_count' => $queuedCount,
         ],
     ]);
 } catch (Throwable $e) {

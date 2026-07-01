@@ -1108,3 +1108,377 @@ function send_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, str
         );
     }
 }
+
+
+/**
+ * Ensure the async email queue table exists.
+ * This keeps the contact form fix deployable even when the SQL was not imported manually.
+ */
+function email_queue_column_exists(PDO $pdo, string $column): bool
+{
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'email_queue'
+           AND COLUMN_NAME = :column"
+    );
+    $stmt->execute([':column' => $column]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function email_queue_index_exists(PDO $pdo, string $indexName): bool
+{
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*)
+         FROM INFORMATION_SCHEMA.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'email_queue'
+           AND INDEX_NAME = :index_name"
+    );
+    $stmt->execute([':index_name' => $indexName]);
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function email_queue_add_column_if_missing(PDO $pdo, string $column, string $definition): void
+{
+    if (!email_queue_column_exists($pdo, $column)) {
+        $pdo->exec("ALTER TABLE email_queue ADD COLUMN {$definition}");
+    }
+}
+
+/**
+ * Ensure the async email queue table exists and upgrade older queue schemas.
+ * Your current DB already had email_queue, but it was missing locked_at/body_html/etc.
+ * CREATE TABLE IF NOT EXISTS alone does NOT update existing tables, so the worker failed.
+ */
+function ensure_email_queue_table(PDO $pdo): void
+{
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS email_queue (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            related_type VARCHAR(40) NULL,
+            related_id INT UNSIGNED NULL,
+            recipient_email VARCHAR(190) NOT NULL,
+            reply_to_email VARCHAR(190) NULL,
+            subject VARCHAR(255) NOT NULL,
+            body_html MEDIUMTEXT NULL,
+            email_type VARCHAR(80) NOT NULL,
+            status ENUM('pending','processing','sent','failed','Pending','Processing','Sent','Failed') NOT NULL DEFAULT 'pending',
+            attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3,
+            last_error TEXT NULL,
+            available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            locked_at DATETIME NULL,
+            sent_at DATETIME NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_email_queue_job (related_type, related_id, email_type, recipient_email),
+            KEY idx_email_queue_status_available (status, available_at, id),
+            KEY idx_email_queue_related (related_type, related_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+    );
+
+    // Upgrade older versions of the table without deleting existing queued emails.
+    email_queue_add_column_if_missing($pdo, 'related_type', "related_type VARCHAR(40) NULL AFTER id");
+    email_queue_add_column_if_missing($pdo, 'related_id', "related_id INT UNSIGNED NULL AFTER related_type");
+    email_queue_add_column_if_missing($pdo, 'recipient_email', "recipient_email VARCHAR(190) NOT NULL AFTER related_id");
+    email_queue_add_column_if_missing($pdo, 'reply_to_email', "reply_to_email VARCHAR(190) NULL AFTER recipient_email");
+    email_queue_add_column_if_missing($pdo, 'subject', "subject VARCHAR(255) NOT NULL AFTER reply_to_email");
+    email_queue_add_column_if_missing($pdo, 'body_html', "body_html MEDIUMTEXT NULL AFTER subject");
+    email_queue_add_column_if_missing($pdo, 'email_type', "email_type VARCHAR(80) NOT NULL DEFAULT 'general' AFTER body_html");
+    email_queue_add_column_if_missing($pdo, 'status', "status ENUM('pending','processing','sent','failed','Pending','Processing','Sent','Failed') NOT NULL DEFAULT 'pending' AFTER email_type");
+    email_queue_add_column_if_missing($pdo, 'attempts', "attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER status");
+    email_queue_add_column_if_missing($pdo, 'max_attempts', "max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3 AFTER attempts");
+    email_queue_add_column_if_missing($pdo, 'last_error', "last_error TEXT NULL AFTER max_attempts");
+    email_queue_add_column_if_missing($pdo, 'available_at', "available_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER last_error");
+    email_queue_add_column_if_missing($pdo, 'locked_at', "locked_at DATETIME NULL AFTER available_at");
+    email_queue_add_column_if_missing($pdo, 'sent_at', "sent_at DATETIME NULL AFTER locked_at");
+    email_queue_add_column_if_missing($pdo, 'created_at', "created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP AFTER sent_at");
+    email_queue_add_column_if_missing($pdo, 'updated_at', "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER created_at");
+
+    if (!email_queue_index_exists($pdo, 'idx_email_queue_status_available')) {
+        $pdo->exec("CREATE INDEX idx_email_queue_status_available ON email_queue (status, available_at, id)");
+    }
+
+    if (!email_queue_index_exists($pdo, 'idx_email_queue_related')) {
+        $pdo->exec("CREATE INDEX idx_email_queue_related ON email_queue (related_type, related_id)");
+    }
+}
+
+function enqueue_email(
+    PDO $pdo,
+    ?string $relatedType,
+    ?int $relatedId,
+    string $to,
+    string $subject,
+    string $htmlBody,
+    string $emailType,
+    ?string $replyTo = null,
+    int $maxAttempts = 3
+): bool {
+    ensure_email_queue_table($pdo);
+
+    $to = trim($to);
+    $replyTo = $replyTo !== null ? trim($replyTo) : null;
+
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        error_log('Email queue skipped invalid recipient: ' . $to);
+        return false;
+    }
+
+    if ($replyTo !== null && $replyTo !== '' && !filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+        $replyTo = null;
+    }
+
+    $stmt = $pdo->prepare(
+        "INSERT INTO email_queue
+            (related_type, related_id, recipient_email, reply_to_email, subject, body_html, email_type, status, attempts, max_attempts, available_at, created_at, updated_at)
+         VALUES
+            (:related_type, :related_id, :recipient_email, :reply_to_email, :subject, :body_html, :email_type, 'pending', 0, :max_attempts, NOW(), NOW(), NOW())
+         ON DUPLICATE KEY UPDATE
+            subject = VALUES(subject),
+            body_html = VALUES(body_html),
+            reply_to_email = VALUES(reply_to_email),
+            status = IF(status = 'sent', status, 'pending'),
+            last_error = IF(status = 'sent', last_error, NULL),
+            available_at = IF(status = 'sent', available_at, NOW()),
+            updated_at = NOW()"
+    );
+
+    return $stmt->execute([
+        ':related_type' => $relatedType,
+        ':related_id' => $relatedId,
+        ':recipient_email' => $to,
+        ':reply_to_email' => $replyTo,
+        ':subject' => mb_substr($subject, 0, 255),
+        ':body_html' => $htmlBody,
+        ':email_type' => $emailType,
+        ':max_attempts' => max(1, min(10, $maxAttempts)),
+    ]);
+}
+
+function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, string $email, string $phone, string $subject, string $message): int
+{
+    $queued = 0;
+    $ref = 'INQ-' . str_pad((string) $enquiryId, 5, '0', STR_PAD_LEFT);
+    $adminEmail = defined('ADMIN_EMAIL') ? trim((string) ADMIN_EMAIL) : '';
+
+    if ($adminEmail !== '' && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
+        $adminBody = email_shell(
+            'New contact enquiry',
+            '<p style="margin:0 0 16px;">A new contact enquiry was submitted from the website.</p>' .
+            email_badge($ref, 'blue') .
+            contact_details_html($name, $email, $phone, $subject, $message),
+            'A new contact enquiry was submitted.'
+        );
+
+        if (enqueue_email(
+            $pdo,
+            'enquiry',
+            $enquiryId,
+            $adminEmail,
+            'New contact enquiry - Jebal Guest House ' . $ref,
+            $adminBody,
+            'admin_contact_enquiry',
+            $email
+        )) {
+            $queued++;
+        }
+    } else {
+        error_log('ADMIN_EMAIL is missing or invalid. Contact admin queue skipped for enquiry #' . $enquiryId);
+    }
+
+    if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $customerBody = email_shell(
+            'We received your message',
+            '<p style="margin:0 0 14px;">Dear ' . email_safe($name) . ',</p>
+            <p style="margin:0 0 16px;">Thank you for contacting Jebal Guest House. We received your message and will reply as soon as possible.</p>' .
+            email_badge($ref, 'gold') .
+            email_info_table([
+                'Reference' => $ref,
+                'Subject' => $subject,
+            ]),
+            'We received your message at Jebal Guest House.'
+        );
+
+        if (enqueue_email(
+            $pdo,
+            'enquiry',
+            $enquiryId,
+            $email,
+            'We received your message - Jebal Guest House ' . $ref,
+            $customerBody,
+            'contact_auto_reply'
+        )) {
+            $queued++;
+        }
+    }
+
+    return $queued;
+}
+
+function lock_next_email_queue_batch(PDO $pdo, int $limit = 10): array
+{
+    ensure_email_queue_table($pdo);
+    $limit = max(1, min(50, $limit));
+    $lockToken = bin2hex(random_bytes(16));
+
+    // Reset stale locks so a crashed cron run does not block the queue forever.
+    $pdo->exec(
+        "UPDATE email_queue
+         SET status = 'pending', locked_at = NULL, last_error = CONCAT(COALESCE(last_error, ''), '\nStale processing lock reset.'), updated_at = NOW()
+         WHERE status = 'processing'
+           AND locked_at < (NOW() - INTERVAL 10 MINUTE)"
+    );
+
+    $pdo->beginTransaction();
+    try {
+        $select = $pdo->prepare(
+            "SELECT id
+             FROM email_queue
+             WHERE status = 'pending'
+               AND available_at <= NOW()
+               AND attempts < max_attempts
+             ORDER BY id ASC
+             LIMIT {$limit}
+             FOR UPDATE"
+        );
+        $select->execute();
+        $ids = array_map('intval', $select->fetchAll(PDO::FETCH_COLUMN));
+
+        if ($ids === []) {
+            $pdo->commit();
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($ids), '?'));
+        $update = $pdo->prepare(
+            "UPDATE email_queue
+             SET status = 'processing', locked_at = NOW(), last_error = ?, updated_at = NOW()
+             WHERE id IN ({$placeholders})"
+        );
+        $update->execute(array_merge([$lockToken], $ids));
+        $pdo->commit();
+
+        $fetch = $pdo->prepare("SELECT * FROM email_queue WHERE last_error = :token AND status = 'processing' ORDER BY id ASC");
+        $fetch->execute([':token' => $lockToken]);
+        return $fetch->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
+        throw $e;
+    }
+}
+
+function email_queue_body_from_job(array $job): string
+{
+    $body = isset($job['body_html']) ? trim((string) $job['body_html']) : '';
+    if ($body !== '') {
+        return $body;
+    }
+
+    // Backward compatibility for your older queue table that stored data in payload_json.
+    if (isset($job['payload_json']) && trim((string) $job['payload_json']) !== '') {
+        $payload = json_decode((string) $job['payload_json'], true);
+        if (is_array($payload)) {
+            foreach (['body_html', 'html', 'body', 'message'] as $key) {
+                if (!empty($payload[$key])) {
+                    return (string) $payload[$key];
+                }
+            }
+        }
+    }
+
+    return '<p>Email content was missing from the queue record.</p>';
+}
+
+function process_email_queue(PDO $pdo, int $limit = 10): array
+{
+    $jobs = lock_next_email_queue_batch($pdo, $limit);
+    $processed = 0;
+    $sent = 0;
+    $failed = 0;
+
+    foreach ($jobs as $job) {
+        $processed++;
+        $jobId = (int) $job['id'];
+        $relatedType = $job['related_type'] !== null ? (string) $job['related_type'] : '';
+        $relatedId = $job['related_id'] !== null ? (int) $job['related_id'] : null;
+        $emailType = (string) $job['email_type'];
+        $to = (string) $job['recipient_email'];
+        $subject = (string) $job['subject'];
+        $replyTo = $job['reply_to_email'] !== null ? (string) $job['reply_to_email'] : null;
+
+        try {
+            $bodyHtml = email_queue_body_from_job($job);
+            $ok = send_html_email($to, $subject, $bodyHtml, $replyTo);
+
+            if ($ok) {
+                $update = $pdo->prepare(
+                    "UPDATE email_queue
+                     SET status = 'sent', attempts = attempts + 1, locked_at = NULL, last_error = NULL, sent_at = NOW(), updated_at = NOW()
+                     WHERE id = :id"
+                );
+                $update->execute([':id' => $jobId]);
+
+                track_email(
+                    $pdo,
+                    $relatedType,
+                    $relatedId,
+                    $to,
+                    $subject,
+                    $emailType,
+                    true,
+                    null
+                );
+                $sent++;
+                continue;
+            }
+
+            throw new RuntimeException('PHPMailer returned false.');
+        } catch (Throwable $e) {
+            $error = mb_substr($e->getMessage(), 0, 1000);
+            $attemptsAfter = (int) $job['attempts'] + 1;
+            $maxAttempts = (int) $job['max_attempts'];
+            $newStatus = $attemptsAfter >= $maxAttempts ? 'failed' : 'pending';
+
+            $update = $pdo->prepare(
+                "UPDATE email_queue
+                 SET status = :status,
+                     attempts = attempts + 1,
+                     locked_at = NULL,
+                     last_error = :last_error,
+                     available_at = DATE_ADD(NOW(), INTERVAL LEAST(30, POW(2, attempts + 1)) MINUTE),
+                     updated_at = NOW()
+                 WHERE id = :id"
+            );
+            $update->execute([
+                ':status' => $newStatus,
+                ':last_error' => $error,
+                ':id' => $jobId,
+            ]);
+
+            track_email(
+                $pdo,
+                $relatedType,
+                $relatedId,
+                $to,
+                $subject,
+                $emailType,
+                false,
+                $error
+            );
+            $failed++;
+            error_log('Email queue job #' . $jobId . ' failed: ' . $error);
+        }
+    }
+
+    return [
+        'processed' => $processed,
+        'sent' => $sent,
+        'failed' => $failed,
+        'remaining_pending' => (int) $pdo->query("SELECT COUNT(*) FROM email_queue WHERE status = 'pending' AND available_at <= NOW()")->fetchColumn(),
+    ];
+}
