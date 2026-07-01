@@ -16,6 +16,9 @@ function normalizeBookingStatus(status) {
     .replace(/\s+/g, '_')
 
   if (value === 'confirmed') return 'confirmed'
+  if (value === 'checked_in' || value === 'check_in' || value === 'checkedin') return 'checked_in'
+  if (value === 'checked_out' || value === 'check_out' || value === 'checkedout') return 'checked_out'
+  if (value === 'no_show' || value === 'noshow') return 'no_show'
   if (value === 'cancelled' || value === 'canceled') return 'cancelled'
 
   // Some API rows may expose the payment status in a generic `status` field.
@@ -119,10 +122,9 @@ export function normalizeBooking(booking) {
 }
 
 export async function fetchBookings() {
-  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/list.php?_=${Date.now()}`, {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/list.php`, {
     method: 'GET',
-    cache: 'no-store',
-    headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+    headers: { Accept: 'application/json' },
   })
 
   const payload = await readJsonResponse(response)

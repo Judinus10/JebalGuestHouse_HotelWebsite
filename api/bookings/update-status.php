@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $data = read_request_data();
 $id = (int) ($data['id'] ?? 0);
 $status = strtolower(clean_string($data['status'] ?? '', 30));
-$allowedStatuses = ['pending', 'confirmed', 'cancelled', 'canceled'];
+$allowedStatuses = ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'canceled', 'no_show'];
 
 if ($status === 'canceled') {
     $status = 'cancelled';
@@ -73,7 +73,15 @@ try {
         }
     }
 
-    $displayStatus = $status === 'cancelled' ? 'Cancelled' : ucfirst($status);
+    $displayStatusMap = [
+        'pending' => 'Pending',
+        'confirmed' => 'Confirmed',
+        'checked_in' => 'Checked In',
+        'checked_out' => 'Checked Out',
+        'cancelled' => 'Cancelled',
+        'no_show' => 'No Show',
+    ];
+    $displayStatus = $displayStatusMap[$status] ?? ucfirst($status);
 
     $update = $pdo->prepare('UPDATE bookings SET status = :status, updated_at = NOW() WHERE id = :id');
     $update->execute([

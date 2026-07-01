@@ -475,27 +475,17 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
 }
 
 function Pagination({ page, totalPages, totalItems, onPageChange }) {
-  if (totalPages <= 1) return null
+  if (totalItems === 0) return null
 
   const start = (page - 1) * PAGE_SIZE + 1
   const end = Math.min(page * PAGE_SIZE, totalItems)
 
   return (
     <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-text-secondary">Showing {start}-{end} of {totalItems}</p>
-      <div className="flex justify-end gap-2">
+      <p className="text-sm font-medium text-text-secondary">Showing {start}-{end} of {totalItems}</p>
+      <div className="flex items-center justify-end gap-2">
         <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
-        {Array.from({ length: totalPages }, (_, index) => index + 1).map((item) => (
-          <Button
-            key={item}
-            type="button"
-            variant={item === page ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onPageChange(item)}
-          >
-            {item}
-          </Button>
-        ))}
+        <span className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-bold text-text-primary">{page} / {totalPages}</span>
         <Button type="button" variant="outline" size="sm" disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
       </div>
     </div>
@@ -794,7 +784,7 @@ export default function Payments() {
                       ref={(element) => {
                         if (element) focusRefs.current[payment.transaction_id] = element
                       }}
-                      className={`border-b border-border last:border-0 hover:bg-blue-50/40 ${flashTransaction === payment.transaction_id ? 'dashboard-focus-flash' : ''}`}
+                      className={`transition hover:bg-blue-50/40 ${flashTransaction === payment.transaction_id ? 'dashboard-payment-focus-row' : 'border-b border-border last:border-0'}`}
                     >
                       <td className="px-3 py-4 font-semibold text-text-primary">{payment.transaction_id}</td>
                       <td className="px-3 py-4 text-text-secondary">{payment.booking_no}</td>

@@ -106,3 +106,20 @@
 .dashboard-focus-flash > td {
   animation: dashboardFocusFlash 1.35s ease-in-out;
 }
+
+@keyframes dashboardPaymentFocusFlash {
+  0%, 100% {
+    background-color: transparent;
+  }
+  18%, 70% {
+    background-color: rgba(148, 163, 184, 0.20);
+  }
+}
+
+.dashboard-payment-focus-row {
+  animation: dashboardPaymentFocusFlash 1.35s ease-in-out;
+}
+
+.dashboard-payment-focus-row > td {
+  animation: dashboardPaymentFocusFlash 1.35s ease-in-out;
+}

@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { fetchBookings } from '@/services/bookingsApi'
+import { fetchBookings, updateBookingStatus } from '@/services/bookingsApi'
 
 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -243,7 +243,7 @@ function FloatingBookingTooltip({ tooltip }) {
   )
 }
 
-function BookingDetailsModal({ booking, onClose }) {
+function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus }) {
   if (!booking) return null
 
   return (
@@ -296,11 +296,18 @@ function BookingDetailsModal({ booking, onClose }) {
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
             <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline">View details</Button>
-              <Button size="sm" variant="outline">Confirm booking</Button>
-              <Button size="sm" variant="outline">Cancel booking</Button>
-              <Button size="sm" variant="outline">Mark checked in</Button>
-              <Button size="sm" variant="outline">Mark checked out</Button>
+              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'confirmed')}>
+                Confirm booking
+              </Button>
+              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'cancelled')}>
+                Cancel booking
+              </Button>
+              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'checked_in')}>
+                Mark checked in
+              </Button>
+              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'checked_out')}>
+                Mark checked out
+              </Button>
             </div>
           </div>
         </div>
@@ -316,6 +323,7 @@ export default function BookingCalendar() {
   const [tooltip, setTooltip] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   const year = currentDate.getFullYear()
   const monthIndex = currentDate.getMonth()
@@ -352,11 +360,46 @@ export default function BookingCalendar() {
   const goToToday = () => setCurrentDate(new Date())
 
   const showTooltip = (event, booking) => {
+    if (selectedBooking) return
+
     const rect = event.currentTarget.getBoundingClientRect()
     setTooltip({ booking, position: getTooltipPosition(rect) })
   }
 
   const hideTooltip = () => setTooltip(null)
+
+  const openBookingModal = (booking) => {
+    hideTooltip()
+    setSelectedBooking(booking)
+  }
+
+  const handleStatusChange = async (bookingId, status) => {
+    try {
+      setUpdatingStatus(true)
+      setError('')
+      const updatedBooking = await updateBookingStatus(bookingId, status)
+
+      setCalendarBookings((current) =>
+        current.map((booking) =>
+          booking.id === bookingId
+            ? { ...booking, ...updatedBooking, booking_status: updatedBooking.booking_status || status }
+            : booking
+        )
+      )
+
+      setSelectedBooking((current) =>
+        current && current.id === bookingId
+          ? { ...current, ...updatedBooking, booking_status: updatedBooking.booking_status || status }
+          : current
+      )
+    } catch (err) {
+      const message = err.message || 'Unable to update booking status.'
+      setError(message)
+      window.alert(message)
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
 
   return (
     <div>
@@ -430,7 +473,7 @@ export default function BookingCalendar() {
                       <button
                         key={`${booking.id}-${weekIndex}`}
                         type="button"
-                        onClick={() => setSelectedBooking(booking)}
+                        onClick={() => openBookingModal(booking)}
                         onMouseEnter={(event) => showTooltip(event, booking)}
                         onMouseMove={(event) => showTooltip(event, booking)}
                         onMouseLeave={hideTooltip}
@@ -464,7 +507,7 @@ export default function BookingCalendar() {
             <button
               key={booking.id}
               type="button"
-              onClick={() => setSelectedBooking(booking)}
+              onClick={() => openBookingModal(booking)}
               className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm"
             >
               <div className="flex items-start justify-between gap-3">
@@ -483,7 +526,12 @@ export default function BookingCalendar() {
       <FloatingBookingTooltip tooltip={tooltip} />
 
       {selectedBooking && (
-        <BookingDetailsModal booking={selectedBooking} onClose={() => setSelectedBooking(null)} />
+        <BookingDetailsModal
+          booking={selectedBooking}
+          onClose={() => setSelectedBooking(null)}
+          onStatusChange={handleStatusChange}
+          updatingStatus={updatingStatus}
+        />
       )}
     </div>
   )
