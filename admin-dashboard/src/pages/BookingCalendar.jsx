@@ -432,15 +432,17 @@ export default function BookingCalendar() {
         title="Booking Calendar"
         description="Visual occupancy calendar showing reservation date ranges across rooms."
       >
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goToPreviousMonth}>
+        <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:justify-end">
+          <Button className="shrink-0" variant="outline" size="icon" onClick={goToPreviousMonth}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <span className="min-w-[150px] text-center text-sm font-semibold text-slate-800">{monthTitle}</span>
-          <Button variant="outline" size="icon" onClick={goToNextMonth}>
+          <span className="min-w-0 flex-1 truncate text-center text-sm font-semibold text-slate-800 sm:min-w-[150px] sm:flex-none">
+            {monthTitle}
+          </span>
+          <Button className="shrink-0" variant="outline" size="icon" onClick={goToNextMonth}>
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" onClick={goToToday}>Today</Button>
+          <Button className="shrink-0 px-3" variant="outline" onClick={goToToday}>Today</Button>
         </div>
       </PageHeader>
 

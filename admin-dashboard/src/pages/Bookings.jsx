@@ -299,6 +299,47 @@ function SummaryCard({ title, value, icon: Icon, description }) {
   )
 }
 
+function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpdateStatus, onCancel }) {
+  return (
+    <div ref={setRef} className={`rounded-2xl border border-border bg-white p-4 shadow-sm ${shouldFlashBooking ? 'dashboard-focus-flash' : ''}`}>
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-text-primary">{booking.booking_no}</p>
+          <p className="mt-1 truncate text-sm font-semibold text-text-primary">{booking.room_name}</p>
+          <p className="mt-1 text-xs text-text-secondary">Created {formatDate(booking.created_at)}</p>
+        </div>
+        <ActionsDropdown booking={booking} onView={onView} onUpdateStatus={onUpdateStatus} onCancel={onCancel} />
+      </div>
+
+      <div className="mt-4 grid gap-3 text-sm">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Guest</p>
+          <p className="mt-1 truncate font-semibold text-text-primary">{booking.guest_name}</p>
+          <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
+          {booking.guest_email ? <p className="mt-1 truncate text-xs text-text-secondary">{booking.guest_email}</p> : null}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Stay</p>
+            <p className="mt-1 font-semibold text-text-primary">{formatDate(booking.check_in, shortDateFormatter)} - {formatDate(booking.check_out, shortDateFormatter)}</p>
+            <p className="mt-1 text-xs text-text-secondary">{booking.total_nights} night{booking.total_nights === 1 ? '' : 's'} · {booking.guests} guest{booking.guests === 1 ? '' : 's'}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Amount</p>
+            <p className="mt-1 font-bold text-text-primary">{formatMoney(booking.total_amount)}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Badge variant={bookingStatusVariant[booking.booking_status] || 'warning'}>{humanizeBookingStatus(booking.booking_status)}</Badge>
+          <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{humanizePaymentStatus(booking.payment_status)}</Badge>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
   const [open, setOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -1170,11 +1211,11 @@ export default function Bookings() {
   }
 
   return (
-    <div className="space-y-6 overflow-visible">
+    <div className="w-full min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
       <PageHeader title="Bookings" description="View, filter, and manage Jebal Guest House reservations.">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex max-w-full flex-wrap gap-2 md:flex-nowrap md:items-center">
           <Button variant="outline" onClick={clearFilters}><Filter className="h-4 w-4" />Clear Filters</Button>
           <Dropdown
             trigger={
@@ -1196,7 +1237,7 @@ export default function Bookings() {
         </div>
       </PageHeader>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard title="Total bookings" value={summary.total} icon={CalendarDays} description="All reservations" />
         <SummaryCard title="Pending" value={summary.pending} icon={Moon} description="Need attention" />
         <SummaryCard title="Confirmed" value={summary.confirmed} icon={CheckCircle2} description="Upcoming stays" />
@@ -1204,41 +1245,47 @@ export default function Bookings() {
         <SummaryCard title="Paid revenue" value={formatMoney(summary.revenue)} icon={CreditCard} description="Paid booking value" />
       </div>
 
-      <Card>
-        <CardContent className="space-y-4 p-5">
-          <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
-            <div className="relative">
+      <div className="w-full min-w-0 max-w-full overflow-hidden">
+        <Card className="w-full min-w-0 max-w-full overflow-hidden">
+        <CardContent className="min-w-0 max-w-full space-y-4 p-5">
+          <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 md:gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
+            <div className="relative sm:col-span-2 md:col-span-4 lg:col-span-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Search booking, guest, email, phone..." className="pl-9" />
             </div>
 
-            <select value={bookingStatusFilter} onChange={(event) => setBookingStatusFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+            <select value={bookingStatusFilter} onChange={(event) => setBookingStatusFilter(event.target.value)} className="h-10 min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:col-span-2 md:col-span-1">
               <option value="all">All booking statuses</option>
               {bookingStatuses.map((status) => <option key={status} value={status}>{humanizeBookingStatus(status)}</option>)}
             </select>
 
-            <select value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20">
+            <select value={paymentStatusFilter} onChange={(event) => setPaymentStatusFilter(event.target.value)} className="h-10 min-w-0 rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:col-span-2 md:col-span-1">
               <option value="all">All payment statuses</option>
               {paymentStatuses.map((status) => <option key={status} value={status}>{humanizePaymentStatus(status)}</option>)}
             </select>
 
-            <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
-            <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
+            <div className="grid min-w-0 grid-cols-2 gap-3 sm:col-span-2 md:contents">
+              <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="min-w-0" />
+              <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="min-w-0" />
+            </div>
           </div>
         </CardContent>
       </Card>
+      </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="hidden border-b border-border bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-text-secondary xl:grid xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center xl:gap-4">
-            <span>Booking</span>
-            <span>Guest</span>
-            <span>Stay</span>
-            <span>Amount</span>
-            <span>Booking Status</span>
-            <span>Payment Status</span>
-            <span className="text-right">Actions</span>
-          </div>
+      <div className="w-full min-w-0 max-w-full overflow-hidden">
+        <Card className="w-full min-w-0 max-w-full overflow-hidden">
+        <CardContent className="min-w-0 max-w-full p-0">
+          <div className="w-full min-w-0 max-w-full md:overflow-x-auto md:overscroll-x-contain" style={{ WebkitOverflowScrolling: 'touch', contain: 'inline-size' }}>
+            <div className="hidden min-w-[760px] grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] items-center gap-4 border-b border-border bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wide text-text-secondary md:grid xl:min-w-[900px]">
+              <span>Booking</span>
+              <span>Guest</span>
+              <span>Stay</span>
+              <span>Amount</span>
+              <span>Booking Status</span>
+              <span>Payment Status</span>
+              <span className="text-right">Actions</span>
+            </div>
 
           {isLoading ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
@@ -1255,7 +1302,36 @@ export default function Bookings() {
             </div>
           ) : (
             <>
-              <div className="divide-y divide-border">
+              <div className="space-y-3 p-4 md:hidden">
+                {paginatedBookings.map((booking) => {
+                  const shouldFlashBooking = Boolean(
+                    flashBookingNo &&
+                    [booking.booking_no, booking.bookingNo, booking.id].some(
+                      (value) => value != null && String(value) === String(flashBookingNo)
+                    )
+                  )
+
+                  return (
+                    <MobileBookingCard
+                      key={booking.id}
+                      booking={booking}
+                      shouldFlashBooking={shouldFlashBooking}
+                      setRef={(element) => {
+                        if (element) {
+                          if (booking.booking_no) focusRefs.current[booking.booking_no] = element
+                          if (booking.bookingNo) focusRefs.current[booking.bookingNo] = element
+                          if (booking.id) focusRefs.current[booking.id] = element
+                        }
+                      }}
+                      onView={() => setSelectedBooking(booking)}
+                      onUpdateStatus={() => { setStatusFocus('booking'); setStatusBooking(booking) }}
+                      onCancel={() => setDeleteTargetBooking(booking)}
+                    />
+                  )
+                })}
+              </div>
+
+              <div className="hidden divide-y divide-border md:block">
                 {paginatedBookings.map((booking) => {
                   const shouldFlashBooking = Boolean(
                     flashBookingNo &&
@@ -1274,40 +1350,40 @@ export default function Bookings() {
                           if (booking.id) focusRefs.current[booking.id] = element
                         }
                       }}
-                      className={`grid gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] xl:items-center ${shouldFlashBooking ? 'dashboard-focus-flash rounded-xl' : ''}`}
+                      className={`grid min-w-[760px] grid-cols-[1fr_1.15fr_1.25fr_0.8fr_0.9fr_0.95fr_0.8fr] items-center gap-4 px-5 py-4 transition hover:bg-blue-50/40 xl:min-w-[900px] ${shouldFlashBooking ? 'dashboard-focus-flash rounded-xl' : ''}`}
                     >
                       <div>
-                        <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Booking</p>
+                        <p className="sr-only">Booking</p>
                         <p className="font-bold text-text-primary">{booking.booking_no}</p>
                         <p className="mt-1 line-clamp-1 text-sm font-semibold text-text-primary">{booking.room_name}</p>
                         <p className="mt-1 text-xs text-text-secondary">Created {formatDate(booking.created_at)}</p>
                       </div>
 
                       <div>
-                        <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Guest</p>
+                        <p className="sr-only">Guest</p>
                         <p className="line-clamp-1 font-semibold text-text-primary">{booking.guest_name}</p>
                         <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
                         {booking.guest_email ? <p className="mt-1 line-clamp-1 text-xs text-text-secondary">{booking.guest_email}</p> : null}
                       </div>
 
                       <div>
-                        <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Stay</p>
+                        <p className="sr-only">Stay</p>
                         <p className="font-semibold text-text-primary">{formatDate(booking.check_in, shortDateFormatter)} - {formatDate(booking.check_out, shortDateFormatter)}</p>
                         <p className="mt-1 text-xs text-text-secondary">{booking.total_nights} night{booking.total_nights === 1 ? '' : 's'} · {booking.guests} guest{booking.guests === 1 ? '' : 's'}</p>
                       </div>
 
                       <div>
-                        <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Amount</p>
+                        <p className="sr-only">Amount</p>
                         <p className="font-bold text-text-primary">{formatMoney(booking.total_amount)}</p>
                       </div>
 
                       <div>
-                        <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Booking Status</p>
+                        <p className="sr-only">Booking Status</p>
                         <Badge variant={bookingStatusVariant[booking.booking_status] || 'warning'}>{humanizeBookingStatus(booking.booking_status)}</Badge>
                       </div>
 
                       <div>
-                        <p className="text-xs font-bold uppercase text-text-secondary xl:hidden">Payment Status</p>
+                        <p className="sr-only">Payment Status</p>
                         <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{humanizePaymentStatus(booking.payment_status)}</Badge>
                       </div>
 
@@ -1316,11 +1392,13 @@ export default function Bookings() {
                   )
                 })}
               </div>
-              <Pagination page={safeCurrentPage} totalPages={totalPages} totalItems={filteredBookings.length} startItem={startItem} endItem={endItem} onPageChange={setCurrentPage} />
             </>
           )}
+          </div>
+          <Pagination page={safeCurrentPage} totalPages={totalPages} totalItems={filteredBookings.length} startItem={startItem} endItem={endItem} onPageChange={setCurrentPage} />
         </CardContent>
-      </Card>
+        </Card>
+      </div>
 
       {isAddBookingOpen ? <AddBookingModal rooms={rooms} bookings={bookings} onClose={() => setIsAddBookingOpen(false)} onSave={handleAddBooking} /> : null}
       {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} /> : null}

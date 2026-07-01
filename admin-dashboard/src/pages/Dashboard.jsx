@@ -369,6 +369,33 @@ function ListRow({ title, subtitle, right, badge, to }) {
   )
 }
 
+
+function PaymentListRow({ payment }) {
+  return (
+    <Link
+      to={`/payments?focus=${encodeURIComponent(payment.transaction)}`}
+      className="block rounded-xl border border-border px-4 py-3 transition-colors hover:bg-blue-50/40"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="break-all text-sm font-semibold leading-snug text-charcoal sm:text-base">
+            {payment.transaction}
+          </p>
+          <p className="mt-1 line-clamp-1 text-sm text-muted">
+            {payment.guest} • {formatDate(payment.createdAt)}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2 text-right sm:flex-row sm:items-center">
+          <Badge variant={statusVariant[payment.status] || 'secondary'}>{payment.status}</Badge>
+          <span className="whitespace-nowrap font-semibold text-charcoal">
+            {currencyFormatter.format(payment.amount)}
+          </span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
 export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState(defaultDashboardData)
   const [isLoading, setIsLoading] = useState(true)
@@ -603,7 +630,7 @@ export default function Dashboard() {
         </ClickableCard>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-2">
+      <section className="grid gap-6 md:grid-cols-2">
         <StatusDonut title="Booking Status" data={bookingStatusData} to="/bookings" />
         <StatusDonut title="Payment Status" data={paymentStatusData} to="/payments" />
       </section>
@@ -652,16 +679,7 @@ export default function Dashboard() {
           emptyText="No payment records found."
           items={dashboardData.lists.recentPayments}
           to="/payments"
-          renderItem={(payment) => (
-            <ListRow
-              key={payment.transaction}
-              title={`${payment.transaction} • ${payment.guest}`}
-              subtitle={formatDate(payment.createdAt)}
-              right={currencyFormatter.format(payment.amount)}
-              badge={<Badge variant={statusVariant[payment.status] || 'secondary'}>{payment.status}</Badge>}
-              to={`/payments?focus=${encodeURIComponent(payment.transaction)}`}
-            />
-          )}
+          renderItem={(payment) => <PaymentListRow key={payment.transaction} payment={payment} />}
         />
 
         <CompactList

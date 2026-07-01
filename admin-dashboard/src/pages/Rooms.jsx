@@ -613,9 +613,9 @@ function RoomDetailsModal({ room, amenities, image, onClose }) {
   if (!room) return null
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="max-h-[92vh] w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+    <div className="fixed inset-0 z-40 flex items-center justify-center overflow-x-hidden bg-slate-950/50 p-3 backdrop-blur-sm sm:p-4" onClick={onClose}>
+      <div className="max-h-[92vh] w-full max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl bg-white shadow-2xl shadow-slate-950/20 sm:max-w-4xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-4 sm:px-6">
           <div>
             <h2 className="text-lg font-bold text-text-primary">Room Details</h2>
             <p className="text-sm text-text-secondary">Full room information, pricing, images, and amenities.</p>
@@ -625,14 +625,14 @@ function RoomDetailsModal({ room, amenities, image, onClose }) {
           </button>
         </div>
 
-        <div className="max-h-[calc(92vh-81px)] overflow-y-auto p-6">
-          <div className="grid gap-6 lg:grid-cols-[1fr_1.1fr]">
-            <ImageCarousel room={room} heightClass="h-72" />
+        <div className="max-h-[calc(92vh-81px)] overflow-x-hidden overflow-y-auto p-4 sm:p-6">
+          <div className="grid min-w-0 gap-6 lg:grid-cols-[1fr_1.1fr]">
+            <ImageCarousel room={room} heightClass="h-52 sm:h-72" />
 
-            <div className="space-y-5">
+            <div className="min-w-0 space-y-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h3 className="text-2xl font-bold text-text-primary">{room.room_name}</h3>
+                  <h3 className="break-words text-xl font-bold text-text-primary sm:text-2xl">{room.room_name}</h3>
                   <p className="mt-1 text-sm font-medium text-text-secondary">{room.room_type} room · {room.capacity} guests</p>
                 </div>
                 <Badge variant={statusVariant[room.status] || 'secondary'}>{room.status}</Badge>
@@ -651,12 +651,12 @@ function RoomDetailsModal({ room, amenities, image, onClose }) {
 
               <div>
                 <p className="text-sm font-semibold text-text-primary">Description</p>
-                <p className="mt-2 text-sm leading-6 text-text-secondary">{room.description}</p>
+                <p className="mt-2 break-words text-sm leading-6 text-text-secondary">{room.description}</p>
               </div>
 
               <div>
                 <p className="text-sm font-semibold text-text-primary">Amenities</p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex min-w-0 flex-wrap gap-2 overflow-hidden">
                   {amenities.map((amenity) => (
                     <Badge key={amenity.id} variant="secondary">{amenity.amenity_name}</Badge>
                   ))}
@@ -858,20 +858,21 @@ export default function Rooms() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 max-w-full space-y-6 overflow-x-hidden">
       <Toast toast={toast} onClose={() => setToast(null)} />
 
-      <PageHeader
-        title="Rooms"
-        description="Manage room inventory, pricing, amenities, images, and availability."
-      >
-        <Button onClick={openAddModal}>
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-text-primary md:text-3xl">Rooms</h1>
+          <p className="mt-1 text-sm text-text-secondary">Manage room inventory, pricing, amenities, images, and availability.</p>
+        </div>
+        <Button onClick={openAddModal} className="shrink-0">
           <Plus className="h-4 w-4" />
           Add Room
         </Button>
-      </PageHeader>
+      </div>
 
-      <div className="grid gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm shadow-slate-200/60 lg:grid-cols-[1fr_220px_220px]">
+      <div className="grid min-w-0 max-w-full gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm shadow-slate-200/60 md:grid-cols-[minmax(0,1fr)_180px_180px]">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by room name or type..." className="pl-9" />
@@ -901,9 +902,9 @@ export default function Rooms() {
       )}
 
       {!loading && !loadError && (
-      <div className="overflow-hidden rounded-2xl border border-border bg-white shadow-sm shadow-slate-200/60">
-        <div className="overflow-x-auto">
-          <table className="min-w-[980px] w-full text-left text-sm">
+      <div className="max-w-full overflow-hidden rounded-2xl border border-border bg-white shadow-sm shadow-slate-200/60">
+        <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
+          <table className="w-full min-w-[780px] text-left text-sm md:min-w-[980px]">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-text-secondary">
               <tr>
                 <th className="px-5 py-4">Room</th>

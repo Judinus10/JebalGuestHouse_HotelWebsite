@@ -234,7 +234,7 @@ export default function Gallery() {
           title={activeFolder ? `${activeFolder.name} Gallery` : 'Gallery Management'}
           description={activeFolder ? 'Manage images inside this gallery folder from database.' : 'Manage public website gallery folders and images from database.'}
         />
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row">
           {activeFolder ? (
             <Button type="button" variant="outline" onClick={() => setActiveFolderId(null)}>
               <ArrowLeft className="h-4 w-4" /> Back to Folders
@@ -263,7 +263,11 @@ export default function Gallery() {
 
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {folderStats.map((folder) => (
-              <Card key={folder.id} className="overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md">
+              <Card
+                key={folder.id}
+                className="cursor-pointer overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-md sm:cursor-default"
+                onClick={() => setActiveFolderId(folder.id)}
+              >
                 <div className="relative h-44 bg-slate-100">
                   <img src={folder.cover_image || fallbackImage} alt={folder.name} className="h-full w-full object-cover" />
                   <div className="absolute left-3 top-3"><Badge variant={statusVariant(folder.status)}>{folder.status}</Badge></div>
@@ -281,11 +285,54 @@ export default function Gallery() {
                     <div className="rounded-xl bg-slate-50 p-3"><p className="text-xs text-text-secondary">Inactive</p><p className="mt-1 font-semibold">{folder.inactive_count}</p></div>
                   </div>
                   <p className="mt-4 text-xs text-text-secondary">Last updated {formatDate(folder.updated_at)}</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button type="button" size="sm" onClick={() => setActiveFolderId(folder.id)}><Eye className="h-4 w-4" /> Open</Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => openAddImages(folder.id)}><Upload className="h-4 w-4" /> Upload</Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => openEditFolder(folder)}><Pencil className="h-4 w-4" /> Edit</Button>
-                    <Button type="button" size="sm" variant="destructive" onClick={() => setDeleteTarget({ type: 'folder', item: folder })}><Trash2 className="h-4 w-4" /></Button>
+                  <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="hidden shrink-0 sm:inline-flex"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setActiveFolderId(folder.id)
+                      }}
+                    >
+                      <Eye className="h-4 w-4" /> Open
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openAddImages(folder.id)
+                      }}
+                    >
+                      <Upload className="h-4 w-4" /> Upload
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        openEditFolder(folder)
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" /> Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      className="shrink-0"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setDeleteTarget({ type: 'folder', item: folder })
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

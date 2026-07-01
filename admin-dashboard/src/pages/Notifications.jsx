@@ -70,13 +70,13 @@ function formatReferenceId(value) {
 function StatCard({ title, value, icon: Icon }) {
   return (
     <Card>
-      <CardContent className="p-5">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-sm font-medium text-text-secondary">{title}</p>
-            <p className="mt-2 text-2xl font-bold text-text-primary">{value}</p>
+      <CardContent className="p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
+            <p className="truncate text-xs font-medium text-text-secondary sm:text-sm">{title}</p>
+            <p className="mt-2 text-xl font-bold text-text-primary sm:text-2xl">{value}</p>
           </div>
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-primary-600">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-primary-600 sm:h-11 sm:w-11">
             <Icon className="h-5 w-5" />
           </div>
         </div>
@@ -90,11 +90,11 @@ function Pagination({ page, totalPages, totalItems, startItem, endItem, onPageCh
   if (totalItems === 0) return null
 
   return (
-    <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm font-medium text-text-secondary">Showing {startItem}-{endItem} of {totalItems}</p>
-      <div className="flex items-center justify-end gap-2">
+    <div className="sticky bottom-0 z-20 flex w-full flex-col gap-3 border-t border-border bg-white/95 px-3 py-3 shadow-[0_-8px_18px_rgba(15,23,42,0.06)] backdrop-blur sm:px-5 md:flex-row md:items-center md:justify-between">
+      <p className="text-center text-sm font-medium text-text-secondary md:text-left">Showing {startItem}-{endItem} of {totalItems}</p>
+      <div className="flex w-full items-center justify-center gap-2 md:w-auto md:justify-end">
         <Button type="button" variant="outline" size="sm" disabled={page === 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
-        <span className="rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-bold text-text-primary">{page} / {totalPages}</span>
+        <span className="shrink-0 rounded-lg border border-border bg-white px-3 py-1.5 text-sm font-bold text-text-primary">{page} / {totalPages}</span>
         <Button type="button" variant="outline" size="sm" disabled={page === totalPages} onClick={() => onPageChange(page + 1)}>Next</Button>
       </div>
     </div>
@@ -271,7 +271,7 @@ export default function Notifications() {
         </div>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 2xl:grid-cols-6">
         <StatCard title="New Bookings" value={stats.newBookings} icon={CalendarCheck} />
         <StatCard title="Pending Confirmations" value={stats.pendingConfirmations} icon={Clock} />
         <StatCard title="Check-ins Today" value={stats.checkIns} icon={LogIn} />
@@ -319,8 +319,9 @@ export default function Notifications() {
               No live notifications match the selected filters.
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-border">
-              <table className="w-full min-w-[1080px] text-sm">
+            <div className="rounded-xl border border-border">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1080px] text-sm">
                 <thead className="bg-slate-50">
                   <tr>
                     {['Type', 'Reference ID', 'Description', 'Related Room', 'Related Booking', 'Date & Time', 'Status', 'Actions'].map((header) => (
@@ -433,7 +434,8 @@ export default function Notifications() {
                     )
                   })}
                 </tbody>
-              </table>
+                </table>
+              </div>
               <Pagination page={safeCurrentPage} totalPages={totalPages} totalItems={filteredActivities.length} startItem={startItem} endItem={endItem} onPageChange={setCurrentPage} />
             </div>
           )}

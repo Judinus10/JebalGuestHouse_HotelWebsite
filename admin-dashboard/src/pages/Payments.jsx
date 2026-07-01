@@ -697,8 +697,8 @@ export default function Payments() {
       <Card>
         <CardContent className="p-5">
           <div className="mb-5">
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <div>
+            <div className="grid gap-4 md:grid-cols-4 xl:grid-cols-5">
+              <div className="md:col-span-4 xl:col-span-1">
                 <Label htmlFor="payment-search">Search payments</Label>
                 <div className="relative mt-2">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -742,14 +742,28 @@ export default function Payments() {
                 </select>
               </div>
 
-              <div>
-                <Label htmlFor="date-from">From</Label>
-                <Input id="date-from" type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="mt-2" />
-              </div>
+              <div className="grid grid-cols-2 gap-3 md:contents">
+                <div className="min-w-0">
+                  <Label htmlFor="date-from">From</Label>
+                  <Input
+                    id="date-from"
+                    type="date"
+                    value={dateFrom}
+                    onChange={(event) => setDateFrom(event.target.value)}
+                    className="mt-2 w-full min-w-0 px-3 text-sm"
+                  />
+                </div>
 
-              <div>
-                <Label htmlFor="date-to">To</Label>
-                <Input id="date-to" type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="mt-2" />
+                <div className="min-w-0">
+                  <Label htmlFor="date-to">To</Label>
+                  <Input
+                    id="date-to"
+                    type="date"
+                    value={dateTo}
+                    onChange={(event) => setDateTo(event.target.value)}
+                    className="mt-2 w-full min-w-0 px-3 text-sm"
+                  />
+                </div>
               </div>
             </div>
 
