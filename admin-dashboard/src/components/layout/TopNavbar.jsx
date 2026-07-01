@@ -129,17 +129,45 @@ export function TopNavbar({ collapsed, onMenuClick, onToggleCollapse }) {
 
   useEffect(() => {
     let active = true
+    let loading = false
+
     const load = async () => {
-      const data = await fetchNotificationActivities().catch(() => [])
-      if (active) setNotifications(data)
+      if (loading) return
+      loading = true
+      try {
+        const data = await fetchNotificationActivities()
+        if (active) setNotifications(data)
+      } catch {
+        // Keep the last successful notification state. The top bar must not flicker
+        // just because one fast polling request failed.
+      } finally {
+        loading = false
+      }
     }
+
+    const loadWhenVisible = () => {
+      if (!document.hidden) load()
+    }
+
     load()
+
+    window.addEventListener('focus', load)
+    window.addEventListener('pageshow', load)
     window.addEventListener('notification-read-changed', load)
-    const timer = window.setInterval(load, 60000)
+    document.addEventListener('visibilitychange', loadWhenVisible)
+
+    // Booking notifications must be near-real-time while the admin panel is open.
+    // 60 seconds was too slow; 5 seconds keeps the top bar fresh without hammering
+    // the server with overlapping requests.
+    const timer = window.setInterval(loadWhenVisible, 5000)
+
     return () => {
       active = false
       window.clearInterval(timer)
+      window.removeEventListener('focus', load)
+      window.removeEventListener('pageshow', load)
       window.removeEventListener('notification-read-changed', load)
+      document.removeEventListener('visibilitychange', loadWhenVisible)
     }
   }, [])
 

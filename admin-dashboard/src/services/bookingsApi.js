@@ -119,9 +119,10 @@ export function normalizeBooking(booking) {
 }
 
 export async function fetchBookings() {
-  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/list.php`, {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/list.php?_=${Date.now()}`, {
     method: 'GET',
-    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
   })
 
   const payload = await readJsonResponse(response)

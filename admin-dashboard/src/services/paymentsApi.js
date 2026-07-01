@@ -87,10 +87,12 @@ function normalizePayment(payment) {
 }
 
 export async function fetchPayments() {
-  const response = await apiFetch(`${API_BASE_URL}/list.php`, {
+  const response = await apiFetch(`${API_BASE_URL}/list.php?_=${Date.now()}`, {
     method: 'GET',
+    cache: 'no-store',
     headers: {
       Accept: 'application/json',
+      'Cache-Control': 'no-cache',
     },
   })
 

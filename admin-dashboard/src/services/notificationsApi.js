@@ -4,6 +4,11 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 const CONTACT_API_URL = buildApiUrl('/contact/list_enquiries.php')
 
+function withCacheBuster(url) {
+  const separator = String(url).includes('?') ? '&' : '?'
+  return `${url}${separator}_=${Date.now()}`
+}
+
 const READ_NOTIFICATIONS_KEY = 'jebal_read_notifications'
 
 function readStoredNotificationIds() {
@@ -97,7 +102,10 @@ function normalizeInquiry(item) {
 }
 
 async function fetchEnquiries() {
-  const response = await apiFetch(CONTACT_API_URL, { headers: { Accept: 'application/json' } })
+  const response = await apiFetch(withCacheBuster(CONTACT_API_URL), {
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+  })
   const payload = await readJsonResponse(response)
   return (payload.data || []).map(normalizeInquiry)
 }
