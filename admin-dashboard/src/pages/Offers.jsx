@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   BadgePercent,
   CalendarDays,
@@ -110,8 +110,14 @@ function StatCard({ title, value, description, icon: Icon }) {
 
 function Modal({ title, description, children, onClose, size = 'max-w-2xl' }) {
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
-      <div className={`max-h-[90vh] w-full overflow-hidden rounded-3xl bg-white shadow-2xl ${size}`}>
+    <div
+      className="fixed inset-0 z-40 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className={`max-h-[90vh] w-full overflow-hidden rounded-3xl bg-white shadow-2xl ${size}`}
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-5">
           <div>
             <h2 className="text-lg font-bold text-text-primary">{title}</h2>
@@ -439,6 +445,41 @@ function DeleteOfferModal({ offer, onClose, onConfirm }) {
   )
 }
 
+
+function PaginationControls({ currentPage, totalPages, totalItems, pageSize, onPageChange }) {
+  const startItem = totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1
+  const endItem = Math.min(currentPage * pageSize, totalItems)
+
+  return (
+    <div className="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-border bg-white/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm font-medium text-text-secondary">Showing {startItem}-{endItem} of {totalItems}</p>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={currentPage === 1}
+          onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+        >
+          Previous
+        </Button>
+        <span className="rounded-xl border border-border bg-white px-3 py-2 text-sm font-bold text-text-primary shadow-sm">
+          {currentPage} / {totalPages}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={currentPage === totalPages}
+          onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+        >
+          Next
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function OfferActionsDropdown({ offer, onView, onEdit, onDelete }) {
   return (
     <div className="group relative inline-flex justify-end">
@@ -486,6 +527,7 @@ export default function Offers() {
   const [viewOffer, setViewOffer] = useState(null)
   const [deleteOffer, setDeleteOffer] = useState(null)
   const [toast, setToast] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
 
   const showToast = (message) => {
     setToast(message)
@@ -512,6 +554,20 @@ export default function Offers() {
       return matchesSearch && matchesStatus && matchesDiscount
     })
   }, [offers, searchTerm, statusFilter, discountFilter])
+
+  const pageSize = 6
+  const totalPages = Math.max(1, Math.ceil(filteredOffers.length / pageSize))
+  const paginatedOffers = filteredOffers.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter, discountFilter])
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages)
+    }
+  }, [currentPage, totalPages])
 
   const resetFilters = () => {
     setSearchTerm('')
@@ -595,8 +651,8 @@ export default function Offers() {
 
       <Card>
         <CardContent className="p-5">
-          <div className="grid gap-4 lg:grid-cols-[1fr_180px_180px_auto]">
-            <div className="relative">
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_180px_180px_auto]">
+            <div className="relative md:col-span-3 lg:col-span-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 value={searchTerm}
@@ -609,7 +665,7 @@ export default function Offers() {
             <select
               value={statusFilter}
               onChange={(event) => setStatusFilter(event.target.value)}
-              className="h-11 rounded-xl border border-border bg-white px-4 text-sm text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              className="h-11 min-w-0 rounded-xl border border-border bg-white px-4 text-sm text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             >
               <option value="all">All statuses</option>
               {offerStatuses.map((status) => (
@@ -622,7 +678,7 @@ export default function Offers() {
             <select
               value={discountFilter}
               onChange={(event) => setDiscountFilter(event.target.value)}
-              className="h-11 rounded-xl border border-border bg-white px-4 text-sm text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              className="h-11 min-w-0 rounded-xl border border-border bg-white px-4 text-sm text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             >
               <option value="all">All discount types</option>
               {discountTypes.map((type) => (
@@ -632,7 +688,7 @@ export default function Offers() {
               ))}
             </select>
 
-            <Button variant="outline" onClick={resetFilters}>
+            <Button variant="outline" onClick={resetFilters} className="min-w-[88px]">
               Reset
             </Button>
           </div>
@@ -655,7 +711,7 @@ export default function Offers() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border bg-white">
-                {filteredOffers.map((offer) => (
+                {paginatedOffers.map((offer) => (
                   <tr key={offer.id} className="transition hover:bg-slate-50/80">
                     <td className="px-5 py-4">
                       <div className="min-w-64">
@@ -684,6 +740,16 @@ export default function Offers() {
               </tbody>
             </table>
           </div>
+
+          {filteredOffers.length > 0 ? (
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalItems={filteredOffers.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+            />
+          ) : null}
 
           {filteredOffers.length === 0 ? (
             <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
