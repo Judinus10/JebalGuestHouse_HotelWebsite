@@ -4,11 +4,6 @@ import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 
 const CONTACT_API_URL = buildApiUrl('/contact/list_enquiries.php')
 
-function withCacheBuster(url) {
-  const separator = String(url).includes('?') ? '&' : '?'
-  return `${url}${separator}_=${Date.now()}`
-}
-
 const READ_NOTIFICATIONS_KEY = 'jebal_read_notifications'
 
 function readStoredNotificationIds() {
@@ -68,10 +63,30 @@ function asDate(value) {
 }
 
 function isToday(value) {
-  const date = asDate(value)
+  if (!value) return false
+  const raw = String(value).trim()
+  const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  const date = ymd
+    ? new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))
+    : asDate(value)
   if (!date) return false
   const now = new Date()
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate()
+}
+
+function isActiveStayBooking(booking) {
+  const bookingStatus = String(booking.booking_status || '').toLowerCase()
+  const paymentStatus = String(booking.payment_status || '').toLowerCase()
+
+  if (['cancelled', 'canceled', 'no_show', 'checked_out', 'expired'].includes(bookingStatus)) {
+    return false
+  }
+
+  if (['cancelled', 'canceled', 'failed', 'refunded', 'expired'].includes(paymentStatus)) {
+    return false
+  }
+
+  return true
 }
 
 function titleCaseStatus(status) {
@@ -102,10 +117,7 @@ function normalizeInquiry(item) {
 }
 
 async function fetchEnquiries() {
-  const response = await apiFetch(withCacheBuster(CONTACT_API_URL), {
-    cache: 'no-store',
-    headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
-  })
+  const response = await apiFetch(CONTACT_API_URL, { headers: { Accept: 'application/json' } })
   const payload = await readJsonResponse(response)
   return (payload.data || []).map(normalizeInquiry)
 }
@@ -144,34 +156,36 @@ function activitiesFromBookings(bookings) {
       searchText: [booking.booking_no, booking.guest_name, booking.guest_email, booking.guest_phone, booking.room_name].join(' '),
     }))
 
-    if (isToday(booking.check_in)) {
+    if (isActiveStayBooking(booking) && isToday(booking.check_in)) {
+      const alreadyCheckedIn = bookingStatus === 'checked_in'
       activities.push(makeActivity({
         id: `checkin-${booking.id}`,
         type: 'Check-in',
-        title: 'Check-in Today',
+        title: alreadyCheckedIn ? 'Checked In Today' : 'Check-in Today',
         reference_id: booking.booking_no,
         description: `${booking.guest_name} is scheduled to check in today.`,
         related_room: booking.room_name || '-',
         related_booking: booking.booking_no || '-',
-        status: 'New',
-        created_at: booking.check_in,
+        status: alreadyCheckedIn ? 'Resolved' : 'New',
+        created_at: new Date().toISOString(),
         details: `Check-in for ${booking.room_name}. Contact ${booking.guest_phone || booking.guest_email || 'guest'} before arrival.`,
         route: '/bookings',
         searchText: [booking.booking_no, booking.guest_name, booking.room_name, 'check in'].join(' '),
       }))
     }
 
-    if (isToday(booking.check_out)) {
+    if (isActiveStayBooking(booking) && isToday(booking.check_out)) {
+      const alreadyCheckedOut = bookingStatus === 'checked_out'
       activities.push(makeActivity({
         id: `checkout-${booking.id}`,
         type: 'Check-out',
-        title: 'Check-out Today',
+        title: alreadyCheckedOut ? 'Checked Out Today' : 'Check-out Today',
         reference_id: booking.booking_no,
         description: `${booking.guest_name} is scheduled to check out today.`,
         related_room: booking.room_name || '-',
         related_booking: booking.booking_no || '-',
-        status: 'New',
-        created_at: booking.check_out,
+        status: alreadyCheckedOut ? 'Resolved' : 'New',
+        created_at: new Date().toISOString(),
         details: `Prepare room cleaning after check-out for ${booking.room_name}.`,
         route: '/bookings',
         searchText: [booking.booking_no, booking.guest_name, booking.room_name, 'check out'].join(' '),
