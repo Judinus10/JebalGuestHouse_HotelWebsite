@@ -27,7 +27,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { initialAmenities } from '@/data/roomData'
-import { createRoom, deleteRoomById, listRooms, updateRoom } from '@/services/roomsApi'
+import { createRoom, deleteRoomById, deleteRoomImage, listRooms, updateRoom } from '@/services/roomsApi'
 
 const emptyForm = {
   room_name: '',
@@ -107,7 +107,7 @@ function getRoomImages(room) {
   return unique
 }
 
-function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true }) {
+function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true, onDeleteImage = null, deletingImageId = null }) {
   const images = getRoomImages(room)
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -128,6 +128,30 @@ function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true }) {
     setActiveIndex((current) => (current === images.length - 1 ? 0 : current + 1))
   }
 
+  function getImageId(image) {
+    if (!image?.raw || typeof image.raw !== 'object') return null
+    return image.raw.id || image.raw.image_id || null
+  }
+
+  function handleDeleteImage(event, image, index) {
+    event.preventDefault()
+    event.stopPropagation()
+    if (!onDeleteImage) return
+
+    onDeleteImage(image, index)
+
+    if (images.length <= 1) {
+      setActiveIndex(0)
+      return
+    }
+
+    setActiveIndex((current) => {
+      if (index < current) return current - 1
+      if (index === current && current >= images.length - 1) return images.length - 2
+      return current
+    })
+  }
+
   return (
     <div className="space-y-3">
       <div className={cn('relative overflow-hidden rounded-2xl border border-border bg-slate-100', heightClass)}>
@@ -137,6 +161,19 @@ function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true }) {
           <div className="flex h-full w-full items-center justify-center text-slate-400">
             <BedDouble className="h-10 w-10" />
           </div>
+        )}
+
+        {activeImage && onDeleteImage && (
+          <button
+            type="button"
+            onClick={(event) => handleDeleteImage(event, activeImage, Math.min(activeIndex, images.length - 1))}
+            disabled={deletingImageId && deletingImageId === getImageId(activeImage)}
+            className="absolute right-3 top-3 z-10 flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-red-600 shadow-lg shadow-slate-900/20 transition hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-label="Delete this room image"
+            title="Delete this image"
+          >
+            <Trash2 className="h-5 w-5" />
+          </button>
         )}
 
         {images.length > 1 && (
@@ -167,18 +204,31 @@ function ImageCarousel({ room, heightClass = 'h-72', showThumbnails = true }) {
       {showThumbnails && images.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {images.map((image, index) => (
-            <button
-              type="button"
-              key={image.src}
-              onClick={() => setActiveIndex(index)}
-              className={cn(
-                'h-14 w-20 shrink-0 overflow-hidden rounded-xl border bg-slate-100 transition',
-                index === activeIndex ? 'border-primary-600 ring-2 ring-primary-600/20' : 'border-border hover:border-primary-300'
+            <div key={image.src} className="group relative h-14 w-20 shrink-0">
+              <button
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                className={cn(
+                  'h-full w-full overflow-hidden rounded-xl border bg-slate-100 transition',
+                  index === activeIndex ? 'border-primary-600 ring-2 ring-primary-600/20' : 'border-border hover:border-primary-300'
+                )}
+                aria-label={`View room image ${index + 1}`}
+              >
+                <img src={image.src} alt={`${room?.room_name || 'Room'} ${index + 1}`} className="h-full w-full object-cover" />
+              </button>
+              {onDeleteImage && (
+                <button
+                  type="button"
+                  onClick={(event) => handleDeleteImage(event, image, index)}
+                  disabled={deletingImageId && deletingImageId === getImageId(image)}
+                  className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white opacity-100 shadow-md shadow-slate-900/20 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60 sm:opacity-0 sm:group-hover:opacity-100"
+                  aria-label={`Delete room image ${index + 1}`}
+                  title="Delete this image"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
-              aria-label={`View room image ${index + 1}`}
-            >
-              <img src={image.src} alt={`${room?.room_name || 'Room'} ${index + 1}`} className="h-full w-full object-cover" />
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -312,10 +362,11 @@ function Toast({ toast, onClose }) {
   )
 }
 
-function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
+function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExistingImage }) {
   const [form, setForm] = useState(() => room || emptyForm)
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
+  const [deletingImageId, setDeletingImageId] = useState(null)
 
   const isEdit = mode === 'edit'
 
@@ -334,6 +385,46 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
           : [...current.amenity_ids, amenityId],
       }
     })
+  }
+
+  function removeSelectedFile(_, index) {
+    setSelectedFiles((current) => current.filter((__, fileIndex) => fileIndex !== index))
+  }
+
+  async function removeExistingImage(image) {
+    const imageId = image?.raw && typeof image.raw === 'object' ? image.raw.id || image.raw.image_id : null
+
+    if (!imageId) {
+      setErrors((current) => ({ ...current, images: 'This image cannot be deleted because it has no database image id.' }))
+      return
+    }
+
+    const confirmed = window.confirm('Delete this room image permanently?')
+    if (!confirmed) return
+
+    setDeletingImageId(imageId)
+    setErrors((current) => ({ ...current, images: '' }))
+
+    try {
+      await onDeleteExistingImage(imageId)
+      setForm((current) => {
+        const imageRecords = Array.isArray(current.image_records) ? current.image_records.filter((record) => Number(record.id || record.image_id) !== Number(imageId)) : []
+        const removedSrc = image.src
+        const images = Array.isArray(current.images) ? current.images.filter((src) => resolveImageSrc(src) !== removedSrc) : []
+        const mainImageSrc = resolveImageSrc(current.image)
+
+        return {
+          ...current,
+          image_records: imageRecords,
+          images,
+          image: mainImageSrc === removedSrc ? imageRecords[0] || images[0] || null : current.image,
+        }
+      })
+    } catch (error) {
+      setErrors((current) => ({ ...current, images: error.message || 'Unable to delete image.' }))
+    } finally {
+      setDeletingImageId(null)
+    }
   }
 
   function handleSubmit(event) {
@@ -477,7 +568,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
                 <div>
                   <p className="text-sm font-semibold text-text-primary">Room image preview</p>
                   <p className="text-xs text-text-secondary">
-                    Use the arrows or thumbnails to review current room photos before saving.
+                    Use the arrows or thumbnails to review photos. Use the delete button to remove a specific image.
                   </p>
                 </div>
                 {selectedFiles.length > 0 && (
@@ -494,10 +585,17 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit }) {
                     image: null,
                   }}
                   heightClass="h-56"
+                  onDeleteImage={removeSelectedFile}
                 />
               ) : (
-                <ImageCarousel room={form} heightClass="h-56" />
+                <ImageCarousel
+                  room={form}
+                  heightClass="h-56"
+                  onDeleteImage={removeExistingImage}
+                  deletingImageId={deletingImageId}
+                />
               )}
+              {errors.images && <p className="mt-3 text-xs font-medium text-red-600">{errors.images}</p>}
             </div>
           )}
 
@@ -742,6 +840,12 @@ export default function Rooms() {
     }
   }
 
+  async function handleDeleteRoomImage(imageId) {
+    await deleteRoomImage(imageId)
+    await loadRooms()
+    showToast('Image deleted', 'The selected room image was removed.')
+  }
+
   async function confirmDeleteRoom() {
     try {
       await deleteRoomById(deleteRoom.id)
@@ -879,6 +983,7 @@ export default function Rooms() {
           amenities={initialAmenities}
           onClose={closeFormModal}
           onSubmit={handleSubmitRoom}
+          onDeleteExistingImage={handleDeleteRoomImage}
         />
       )}
 

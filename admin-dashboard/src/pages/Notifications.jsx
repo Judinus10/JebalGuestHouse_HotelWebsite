@@ -55,6 +55,18 @@ function formatDate(value) {
   }).format(date)
 }
 
+function formatReferenceId(value) {
+  const reference = String(value || '').trim()
+  if (!reference) return '-'
+
+  // Booking/contact IDs are already short and readable. Only shorten long payment/transaction references.
+  if (reference.length <= 18 || reference.startsWith('BK-') || reference.startsWith('INQ-')) {
+    return reference
+  }
+
+  return `${reference.slice(0, 14)}...`
+}
+
 function StatCard({ title, value, icon: Icon }) {
   return (
     <Card>
@@ -340,7 +352,11 @@ export default function Notifications() {
                       className={`align-middle hover:bg-blue-50/40 ${shouldFlashNotification ? 'dashboard-focus-flash' : ''}`}
                     >
                       <td className="whitespace-nowrap px-4 py-3"><Badge variant={typeVariants[item.type] || 'outline'}>{item.type}</Badge></td>
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.reference_id}</td>
+                      <td className="max-w-[170px] whitespace-nowrap px-4 py-3 font-semibold text-primary-700">
+                        <span className="block truncate" title={item.reference_id || '-'}>
+                          {formatReferenceId(item.reference_id)}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-text-primary">
                         <div className="max-w-[320px]">
                           <p className="line-clamp-1 font-medium text-text-primary">{item.title}</p>

@@ -37,12 +37,13 @@ try {
         if (!is_writable($uploadDir)) json_response(false, 'Upload folder is not writable.', 500);
 
         $tmp = (string) $_FILES['image']['tmp_name'];
-        $mime = mime_content_type($tmp) ?: '';
-        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-        if (!isset($allowed[$mime])) json_response(false, 'Only JPG, PNG, and WEBP images are allowed.', 422);
-        if ((int) $_FILES['image']['size'] > 8 * 1024 * 1024) json_response(false, 'Image must be below 8MB.', 422);
+        try {
+            [, $extension] = gallery_validate_uploaded_image($_FILES['image']);
+        } catch (RuntimeException $validationError) {
+            json_response(false, $validationError->getMessage(), 422);
+        }
 
-        $filename = 'gallery_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $allowed[$mime];
+        $filename = 'gallery_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
         if (!move_uploaded_file($tmp, $uploadDir . '/' . $filename)) json_response(false, 'Unable to save uploaded image.', 500);
         gallery_delete_file_if_local($storedPath);
         $storedPath = $filename;

@@ -244,11 +244,36 @@ function FloatingBookingTooltip({ tooltip }) {
 }
 
 function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus }) {
+  useEffect(() => {
+    if (!booking) return undefined
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [booking, onClose])
+
   if (!booking) return null
 
+  const handleBackdropClick = (event) => {
+    if (event.target === event.currentTarget) {
+      onClose()
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4"
+      onMouseDown={handleBackdropClick}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
         <div className="flex items-start justify-between border-b border-slate-200 p-6">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking Details</p>

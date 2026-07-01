@@ -30,6 +30,71 @@ function gallery_upload_dir(): string
     return $dir;
 }
 
+
+function gallery_allowed_image_types(): array
+{
+    return [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
+}
+
+function gallery_detect_image_mime(string $tmpPath): string
+{
+    if ($tmpPath === '' || !is_file($tmpPath)) {
+        return '';
+    }
+
+    if (function_exists('mime_content_type')) {
+        $mime = @mime_content_type($tmpPath);
+        if (is_string($mime) && $mime !== '') {
+            return strtolower($mime);
+        }
+    }
+
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = @$finfo->file($tmpPath);
+        if (is_string($mime) && $mime !== '') {
+            return strtolower($mime);
+        }
+    }
+
+    $imageInfo = @getimagesize($tmpPath);
+    if (is_array($imageInfo) && !empty($imageInfo['mime'])) {
+        return strtolower((string) $imageInfo['mime']);
+    }
+
+    return '';
+}
+
+function gallery_validate_uploaded_image(array $file, int $maxBytes = 8388608): array
+{
+    $tmp = (string) ($file['tmp_name'] ?? '');
+    $size = (int) ($file['size'] ?? 0);
+    $allowed = gallery_allowed_image_types();
+
+    if ($tmp === '' || !is_uploaded_file($tmp)) {
+        throw new RuntimeException('Invalid uploaded image. Please choose the image again.');
+    }
+
+    if ($size <= 0) {
+        throw new RuntimeException('Uploaded image is empty.');
+    }
+
+    if ($size > $maxBytes) {
+        throw new RuntimeException('Each image must be below 8MB.');
+    }
+
+    $mime = gallery_detect_image_mime($tmp);
+    if (!isset($allowed[$mime])) {
+        throw new RuntimeException('Only JPG, PNG, and WEBP images are allowed.');
+    }
+
+    return [$mime, $allowed[$mime]];
+}
+
 function gallery_image_url(string $path): string
 {
     $path = trim($path);

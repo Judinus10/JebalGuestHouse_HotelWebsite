@@ -99,6 +99,44 @@ function experience_normalize(array $row): array
     ];
 }
 
+function experience_allowed_image_types(): array
+{
+    return [
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+    ];
+}
+
+function experience_detect_image_mime(string $tmpPath): string
+{
+    if ($tmpPath === '' || !is_file($tmpPath)) {
+        return '';
+    }
+
+    if (function_exists('mime_content_type')) {
+        $mime = @mime_content_type($tmpPath);
+        if (is_string($mime) && $mime !== '') {
+            return strtolower($mime);
+        }
+    }
+
+    if (class_exists('finfo')) {
+        $finfo = new finfo(FILEINFO_MIME_TYPE);
+        $mime = @$finfo->file($tmpPath);
+        if (is_string($mime) && $mime !== '') {
+            return strtolower($mime);
+        }
+    }
+
+    $imageInfo = @getimagesize($tmpPath);
+    if (is_array($imageInfo) && !empty($imageInfo['mime'])) {
+        return strtolower((string) $imageInfo['mime']);
+    }
+
+    return '';
+}
+
 function experience_upload_image(string $field = 'image'): ?string
 {
     if (empty($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
@@ -112,8 +150,32 @@ function experience_upload_image(string $field = 'image'): ?string
         ], 400);
     }
 
-    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
-    $mime = mime_content_type($_FILES[$field]['tmp_name']);
+    $tmpPath = (string) ($_FILES[$field]['tmp_name'] ?? '');
+    $size = (int) ($_FILES[$field]['size'] ?? 0);
+    $allowed = experience_allowed_image_types();
+
+    if ($tmpPath === '' || !is_uploaded_file($tmpPath)) {
+        experience_json([
+            'success' => false,
+            'message' => 'Invalid uploaded image. Please choose the image again.',
+        ], 400);
+    }
+
+    if ($size <= 0) {
+        experience_json([
+            'success' => false,
+            'message' => 'Uploaded image is empty.',
+        ], 400);
+    }
+
+    if ($size > 8388608) {
+        experience_json([
+            'success' => false,
+            'message' => 'Image must be below 8MB.',
+        ], 400);
+    }
+
+    $mime = experience_detect_image_mime($tmpPath);
 
     if (!isset($allowed[$mime])) {
         experience_json([
@@ -125,7 +187,7 @@ function experience_upload_image(string $field = 'image'): ?string
     $filename = 'experience_' . time() . '_' . bin2hex(random_bytes(6)) . '.' . $allowed[$mime];
     $target = experience_upload_dir() . '/' . $filename;
 
-    if (!move_uploaded_file($_FILES[$field]['tmp_name'], $target)) {
+    if (!move_uploaded_file($tmpPath, $target)) {
         experience_json([
             'success' => false,
             'message' => 'Failed to save uploaded image.',

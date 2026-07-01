@@ -461,7 +461,7 @@ export default function Messages() {
                           if (item.inquiry_id) focusRefs.current[item.inquiry_id] = element
                         }
                       }}
-                      className={`hover:bg-blue-50/40 ${shouldFlashInquiry ? 'dashboard-focus-flash' : ''}`}
+                      className={`hover:bg-blue-50/40 ${shouldFlashInquiry ? 'dashboard-message-focus-row' : ''}`}
                     >
                       <td className="whitespace-nowrap px-4 py-3 font-semibold text-primary-700">{item.inquiry_id}</td>
                       <td className="px-4 py-3">

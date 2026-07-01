@@ -28,7 +28,6 @@ try {
     $count = is_array($files['name']) ? count($files['name']) : 0;
     if ($count === 0) json_response(false, 'Select at least one image.', 422);
 
-    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp'];
     $saved = [];
 
     $pdo->beginTransaction();
@@ -46,14 +45,15 @@ try {
 
         $tmp = (string) $files['tmp_name'][$i];
         $original = basename((string) $files['name'][$i]);
-        $mime = mime_content_type($tmp) ?: '';
-        if (!isset($allowed[$mime])) throw new RuntimeException('Only JPG, PNG, and WEBP images are allowed.');
-        if ((int) $files['size'][$i] > 8 * 1024 * 1024) throw new RuntimeException('Each image must be below 8MB.');
+        [, $extension] = gallery_validate_uploaded_image([
+            'tmp_name' => $tmp,
+            'size' => $files['size'][$i] ?? 0,
+        ]);
 
         $title = clean_string($_POST['titles'][$i] ?? pathinfo($original, PATHINFO_FILENAME), 180);
         if ($title === '') $title = 'Gallery Image';
 
-        $filename = 'gallery_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $allowed[$mime];
+        $filename = 'gallery_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
         $destination = $uploadDir . '/' . $filename;
         if (!move_uploaded_file($tmp, $destination)) throw new RuntimeException('Unable to save uploaded image.');
 
@@ -75,5 +75,5 @@ try {
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Gallery upload error: ' . $e->getMessage());
-    json_response(false, $e->getMessage(), 500);
+    json_response(false, 'Unable to upload gallery images: ' . $e->getMessage(), 500);
 }
