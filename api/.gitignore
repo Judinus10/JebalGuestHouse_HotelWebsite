@@ -1,5 +1,5 @@
 .env
-.env.example
+.env_server
 admin-dashboard/.env
 admin-dashboard/vite.config.js
 public-website/.env
