@@ -128,7 +128,9 @@ function queue_stay_reminder_email(PDO $pdo, string $date, array $checkIns, arra
         $body,
         'admin_stay_reminder_' . str_replace('-', '', $date),
         null,
-        3
+        3,
+        admin_from_email(),
+        admin_from_name()
     ) ? 1 : 0;
 }
 

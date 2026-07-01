@@ -321,7 +321,7 @@ if ($sideEffects['booking_id'] > 0) {
                     'invoice_number' => (string) ($invoice['invoice_number'] ?? ''),
                 ]);
 
-                send_payment_success_emails($pdo, $freshBooking, [
+                queue_payment_success_emails($pdo, $freshBooking, [
                     'amount' => (float) $sideEffects['amount'],
                     'currency' => (string) $sideEffects['currency'],
                     'method' => (string) $sideEffects['method'],
@@ -329,10 +329,10 @@ if ($sideEffects['booking_id'] > 0) {
                     'transaction_id' => (string) $sideEffects['payment_id'],
                     'invoice' => $invoice,
                 ]);
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'success_email_sent', 'Success Email Sent', 'Payment success emails were triggered for customer/admin.', []);
+                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'success_email_queued', 'Success Email Queued', 'Payment success emails were queued for cron delivery to customer/admin.', []);
             } elseif ($sideEffects['send_failed']) {
-                send_payment_failed_email($pdo, $freshBooking);
-                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'failed_email_sent', 'Failed Payment Email Sent', 'Payment failed/cancelled email was triggered.', []);
+                queue_payment_failed_email($pdo, $freshBooking);
+                booking_audit_log($pdo, (int) $sideEffects['booking_id'], 'failed_email_queued', 'Failed Payment Email Queued', 'Payment failed/cancelled emails were queued for cron delivery.', []);
             }
         }
     } catch (Throwable $e) {

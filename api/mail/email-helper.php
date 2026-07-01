@@ -9,7 +9,63 @@ require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 
 require_once __DIR__ . '/../helpers.php';
 
-function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null): bool
+
+function email_constant_value(string $name, mixed $default = ''): mixed
+{
+    return defined($name) ? constant($name) : $default;
+}
+
+function email_smtp_profile_for_from(?string $fromEmail): array
+{
+    $fromEmail = strtolower(trim((string) $fromEmail));
+    $bookingFrom = strtolower(trim((string) email_constant_value('BOOKING_FROM_EMAIL')));
+    $contactFrom = strtolower(trim((string) email_constant_value('CONTACT_FROM_EMAIL')));
+    $adminFrom = strtolower(trim((string) email_constant_value('ADMIN_FROM_EMAIL')));
+
+    $prefix = '';
+    if ($fromEmail !== '' && $bookingFrom !== '' && $fromEmail === $bookingFrom) {
+        $prefix = 'BOOKING_';
+    } elseif ($fromEmail !== '' && $contactFrom !== '' && $fromEmail === $contactFrom) {
+        $prefix = 'CONTACT_';
+    } elseif ($fromEmail !== '' && $adminFrom !== '' && $fromEmail === $adminFrom) {
+        $prefix = 'ADMIN_';
+    }
+
+    return [
+        'host' => trim((string) email_constant_value($prefix . 'SMTP_HOST', email_constant_value('SMTP_HOST', ''))),
+        'user' => trim((string) email_constant_value($prefix . 'SMTP_USER', email_constant_value('SMTP_USER', ''))),
+        'pass' => trim((string) email_constant_value($prefix . 'SMTP_PASS', email_constant_value('SMTP_PASS', ''))),
+        'port' => (int) email_constant_value($prefix . 'SMTP_PORT', email_constant_value('SMTP_PORT', 587)),
+        'secure' => strtolower(trim((string) email_constant_value($prefix . 'SMTP_SECURE', email_constant_value('SMTP_SECURE', 'tls')))),
+    ];
+}
+
+function email_sender_for_type(string $emailType, string $relatedType = ''): array
+{
+    $type = strtolower($emailType);
+    $relatedType = strtolower($relatedType);
+
+    if (str_contains($type, 'contact') || $relatedType === 'enquiry') {
+        return [contact_from_email(), contact_from_name()];
+    }
+
+    if (str_contains($type, 'reminder') || str_contains($type, 'stay') || str_contains($type, 'admin_stay')) {
+        return [admin_from_email(), admin_from_name()];
+    }
+
+    if ($relatedType === 'booking'
+        || str_contains($type, 'booking')
+        || str_contains($type, 'payment')
+        || str_contains($type, 'invoice')
+        || str_contains($type, 'cancel')
+        || str_contains($type, 'expired')) {
+        return [booking_from_email(), booking_from_name()];
+    }
+
+    return [email_env_address('FROM_EMAIL'), email_env_name('FROM_NAME')];
+}
+
+function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null, ?string $fromEmailOverride = null, ?string $fromNameOverride = null): bool
 {
     try {
         if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
@@ -19,16 +75,27 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
 
         $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
 
-        $smtpHost = defined('SMTP_HOST') ? trim((string) SMTP_HOST) : '';
-        $smtpUser = defined('SMTP_USER') ? trim((string) SMTP_USER) : '';
-        $smtpPass = defined('SMTP_PASS') ? trim((string) SMTP_PASS) : '';
-        $smtpPort = defined('SMTP_PORT') ? (int) SMTP_PORT : 0;
-        $smtpSecure = defined('SMTP_SECURE') ? strtolower(trim((string) SMTP_SECURE)) : 'tls';
-        $fromEmail = defined('FROM_EMAIL') ? trim((string) FROM_EMAIL) : '';
-        $fromName = defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Jebal Guest House';
+        $fromEmail = $fromEmailOverride !== null && trim($fromEmailOverride) !== ''
+            ? trim($fromEmailOverride)
+            : (defined('FROM_EMAIL') ? trim((string) FROM_EMAIL) : '');
+        $fromName = $fromNameOverride !== null && trim($fromNameOverride) !== ''
+            ? trim($fromNameOverride)
+            : (defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Jebal Guest House');
+
+        $smtpProfile = email_smtp_profile_for_from($fromEmail);
+        $smtpHost = $smtpProfile['host'];
+        $smtpUser = $smtpProfile['user'];
+        $smtpPass = $smtpProfile['pass'];
+        $smtpPort = $smtpProfile['port'];
+        $smtpSecure = $smtpProfile['secure'];
 
         if ($smtpHost === '' || $smtpUser === '' || $smtpPass === '' || $smtpPort < 1 || $fromEmail === '') {
-            error_log('SMTP configuration missing for HTML email.');
+            error_log('SMTP configuration missing for HTML email from ' . $fromEmail . ' using user ' . $smtpUser . '.');
+            return false;
+        }
+
+        if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            error_log('Invalid FROM email for HTML email: ' . $fromEmail);
             return false;
         }
 
@@ -110,6 +177,70 @@ function html_to_plain_text(string $html): string
     return trim($text);
 }
 
+function email_env_address(string $constantName, string $fallbackConstant = 'FROM_EMAIL'): string
+{
+    $value = defined($constantName) ? trim((string) constant($constantName)) : '';
+    if ($value !== '' && filter_var($value, FILTER_VALIDATE_EMAIL)) {
+        return $value;
+    }
+
+    $fallback = defined($fallbackConstant) ? trim((string) constant($fallbackConstant)) : '';
+    return filter_var($fallback, FILTER_VALIDATE_EMAIL) ? $fallback : '';
+}
+
+function email_env_name(string $constantName, string $fallbackConstant = 'FROM_NAME'): string
+{
+    $value = defined($constantName) ? trim((string) constant($constantName)) : '';
+    if ($value !== '') {
+        return $value;
+    }
+
+    $fallback = defined($fallbackConstant) ? trim((string) constant($fallbackConstant)) : '';
+    return $fallback !== '' ? $fallback : 'Jebal Guest House';
+}
+
+function booking_from_email(): string
+{
+    return email_env_address('BOOKING_FROM_EMAIL');
+}
+
+function booking_from_name(): string
+{
+    return email_env_name('BOOKING_FROM_NAME');
+}
+
+function contact_from_email(): string
+{
+    return email_env_address('CONTACT_FROM_EMAIL');
+}
+
+function contact_from_name(): string
+{
+    return email_env_name('CONTACT_FROM_NAME');
+}
+
+function admin_from_email(): string
+{
+    return email_env_address('ADMIN_FROM_EMAIL', 'ADMIN_EMAIL');
+}
+
+function admin_from_name(): string
+{
+    return email_env_name('ADMIN_FROM_NAME', 'FROM_NAME');
+}
+
+function booking_admin_email(): string
+{
+    $email = email_env_address('BOOKING_ADMIN_EMAIL', 'ADMIN_EMAIL');
+    return $email !== '' ? $email : email_env_address('ADMIN_EMAIL', 'FROM_EMAIL');
+}
+
+function contact_admin_email(): string
+{
+    $email = email_env_address('CONTACT_ADMIN_EMAIL', 'ADMIN_EMAIL');
+    return $email !== '' ? $email : email_env_address('ADMIN_EMAIL', 'FROM_EMAIL');
+}
+
 function track_email(PDO $pdo, string $relatedType, ?int $relatedId, string $to, string $subject, string $emailType, bool $sent, ?string $errorMessage = null): void
 {
     $bookingId = $relatedType === 'booking' ? $relatedId : null;
@@ -136,9 +267,23 @@ function track_email(PDO $pdo, string $relatedType, ?int $relatedId, string $to,
     }
 }
 
-function send_tracked_email(PDO $pdo, string $relatedType, ?int $relatedId, string $to, string $subject, string $htmlBody, string $emailType, ?string $replyTo = null): bool
-{
-    $sent = send_html_email($to, $subject, $htmlBody, $replyTo);
+function send_tracked_email(
+    PDO $pdo,
+    string $relatedType,
+    ?int $relatedId,
+    string $to,
+    string $subject,
+    string $htmlBody,
+    string $emailType,
+    ?string $replyTo = null,
+    ?string $fromEmail = null,
+    ?string $fromName = null
+): bool {
+    if ($fromEmail === null || trim($fromEmail) === '') {
+        [$fromEmail, $fromName] = email_sender_for_type($emailType, $relatedType);
+    }
+
+    $sent = send_html_email($to, $subject, $htmlBody, $replyTo, $fromEmail, $fromName);
 
     track_email(
         $pdo,
@@ -961,6 +1106,165 @@ function status_label_for_email(?string $status): string
     return $value === '' ? '-' : ucwords($value);
 }
 
+
+function queue_payment_success_emails(PDO $pdo, array $booking, array $payment): int
+{
+    $queued = 0;
+    $downloadLink = invoice_download_link($booking);
+    $invoiceLink = $downloadLink !== '' ? email_button('Download Invoice', $downloadLink) : '';
+    $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
+    $bookingId = (int) ($booking['id'] ?? 0);
+
+    if ($bookingId < 1) {
+        return 0;
+    }
+
+    $customerType = 'payment_successful';
+    $adminType = 'admin_payment_received';
+
+    if (!booking_email_sent($pdo, $bookingId, [$customerType])) {
+        $bodyCustomer = email_shell(
+            'Payment successful',
+            '<p style="margin:0 0 14px;">Dear ' . email_safe($booking['full_name'] ?? 'Guest') . ',</p>
+            <p style="margin:0 0 16px;">Your payment has been received successfully. Your booking is now confirmed.</p>' .
+            email_badge('Paid', 'green') .
+            email_info_table(array_merge(booking_support_rows($booking), [
+                'Amount Paid' => $amount,
+                'Payment Method' => $payment['payment_method'] ?? $payment['method'] ?? 'PayHere',
+                'Transaction ID' => $payment['transaction_id'] ?? $payment['payment_id'] ?? '',
+            ])) .
+            booking_details_html($booking) .
+            $invoiceLink,
+            'Your payment to Jebal Guest House was successful.'
+        );
+
+        if (enqueue_email(
+            $pdo,
+            'booking',
+            $bookingId,
+            (string) ($booking['email'] ?? ''),
+            'Payment successful - Jebal Guest House #' . $bookingId,
+            $bodyCustomer,
+            $customerType,
+            null,
+            3,
+            booking_from_email(),
+            booking_from_name()
+        )) {
+            $queued++;
+        }
+    }
+
+    $adminEmail = booking_admin_email();
+    if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, [$adminType])) {
+        $bodyAdmin = email_shell(
+            'Payment received',
+            '<p style="margin:0 0 16px;">A customer payment was received and the booking is confirmed.</p>' .
+            email_badge('Paid', 'green') .
+            email_info_table(array_merge(booking_admin_summary_rows($booking, $payment), [
+                'Payment Method' => $payment['payment_method'] ?? $payment['method'] ?? 'PayHere',
+                'Transaction ID' => $payment['transaction_id'] ?? $payment['payment_id'] ?? '',
+            ])),
+            'A payment was received.'
+        );
+
+        if (enqueue_email(
+            $pdo,
+            'booking',
+            $bookingId,
+            $adminEmail,
+            'Payment received - Jebal Guest House #' . $bookingId,
+            $bodyAdmin,
+            $adminType,
+            $booking['email'] ?? null,
+            3,
+            booking_from_email(),
+            booking_from_name()
+        )) {
+            $queued++;
+        }
+    }
+
+    if ($queued > 0) {
+        update_booking_email_status($pdo, $bookingId, 'Payment Email Queued');
+    }
+
+    return $queued;
+}
+
+function queue_payment_failed_email(PDO $pdo, array $booking): int
+{
+    $queued = 0;
+    $bookingId = (int) ($booking['id'] ?? 0);
+
+    if ($bookingId < 1) {
+        return 0;
+    }
+
+    if (!booking_email_sent($pdo, $bookingId, ['payment_failed'])) {
+        $body = email_shell(
+            'Payment failed',
+            '<p style="margin:0 0 14px;">Dear ' . email_safe($booking['full_name'] ?? 'Guest') . ',</p>
+            <p style="margin:0 0 16px;">Your payment could not be completed. You can retry payment from your booking bill link if the room is still available.</p>' .
+            email_badge('Payment failed', 'red') .
+            email_info_table(booking_support_rows($booking)) .
+            booking_details_html($booking) .
+            email_button('Retry Payment', latest_booking_bill_url($pdo, $bookingId)),
+            'Your payment could not be completed.'
+        );
+
+        if (enqueue_email(
+            $pdo,
+            'booking',
+            $bookingId,
+            (string) ($booking['email'] ?? ''),
+            'Payment failed - Jebal Guest House #' . $bookingId,
+            $body,
+            'payment_failed',
+            null,
+            3,
+            booking_from_email(),
+            booking_from_name()
+        )) {
+            $queued++;
+        }
+    }
+
+    $adminEmail = booking_admin_email();
+    if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
+        $adminBody = email_shell(
+            'Payment failed',
+            '<p style="margin:0 0 16px;">A customer payment failed or was cancelled.</p>' .
+            email_badge('Payment failed', 'red') .
+            email_info_table(booking_admin_summary_rows($booking)),
+            'A customer payment failed or was cancelled.'
+        );
+
+        if (enqueue_email(
+            $pdo,
+            'booking',
+            $bookingId,
+            $adminEmail,
+            'Payment failed - Jebal Guest House #' . $bookingId,
+            $adminBody,
+            'admin_payment_failed',
+            $booking['email'] ?? null,
+            3,
+            booking_from_email(),
+            booking_from_name()
+        )) {
+            $queued++;
+        }
+    }
+
+    if ($queued > 0) {
+        update_booking_email_status($pdo, $bookingId, 'Payment Failed Email Queued');
+    }
+
+    return $queued;
+}
+
+
 function send_booking_status_changed_email(PDO $pdo, array $booking, string $oldStatus, string $newStatus): void
 {
     $label = status_label_for_email($newStatus);
@@ -1161,6 +1465,8 @@ function ensure_email_queue_table(PDO $pdo): void
             related_id INT UNSIGNED NULL,
             recipient_email VARCHAR(190) NOT NULL,
             reply_to_email VARCHAR(190) NULL,
+            from_email VARCHAR(190) NULL,
+            from_name VARCHAR(190) NULL,
             subject VARCHAR(255) NOT NULL,
             body_html MEDIUMTEXT NULL,
             email_type VARCHAR(80) NOT NULL,
@@ -1184,7 +1490,9 @@ function ensure_email_queue_table(PDO $pdo): void
     email_queue_add_column_if_missing($pdo, 'related_id', "related_id INT UNSIGNED NULL AFTER related_type");
     email_queue_add_column_if_missing($pdo, 'recipient_email', "recipient_email VARCHAR(190) NOT NULL AFTER related_id");
     email_queue_add_column_if_missing($pdo, 'reply_to_email', "reply_to_email VARCHAR(190) NULL AFTER recipient_email");
-    email_queue_add_column_if_missing($pdo, 'subject', "subject VARCHAR(255) NOT NULL AFTER reply_to_email");
+    email_queue_add_column_if_missing($pdo, 'from_email', "from_email VARCHAR(190) NULL AFTER reply_to_email");
+    email_queue_add_column_if_missing($pdo, 'from_name', "from_name VARCHAR(190) NULL AFTER from_email");
+    email_queue_add_column_if_missing($pdo, 'subject', "subject VARCHAR(255) NOT NULL AFTER from_name");
     email_queue_add_column_if_missing($pdo, 'body_html', "body_html MEDIUMTEXT NULL AFTER subject");
     email_queue_add_column_if_missing($pdo, 'email_type', "email_type VARCHAR(80) NOT NULL DEFAULT 'general' AFTER body_html");
     email_queue_add_column_if_missing($pdo, 'status', "status ENUM('pending','processing','sent','failed','Pending','Processing','Sent','Failed') NOT NULL DEFAULT 'pending' AFTER email_type");
@@ -1215,12 +1523,16 @@ function enqueue_email(
     string $htmlBody,
     string $emailType,
     ?string $replyTo = null,
-    int $maxAttempts = 3
+    int $maxAttempts = 3,
+    ?string $fromEmail = null,
+    ?string $fromName = null
 ): bool {
     ensure_email_queue_table($pdo);
 
     $to = trim($to);
     $replyTo = $replyTo !== null ? trim($replyTo) : null;
+    $fromEmail = $fromEmail !== null ? trim($fromEmail) : null;
+    $fromName = $fromName !== null ? trim($fromName) : null;
 
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
         error_log('Email queue skipped invalid recipient: ' . $to);
@@ -1231,15 +1543,25 @@ function enqueue_email(
         $replyTo = null;
     }
 
+    if ($fromEmail !== null && $fromEmail !== '' && !filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+        $fromEmail = null;
+    }
+
+    if ($fromName === '') {
+        $fromName = null;
+    }
+
     $stmt = $pdo->prepare(
         "INSERT INTO email_queue
-            (related_type, related_id, recipient_email, reply_to_email, subject, body_html, email_type, status, attempts, max_attempts, available_at, created_at, updated_at)
+            (related_type, related_id, recipient_email, reply_to_email, from_email, from_name, subject, body_html, email_type, status, attempts, max_attempts, available_at, created_at, updated_at)
          VALUES
-            (:related_type, :related_id, :recipient_email, :reply_to_email, :subject, :body_html, :email_type, 'pending', 0, :max_attempts, NOW(), NOW(), NOW())
+            (:related_type, :related_id, :recipient_email, :reply_to_email, :from_email, :from_name, :subject, :body_html, :email_type, 'pending', 0, :max_attempts, NOW(), NOW(), NOW())
          ON DUPLICATE KEY UPDATE
             subject = VALUES(subject),
             body_html = VALUES(body_html),
             reply_to_email = VALUES(reply_to_email),
+            from_email = VALUES(from_email),
+            from_name = VALUES(from_name),
             status = IF(status = 'sent', status, 'pending'),
             last_error = IF(status = 'sent', last_error, NULL),
             available_at = IF(status = 'sent', available_at, NOW()),
@@ -1251,6 +1573,8 @@ function enqueue_email(
         ':related_id' => $relatedId,
         ':recipient_email' => $to,
         ':reply_to_email' => $replyTo,
+        ':from_email' => $fromEmail,
+        ':from_name' => $fromName !== null ? mb_substr($fromName, 0, 190) : null,
         ':subject' => mb_substr($subject, 0, 255),
         ':body_html' => $htmlBody,
         ':email_type' => $emailType,
@@ -1262,7 +1586,7 @@ function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, st
 {
     $queued = 0;
     $ref = 'INQ-' . str_pad((string) $enquiryId, 5, '0', STR_PAD_LEFT);
-    $adminEmail = defined('ADMIN_EMAIL') ? trim((string) ADMIN_EMAIL) : '';
+    $adminEmail = contact_admin_email();
 
     if ($adminEmail !== '' && filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
         $adminBody = email_shell(
@@ -1281,7 +1605,10 @@ function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, st
             'New contact enquiry - Jebal Guest House ' . $ref,
             $adminBody,
             'admin_contact_enquiry',
-            $email
+            $email,
+            3,
+            contact_from_email(),
+            contact_from_name()
         )) {
             $queued++;
         }
@@ -1309,7 +1636,11 @@ function queue_contact_enquiry_emails(PDO $pdo, int $enquiryId, string $name, st
             $email,
             'We received your message - Jebal Guest House ' . $ref,
             $customerBody,
-            'contact_auto_reply'
+            'contact_auto_reply',
+            null,
+            3,
+            contact_from_email(),
+            contact_from_name()
         )) {
             $queued++;
         }
@@ -1410,10 +1741,16 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
         $to = (string) $job['recipient_email'];
         $subject = (string) $job['subject'];
         $replyTo = $job['reply_to_email'] !== null ? (string) $job['reply_to_email'] : null;
+        $fromEmail = isset($job['from_email']) && $job['from_email'] !== null ? (string) $job['from_email'] : null;
+        $fromName = isset($job['from_name']) && $job['from_name'] !== null ? (string) $job['from_name'] : null;
+
+        if ($fromEmail === null || trim($fromEmail) === '') {
+            [$fromEmail, $fromName] = email_sender_for_type($emailType, $relatedType);
+        }
 
         try {
             $bodyHtml = email_queue_body_from_job($job);
-            $ok = send_html_email($to, $subject, $bodyHtml, $replyTo);
+            $ok = send_html_email($to, $subject, $bodyHtml, $replyTo, $fromEmail, $fromName);
 
             if ($ok) {
                 $update = $pdo->prepare(

@@ -262,27 +262,9 @@ try {
 
     $pdo->commit();
 
-    // Send the customer/admin pending email immediately after a checkout is created.
-    // This is intentionally done after commit so a slow/failed SMTP call cannot break the booking/payment record.
-    try {
-        $pendingEmailBooking = array_merge($booking, [
-            'id' => $bookingId,
-            'amount' => $amount,
-            'currency' => $currency,
-            'status' => 'Pending',
-            'payment_status' => 'Payment Pending',
-        ]);
-
-        send_booking_payment_pending_emails_once($pdo, $pendingEmailBooking, [
-            'order_id' => $orderId,
-            'amount' => $amount,
-            'currency' => $currency,
-            'status' => 'Payment Pending',
-            'method' => 'PayHere',
-        ]);
-    } catch (Throwable $emailException) {
-        error_log('Pending booking email trigger failed after checkout creation: ' . $emailException->getMessage());
-    }
+    // No email is sent at checkout creation.
+    // The customer is already moving to PayHere, so sending a pending email here creates duplicate/noisy mail.
+    // Final success/failed emails are queued after PayHere confirms the payment outcome.
 
     $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
     $checkoutUrl = $baseApiUrl . '/payments/payhere-redirect.php?order_id=' . rawurlencode($orderId) . '&booking_id=' . $bookingId . '&token=' . rawurlencode($checkoutToken);

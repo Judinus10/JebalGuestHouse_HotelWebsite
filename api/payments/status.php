@@ -139,23 +139,8 @@ try {
 
     $paymentStatus = (string) ($record['gateway_payment_status'] ?: $record['payment_status'] ?: 'Payment Pending');
 
-    // Email rule: every online booking must notify the customer/admin even when payment is still pending or failed.
-    // The helper functions are idempotent through email_logs, so repeated bill polling will not resend duplicates.
-    try {
-        if ($paymentStatus === 'Payment Pending') {
-            send_booking_payment_pending_emails_once($pdo, $record, [
-                'order_id' => $orderId,
-                'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
-                'currency' => (string) ($record['paid_currency'] ?? $record['currency'] ?? PAYMENT_CURRENCY),
-                'status' => 'Payment Pending',
-                'method' => (string) ($record['payment_method'] ?? 'PayHere'),
-            ]);
-        } elseif (in_array($paymentStatus, ['Failed', 'Cancelled'], true)) {
-            send_payment_failed_email($pdo, $record);
-        }
-    } catch (Throwable $emailException) {
-        error_log('Public payment status email trigger failed: ' . $emailException->getMessage());
-    }
+    // Do not trigger booking emails from the public bill/status polling endpoint.
+    // Emails are queued by the verified PayHere notify endpoint and delivered by cron.
 
     if ($paymentStatus === 'Paid' && (empty($record['invoice_id']) || empty($record['invoice_file_path']))) {
         try {
