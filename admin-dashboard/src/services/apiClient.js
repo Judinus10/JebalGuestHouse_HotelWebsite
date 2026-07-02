@@ -1,6 +1,8 @@
 import { clearStoredSession, getStoredToken } from '@/utils/auth'
 
-export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+const localApiBaseUrl = 'http://localhost/HotelWebsite/api'
+
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || localApiBaseUrl).replace(/\/$/, '')
 
 export function buildApiUrl(path) {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path}`
