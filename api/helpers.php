@@ -4,7 +4,13 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
-require_once __DIR__ . '/../vendor/autoload.php';
+$rootAutoload = __DIR__ . '/../vendor/autoload.php';
+$apiAutoload = __DIR__ . '/vendor/autoload.php';
+if (is_file($rootAutoload)) {
+    require_once $rootAutoload;
+} elseif (is_file($apiAutoload)) {
+    require_once $apiAutoload;
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
