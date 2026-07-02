@@ -165,6 +165,39 @@ function drawPdfBox(pdf, x, y, width, height, options = {}) {
   pdf.roundedRect(x, y, width, height, radius, radius, 'FD')
 }
 
+
+function getBillReference(bill, bookingNumber) {
+  return cleanContactValue(bill?.invoice_number)
+    || cleanContactValue(bill?.payment_invoice_number)
+    || `BILL-${bookingNumber}`
+}
+
+function getPaymentReference(bill, paymentHistory = []) {
+  const latestWithReference = [...paymentHistory]
+    .reverse()
+    .find((payment) => cleanContactValue(payment.payment_id) || cleanContactValue(payment.order_id))
+
+  return cleanContactValue(bill?.payment_id)
+    || cleanContactValue(latestWithReference?.payment_id)
+    || cleanContactValue(bill?.order_id)
+    || cleanContactValue(latestWithReference?.order_id)
+    || '-'
+}
+
+function drawPdfLabelValue(pdf, label, value, x, y, width, options = {}) {
+  const { labelColor = [100, 116, 139], valueColor = [15, 23, 42], valueSize = 9 } = options
+  pdf.setFont('helvetica', 'normal')
+  pdf.setFontSize(8)
+  pdf.setTextColor(...labelColor)
+  pdf.text(pdfText(label), x, y)
+  pdf.setFont('helvetica', 'bold')
+  pdf.setFontSize(valueSize)
+  pdf.setTextColor(...valueColor)
+  const lines = pdf.splitTextToSize(pdfText(value || '-'), width)
+  pdf.text(lines, x, y + 5)
+  return y + 5 + lines.length * 5
+}
+
 export default function BookingBill() {
   const [searchParams] = useSearchParams()
   const bookingId = searchParams.get('booking_id') || ''
@@ -282,152 +315,235 @@ export default function BookingBill() {
 
     const pdf = new jsPDF('p', 'mm', 'a4')
     const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
     const margin = 14
     const contentWidth = pageWidth - margin * 2
     const logoBase64 = await imageToBase64(logo)
+    const billReference = getBillReference(bill, bookingNumber)
+    const paymentReference = getPaymentReference(bill, paymentHistory)
+    const currentPayment = paymentHistory[paymentHistory.length - 1] || {}
+    const currency = bill.currency || currentPayment.currency || 'LKR'
+    const paymentMethod = bill.payment_method || currentPayment.method || 'PayHere'
 
-    pdf.setFillColor(90, 43, 12)
-    pdf.rect(0, 0, pageWidth, 36, 'F')
+    const safePaymentReference = pdfText(paymentReference)
+    const wrappedPaymentRef = pdf.splitTextToSize(safePaymentReference, 62)
+    const paymentRefText = wrappedPaymentRef.slice(0, 2)
+
+    const addFooter = () => {
+      pdf.setFillColor(61, 31, 13)
+      pdf.rect(0, pageHeight - 16, pageWidth, 16, 'F')
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(7.5)
+      pdf.setTextColor(255, 255, 255)
+      pdf.text('Thank you for choosing Jebal Guest House.', pageWidth / 2, pageHeight - 9.5, { align: 'center' })
+      pdf.setTextColor(242, 200, 173)
+      pdf.text(pdfText(`${hotelPhone} | ${hotelEmail}`), pageWidth / 2, pageHeight - 4.5, { align: 'center' })
+    }
+
+    const sectionTitle = (title, x, y) => {
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(11)
+      pdf.setTextColor(90, 43, 12)
+      pdf.text(title, x, y)
+    }
+
+    const drawMiniLabel = (label, value, x, y, width, options = {}) => {
+      const { valueColor = [15, 23, 42], valueSize = 8.2 } = options
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(7.3)
+      pdf.setTextColor(100, 116, 139)
+      pdf.text(pdfText(label), x, y)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(valueSize)
+      pdf.setTextColor(...valueColor)
+      const lines = pdf.splitTextToSize(pdfText(value || '-'), width)
+      pdf.text(lines.slice(0, 2), x, y + 4.8)
+    }
+
+    pdf.setFillColor(255, 255, 255)
+    pdf.rect(0, 0, pageWidth, pageHeight, 'F')
+
+    const drawWatermarkLogo = () => {
+      if (!logoBase64) return
+
+      const watermarkSize = 86
+      const watermarkX = (pageWidth - watermarkSize) / 2
+      const watermarkY = 102
+
+      try {
+        pdf.saveGraphicsState()
+        pdf.setGState(new pdf.GState({ opacity: 0.045 }))
+        pdf.addImage(logoBase64, 'PNG', watermarkX, watermarkY, watermarkSize, watermarkSize)
+        pdf.restoreGraphicsState()
+      } catch (error) {
+        // Older jsPDF builds can miss GState support. Keep the PDF working.
+      }
+    }
+
+    // Header. White paper, no warning/message strip, no extra reference strip.
+    drawPdfBox(pdf, margin, 11, contentWidth, 40, {
+      fill: [255, 255, 255],
+      border: [234, 222, 211],
+      radius: 2,
+    })
 
     if (logoBase64) {
-      pdf.addImage(logoBase64, 'PNG', margin, 8, 18, 18)
+      pdf.addImage(logoBase64, 'PNG', margin + 6, 18, 24, 24)
     }
 
-    pdf.setTextColor(255, 255, 255)
+    pdf.setTextColor(90, 43, 12)
+    pdf.setFont('helvetica', 'bold')
+    pdf.setFontSize(23)
+    pdf.text('J E B A L', margin + 36, 26)
+    pdf.setFontSize(13)
+    pdf.text('G U E S T  H O U S E', margin + 36, 35)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8)
+    pdf.text('Comfortable Guest House', margin + 37, 42)
+
     pdf.setFont('helvetica', 'bold')
     pdf.setFontSize(18)
-    pdf.text(pdfText(hotelName), logoBase64 ? margin + 23 : margin, 16)
-
+    pdf.text('BILL / INVOICE', pageWidth - margin - 6, 24, { align: 'right' })
     pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(10)
-    pdf.text(pdfText(`${hotelPhone} - ${hotelEmail}`), logoBase64 ? margin + 23 : margin, 23)
+    pdf.setTextColor(71, 85, 105)
+    pdf.setFontSize(7.5)
+    pdf.text(pdfText(`Generated on: ${generatedAt}`), pageWidth - margin - 6, 31, { align: 'right' })
+    pdf.setFont('helvetica', 'bold')
+    pdf.setTextColor(90, 43, 12)
+    pdf.text(pdfText(`Booking Ref: ${bookingNumber}`), pageWidth - margin - 6, 38, { align: 'right' })
+    pdf.text(pdfText(`Bill Ref: ${billReference}`), pageWidth - margin - 6, 44, { align: 'right' })
 
-    pdf.setFontSize(9)
-    pdf.text(pdfText(`Generated: ${generatedAt}`), pageWidth - margin, 14, { align: 'right' })
-    pdf.text(pdfText(`Booking ID: ${bookingNumber}`), pageWidth - margin, 21, { align: 'right' })
+    pdf.setDrawColor(122, 61, 15)
+    pdf.setLineWidth(0.6)
+    pdf.line(margin, 56, pageWidth - margin, 56)
 
-    let y = 46
-
-    if (bill.payment_status === 'Payment Pending') {
-      drawPdfBox(pdf, margin, y, contentWidth, 12, {
-        fill: [254, 252, 232],
-        border: [254, 240, 138],
-      })
-      pdf.setTextColor(133, 77, 14)
-      pdf.setFontSize(9)
-      pdf.text('Payment notification is still being verified. Complete payment soon to keep this room reserved.', margin + 4, y + 8)
-      y += 18
-    }
-
-    if (bill.payment_status === 'Failed' || bill.payment_status === 'Cancelled') {
-      drawPdfBox(pdf, margin, y, contentWidth, 12, {
-        fill: [254, 242, 242],
-        border: [254, 202, 202],
-      })
-      pdf.setTextColor(185, 28, 28)
-      pdf.setFontSize(9)
-      pdf.text('Payment was not completed. You can retry payment if the room is still available.', margin + 4, y + 8)
-      y += 18
-    }
-
-    const cardGap = 4
+    let y = 64
+    const cardGap = 5
     const cardWidth = (contentWidth - cardGap * 2) / 3
-    const cardHeight = 45
+    const cardHeight = 58
 
-    drawPdfBox(pdf, margin, y, cardWidth, cardHeight)
-    drawPdfBox(pdf, margin + cardWidth + cardGap, y, cardWidth, cardHeight)
-    drawPdfBox(pdf, margin + (cardWidth + cardGap) * 2, y, cardWidth, cardHeight)
+    drawPdfBox(pdf, margin, y, cardWidth, cardHeight, { fill: [255, 255, 255], border: [234, 222, 211], radius: 2 })
+    drawPdfBox(pdf, margin + cardWidth + cardGap, y, cardWidth, cardHeight, { fill: [255, 255, 255], border: [234, 222, 211], radius: 2 })
+    drawPdfBox(pdf, margin + (cardWidth + cardGap) * 2, y, cardWidth, cardHeight, { fill: [255, 255, 255], border: [234, 222, 211], radius: 2 })
 
-    pdf.setTextColor(100, 116, 139)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(8)
-    pdf.text('GUEST', margin + 5, y + 8)
-    pdf.text('STAY', margin + cardWidth + cardGap + 5, y + 8)
-    pdf.text('STATUS', margin + (cardWidth + cardGap) * 2 + 5, y + 8)
+    sectionTitle('GUEST DETAILS', margin + 5, y + 9)
+    drawMiniLabel('Guest Name', bill.full_name || '-', margin + 5, y + 18, cardWidth - 10)
+    drawMiniLabel('Phone', bill.phone || '-', margin + 5, y + 30, cardWidth - 10)
+    drawMiniLabel('Email', bill.email || '-', margin + 5, y + 42, cardWidth - 10, { valueSize: 7.6 })
 
-    pdf.setTextColor(15, 23, 42)
-    pdf.setFontSize(10)
-    pdf.text(pdfText(bill.full_name || '-'), margin + 5, y + 20)
-    pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(9)
-    pdf.text(pdfText(`Phone: ${bill.phone || '-'}`), margin + 5, y + 27)
-    pdf.text(pdfText(`Email: ${bill.email || '-'}`), margin + 5, y + 34, { maxWidth: cardWidth - 10 })
+    const stayX = margin + cardWidth + cardGap
+    sectionTitle('STAY DETAILS', stayX + 5, y + 9)
+    drawMiniLabel('Check-in / Check-out', stayDateRange(bill.check_in_date, bill.check_out_date), stayX + 5, y + 18, cardWidth - 10, { valueSize: 7.8 })
+    drawMiniLabel('Nights / Guests', `${nights} Night${nights === 1 ? '' : 's'} | ${bill.guests || 1} Guest${Number(bill.guests || 1) === 1 ? '' : 's'}`, stayX + 5, y + 30, cardWidth - 10, { valueSize: 7.8 })
+    drawMiniLabel('Room', bill.room_name || '-', stayX + 5, y + 42, cardWidth - 10, { valueSize: 7.6 })
 
-    const stayX = margin + cardWidth + cardGap + 5
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(9)
-    pdf.text(pdfText(stayDateRange(bill.check_in_date, bill.check_out_date)), stayX, y + 20)
-    pdf.setFont('helvetica', 'normal')
-    pdf.text(pdfText(`${nights} night${nights === 1 ? '' : 's'} - Guests: ${bill.guests || 1}`), stayX, y + 27)
-    pdf.text(pdfText(`Room: ${bill.room_name || '-'}`), stayX, y + 34, { maxWidth: cardWidth - 10 })
-    pdf.text(pdfText(`Method: ${bill.payment_method || 'PayHere'}`), stayX, y + 41)
+    const statusX = margin + (cardWidth + cardGap) * 2
+    sectionTitle('BOOKING STATUS', statusX + 5, y + 9)
+    drawMiniLabel('Booking Status', shortStatusLabel(displayBookingStatus), statusX + 5, y + 18, cardWidth - 10, {
+      valueColor: displayBookingStatus === 'Confirmed' ? [21, 128, 61] : displayBookingStatus === 'Not Booked' ? [185, 28, 28] : [133, 77, 14],
+    })
+    drawMiniLabel('Payment Status', shortStatusLabel(displayPaymentStatus), statusX + 5, y + 30, cardWidth - 10, {
+      valueColor: displayPaymentStatus === 'Paid' ? [21, 128, 61] : displayPaymentStatus === 'Failed' ? [185, 28, 28] : [133, 77, 14],
+    })
+    drawMiniLabel('Payment Method', paymentMethod, statusX + 5, y + 42, cardWidth - 10, { valueSize: 7.6 })
 
-    const payX = margin + (cardWidth + cardGap) * 2 + 5
-    pdf.setTextColor(100, 116, 139)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(8)
-    pdf.text('BOOKING', payX, y + 20)
-    pdf.setTextColor(15, 23, 42)
-    pdf.setFontSize(10)
-    pdf.text(pdfText(shortStatusLabel(displayBookingStatus)), payX + 22, y + 20)
+    y += cardHeight + 11
 
-    pdf.setTextColor(100, 116, 139)
-    pdf.setFontSize(8)
-    pdf.text('PAYMENT', payX, y + 33)
-    pdf.setTextColor(15, 23, 42)
-    pdf.setFontSize(10)
-    pdf.text(pdfText(shortStatusLabel(displayPaymentStatus)), payX + 22, y + 33)
+    const leftWidth = 103
+    const rightX = margin + leftWidth + 7
+    const rightWidth = contentWidth - leftWidth - 7
+    const panelY = y
+    const panelHeight = 96
 
-    y += cardHeight + 10
+    drawWatermarkLogo()
+
+    drawPdfBox(pdf, margin, panelY, leftWidth, panelHeight, {
+      fill: [255, 255, 255],
+      border: [234, 222, 211],
+      radius: 2,
+    })
+    sectionTitle('BILL SUMMARY', margin + 5, panelY + 10)
 
     autoTable(pdf, {
-      startY: y,
-      margin: { left: margin, right: margin },
-      theme: 'plain',
+      startY: panelY + 17,
+      margin: { left: margin, right: pageWidth - margin - leftWidth },
+      tableWidth: leftWidth,
+      theme: 'grid',
+      head: [['DESCRIPTION', 'AMOUNT']],
+      body: [
+        [`Room Charge (${nights} Night${nights === 1 ? '' : 's'})`, formatMoney(roomTotal, currency)],
+        ['TOTAL CHARGES', formatMoney(roomTotal, currency)],
+        ['PAID', formatMoney(roomPaid, currency)],
+        ['BALANCE', formatMoney(roomBalance, currency)],
+      ],
       styles: {
         font: 'helvetica',
-        fontSize: 11,
-        cellPadding: 3,
+        fontSize: 8.3,
+        cellPadding: 4.8,
+        lineColor: [234, 222, 211],
+        lineWidth: 0.2,
         textColor: [15, 23, 42],
+        minCellHeight: 14,
       },
-      body: [
-        ['Total Charges', formatMoney(roomTotal, bill.currency)],
-        ['Paid', formatMoney(roomPaid, bill.currency)],
-        ['Balance', formatMoney(roomBalance, bill.currency)],
-      ],
+      headStyles: {
+        fillColor: [244, 238, 232],
+        textColor: [15, 23, 42],
+        fontStyle: 'bold',
+      },
       columnStyles: {
-        0: { fontStyle: 'bold' },
-        1: { halign: 'right', fontStyle: 'bold' },
+        0: { cellWidth: 58 },
+        1: { cellWidth: 45, halign: 'right', fontStyle: 'bold' },
       },
       didParseCell: (data) => {
-        if (data.column.index === 1 && data.row.index === 0) data.cell.styles.textColor = [90, 43, 12]
-        if (data.column.index === 1 && data.row.index === 1) data.cell.styles.textColor = [21, 128, 61]
-        if (data.column.index === 1 && data.row.index === 2) data.cell.styles.textColor = [220, 38, 38]
-      },
-      didDrawPage: () => {
-        pdf.setDrawColor(226, 232, 240)
-        pdf.roundedRect(margin, y - 1, contentWidth, 29, 3, 3)
+        if (data.section !== 'body') return
+        if (data.row.index === 1) data.cell.styles.fontStyle = 'bold'
+        if (data.row.index === 2) data.cell.styles.textColor = [21, 128, 61]
+        if (data.row.index === 3) {
+          data.cell.styles.fillColor = [243, 235, 227]
+          data.cell.styles.textColor = [90, 43, 12]
+          data.cell.styles.fontStyle = 'bold'
+        }
       },
     })
 
-    y = pdf.lastAutoTable.finalY + 12
-
-    drawPdfBox(pdf, margin, y, contentWidth, 40, {
+    drawPdfBox(pdf, rightX, panelY, rightWidth, 41, {
       fill: [255, 255, 255],
-      border: [226, 232, 240],
+      border: [234, 222, 211],
+      radius: 2,
+    })
+    sectionTitle('PAYMENT DETAILS', rightX + 5, panelY + 11)
+    drawMiniLabel('Payment Method', paymentMethod, rightX + 5, panelY + 21, rightWidth - 10, { valueSize: 8 })
+    drawMiniLabel('Payment Ref', paymentRefText.join('\n'), rightX + 5, panelY + 32, rightWidth - 10, { valueSize: 7.2 })
+
+    drawPdfBox(pdf, rightX, panelY + 47, rightWidth, 49, {
+      fill: [255, 255, 255],
+      border: [234, 222, 211],
+      radius: 2,
+    })
+    sectionTitle('NOTES', rightX + 5, panelY + 58)
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(8.2)
+    pdf.setTextColor(51, 65, 85)
+    const notes = [
+      'Please keep this bill for your records.',
+      'The room is booked from check-in day morning 11:30 AM to check-out day morning 11:00 AM.',
+      `For billing queries, contact the front desk at ${hotelPhone}.`,
+    ]
+    let noteY = panelY + 68
+    notes.forEach((note) => {
+      const lines = pdf.splitTextToSize(pdfText(note), rightWidth - 14)
+      pdf.text('-', rightX + 5, noteY)
+      pdf.text(lines, rightX + 9, noteY)
+      noteY += lines.length * 4.1 + 2
     })
 
-    pdf.setTextColor(15, 23, 42)
-    pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(11)
-    pdf.text('Notes:', margin + 5, y + 9)
+
+    addFooter()
 
     pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(9)
-    pdf.setTextColor(51, 65, 85)
-    pdf.text('- Please keep this bill for your records.', margin + 8, y + 18)
-    pdf.text('- The room is booked from check-in day morning 11:30 AM to check-out day morning 11:00 AM.', margin + 8, y + 25)
-    pdf.text(pdfText(`- For billing queries, contact the front desk at ${hotelPhone}.`), margin + 8, y + 32)
+    pdf.setFontSize(7)
+    pdf.setTextColor(100, 116, 139)
+    pdf.text('Page 1 of 1', pageWidth - margin, pageHeight - 20, { align: 'right' })
 
     return pdf.output('blob')
   }
