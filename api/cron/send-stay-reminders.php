@@ -106,18 +106,20 @@ function queue_stay_reminder_email(PDO $pdo, string $date, array $checkIns, arra
         return 0;
     }
 
-    $body = email_shell(
-        'Today\'s stay reminders',
-        '<p style="margin:0 0 16px;">These are the bookings that need admin attention today.</p>' .
-        email_badge($checkInCount . ' check-in' . ($checkInCount === 1 ? '' : 's'), 'blue') .
-        ' <span style="display:inline-block;width:8px;"></span>' .
-        email_badge($checkOutCount . ' check-out' . ($checkOutCount === 1 ? '' : 's'), 'gold') .
-        '<h2 style="margin:26px 0 10px;font-size:18px;color:#111827;">Today check-ins</h2>' .
-        stay_reminder_bookings_html($checkIns, 'No check-ins scheduled for today.') .
-        '<h2 style="margin:26px 0 10px;font-size:18px;color:#111827;">Today check-outs</h2>' .
-        stay_reminder_bookings_html($checkOuts, 'No check-outs scheduled for today.'),
-        'Today check-in and check-out reminders for Jebal Guest House.'
-    );
+    $body = function_exists('stay_reminder_email_html')
+        ? stay_reminder_email_html($date, $checkIns, $checkOuts)
+        : email_shell(
+            'Today\'s stay reminders',
+            '<p style="margin:0 0 16px;">These are the bookings that need admin attention today.</p>' .
+            email_badge($checkInCount . ' check-in' . ($checkInCount === 1 ? '' : 's'), 'blue') .
+            ' <span style="display:inline-block;width:8px;"></span>' .
+            email_badge($checkOutCount . ' check-out' . ($checkOutCount === 1 ? '' : 's'), 'gold') .
+            '<h2 style="margin:26px 0 10px;font-size:18px;color:#111827;">Today check-ins</h2>' .
+            stay_reminder_bookings_html($checkIns, 'No check-ins scheduled for today.') .
+            '<h2 style="margin:26px 0 10px;font-size:18px;color:#111827;">Today check-outs</h2>' .
+            stay_reminder_bookings_html($checkOuts, 'No check-outs scheduled for today.'),
+            'Today check-in and check-out reminders for Jebal Guest House.'
+        );
 
     return enqueue_email(
         $pdo,
