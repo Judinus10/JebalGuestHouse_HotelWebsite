@@ -1524,7 +1524,7 @@ function booking_email_info_box(string $title, string $icon, array $rows, string
     </td>';
 }
 
-function booking_email_html(string $state, array $booking, array $payment = [], bool $admin = false, string $extraButton = '', array $extraRows = []): string
+function booking_email_html(string $state, array $booking, array $payment = [], bool $admin = false, string $extraButton = '', array $extraRows = [], string $customHeading = '', string $customMessage = '', string $customBadge = ''): string
 {
     $cfg = $admin ? booking_email_status_config('admin') : booking_email_status_config($state);
     [$heading, $message, $badge, $icon, $badgeColor, $badgeBg] = $cfg;
@@ -1540,6 +1540,16 @@ function booking_email_html(string $state, array $booking, array $payment = [], 
             'cancelled' => 'Booking Cancelled',
             default => 'Booking Updated',
         };
+    }
+
+    if ($customHeading !== '') {
+        $heading = $customHeading;
+    }
+    if ($customMessage !== '') {
+        $message = $customMessage;
+    }
+    if ($customBadge !== '') {
+        $badge = $customBadge;
     }
 
     $guestName = $admin ? ($booking['full_name'] ?? $booking['guest_name'] ?? 'Guest') : ($booking['full_name'] ?? 'Guest');
@@ -1599,6 +1609,154 @@ function booking_email_html(string $state, array $booking, array $payment = [], 
     return booking_email_shell($content, $message);
 }
 
+
+function booking_staying_guest_email(array $booking): string
+{
+    $isOther = !empty($booking['is_booking_for_other']) && (int) $booking['is_booking_for_other'] === 1;
+    $email = strtolower(trim((string) ($booking['staying_guest_email'] ?? '')));
+    $bookerEmail = strtolower(trim((string) ($booking['email'] ?? '')));
+
+    if (!$isOther || $email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        return '';
+    }
+
+    if ($bookerEmail !== '' && $email === $bookerEmail) {
+        return '';
+    }
+
+    return $email;
+}
+
+function booking_staying_guest_name(array $booking): string
+{
+    $name = trim((string) ($booking['staying_guest_name'] ?? ''));
+    return $name !== '' ? $name : 'Guest';
+}
+
+function booking_staying_guest_email_booking(array $booking): array
+{
+    $guestBooking = $booking;
+    $guestBooking['full_name'] = booking_staying_guest_name($booking);
+    $guestBooking['email'] = booking_staying_guest_email($booking);
+    $guestBooking['phone'] = trim((string) ($booking['staying_guest_phone'] ?? ''));
+    return $guestBooking;
+}
+
+function booking_staying_guest_intro(array $booking): string
+{
+    $bookerName = trim((string) ($booking['full_name'] ?? $booking['booker_name'] ?? ''));
+    if ($bookerName === '') {
+        $bookerName = 'Someone';
+    }
+
+    return $bookerName . ' booked a room for you at Jebal Guest House. Your booking details are below.';
+}
+
+function send_staying_guest_booking_email(PDO $pdo, array $booking, string $state, array $payment = [], string $emailType = 'staying_guest_booking_notification', string $subjectPrefix = 'Room booked for you'): bool
+{
+    $bookingId = (int) ($booking['id'] ?? 0);
+    $guestEmail = booking_staying_guest_email($booking);
+
+    if ($bookingId < 1 || $guestEmail === '') {
+        return false;
+    }
+
+    if (booking_email_sent($pdo, $bookingId, [$emailType])) {
+        return true;
+    }
+
+    $guestBooking = booking_staying_guest_email_booking($booking);
+    $bookerName = trim((string) ($booking['full_name'] ?? $booking['booker_name'] ?? ''));
+    $bookerPhone = trim((string) ($booking['phone'] ?? $booking['booker_phone'] ?? ''));
+    $bookerEmail = trim((string) ($booking['email'] ?? $booking['booker_email'] ?? ''));
+
+    $extraRows = [];
+    if ($bookerName !== '') {
+        $extraRows['Booked By'] = $bookerName;
+    }
+    if ($bookerPhone !== '') {
+        $extraRows['Booker Phone'] = $bookerPhone;
+    }
+    if ($bookerEmail !== '') {
+        $extraRows['Booker Email'] = $bookerEmail;
+    }
+
+    $body = booking_email_html(
+        $state,
+        $guestBooking,
+        $payment,
+        false,
+        '',
+        $extraRows,
+        'Room Booked For You',
+        booking_staying_guest_intro($booking),
+        'Booking Details'
+    );
+
+    return send_tracked_email(
+        $pdo,
+        'booking',
+        $bookingId,
+        $guestEmail,
+        $subjectPrefix . ' - Jebal Guest House #' . $bookingId,
+        $body,
+        $emailType,
+        $bookerEmail !== '' ? $bookerEmail : null
+    );
+}
+
+function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $state, array $payment = [], string $emailType = 'staying_guest_booking_notification', string $subjectPrefix = 'Room booked for you'): bool
+{
+    $bookingId = (int) ($booking['id'] ?? 0);
+    $guestEmail = booking_staying_guest_email($booking);
+
+    if ($bookingId < 1 || $guestEmail === '' || booking_email_sent($pdo, $bookingId, [$emailType])) {
+        return false;
+    }
+
+    $guestBooking = booking_staying_guest_email_booking($booking);
+    $bookerName = trim((string) ($booking['full_name'] ?? $booking['booker_name'] ?? ''));
+    $bookerPhone = trim((string) ($booking['phone'] ?? $booking['booker_phone'] ?? ''));
+    $bookerEmail = trim((string) ($booking['email'] ?? $booking['booker_email'] ?? ''));
+
+    $extraRows = [];
+    if ($bookerName !== '') {
+        $extraRows['Booked By'] = $bookerName;
+    }
+    if ($bookerPhone !== '') {
+        $extraRows['Booker Phone'] = $bookerPhone;
+    }
+    if ($bookerEmail !== '') {
+        $extraRows['Booker Email'] = $bookerEmail;
+    }
+
+    $body = booking_email_html(
+        $state,
+        $guestBooking,
+        $payment,
+        false,
+        '',
+        $extraRows,
+        'Room Booked For You',
+        booking_staying_guest_intro($booking),
+        'Booking Details'
+    );
+
+    return enqueue_email(
+        $pdo,
+        'booking',
+        $bookingId,
+        $guestEmail,
+        $subjectPrefix . ' - Jebal Guest House #' . $bookingId,
+        $body,
+        $emailType,
+        $bookerEmail !== '' ? $bookerEmail : null,
+        3,
+        booking_from_email(),
+        booking_from_name()
+    );
+}
+
 function send_booking_received_emails(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
@@ -1631,6 +1789,8 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
         $booking['email'] ?? null
     );
 
+    send_staying_guest_booking_email($pdo, $booking, 'received', [], 'staying_guest_booking_received', 'A room was booked for you');
+
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Sent' : 'Failed');
     }
@@ -1647,6 +1807,7 @@ function send_booking_confirmed_email(PDO $pdo, array $booking): void
     $body = booking_email_html('confirmed', $booking, [], false, $invoiceLink);
 
     $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), $subject, $body, 'booking_confirmed');
+    send_staying_guest_booking_email($pdo, $booking, 'confirmed', [], 'staying_guest_booking_confirmed', 'Booking confirmed for you');
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
     }
@@ -1834,6 +1995,8 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
 
         send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Payment received - Jebal Guest House #' . $bookingId, $bodyAdmin, $adminType, $booking['email'] ?? null);
     }
+
+    send_staying_guest_booking_email($pdo, $booking, 'paid', $payment, 'staying_guest_payment_successful', 'Booking confirmed for you');
 }
 
 
@@ -1933,6 +2096,10 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
         )) {
             $queued++;
         }
+    }
+
+    if (queue_staying_guest_booking_email($pdo, $booking, 'paid', $payment, 'staying_guest_payment_successful', 'Booking confirmed for you')) {
+        $queued++;
     }
 
     if ($queued > 0) {
