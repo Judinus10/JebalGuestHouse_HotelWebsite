@@ -581,3 +581,8 @@ MODIFY COLUMN status ENUM(
     'Cancelled',
     'No Show'
 ) NOT NULL DEFAULT 'Pending';
+
+SELECT *
+FROM email_queue
+WHERE related_type = 'booking'
+ORDER BY id DESC;
