@@ -571,3 +571,13 @@ ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS body_html MEDIUMTEXT NULL AFTER
 ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3 AFTER attempts;
 ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS locked_at DATETIME NULL AFTER available_at;
 ALTER TABLE email_queue ADD COLUMN IF NOT EXISTS sent_at DATETIME NULL AFTER locked_at;
+
+ALTER TABLE bookings
+MODIFY COLUMN status ENUM(
+    'Pending',
+    'Confirmed',
+    'Checked In',
+    'Checked Out',
+    'Cancelled',
+    'No Show'
+) NOT NULL DEFAULT 'Pending';
