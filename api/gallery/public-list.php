@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-header('Content-Type: application/json');
-
 require_once __DIR__ . '/_gallery_helpers.php';
+
+apply_cors_headers();
 
 try {
     $pdo = get_db_connection();
