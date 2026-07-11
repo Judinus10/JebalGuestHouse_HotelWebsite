@@ -1789,7 +1789,6 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
         $booking['email'] ?? null
     );
 
-    send_staying_guest_booking_email($pdo, $booking, 'received', [], 'staying_guest_booking_received', 'A room was booked for you');
 
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Sent' : 'Failed');
@@ -1996,7 +1995,7 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
         send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Payment received - Jebal Guest House #' . $bookingId, $bodyAdmin, $adminType, $booking['email'] ?? null);
     }
 
-    send_staying_guest_booking_email($pdo, $booking, 'paid', $payment, 'staying_guest_payment_successful', 'Booking confirmed for you');
+    send_staying_guest_booking_email($pdo, $booking, 'confirmed', $payment, 'staying_guest_booking_confirmed', 'Booking confirmed for you');
 }
 
 
@@ -2098,7 +2097,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
         }
     }
 
-    if (queue_staying_guest_booking_email($pdo, $booking, 'paid', $payment, 'staying_guest_payment_successful', 'Booking confirmed for you')) {
+    if (queue_staying_guest_booking_email($pdo, $booking, 'confirmed', $payment, 'staying_guest_booking_confirmed', 'Booking confirmed for you')) {
         $queued++;
     }
 
@@ -2196,6 +2195,11 @@ function send_payment_status_changed_email(PDO $pdo, array $booking, array $paym
     ]);
 
     $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Payment status updated - Jebal Guest House #' . $bookingId, $body, 'payment_status_updated');
+
+    if (strtolower(trim($newStatus)) === 'paid') {
+        send_staying_guest_booking_email($pdo, $booking, 'confirmed', $payment, 'staying_guest_booking_confirmed', 'Booking confirmed for you');
+    }
+
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
     }
@@ -2215,6 +2219,13 @@ function send_combined_status_changed_email(PDO $pdo, array $booking, array $pay
     ]);
 
     $sent = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), 'Booking and payment updated - Jebal Guest House #' . $bookingId, $body, 'combined_status_updated');
+
+    $isConfirmed = strtolower(trim($newBookingStatus)) === 'confirmed';
+    $isPaid = strtolower(trim($newPaymentStatus)) === 'paid';
+    if ($isConfirmed || $isPaid) {
+        send_staying_guest_booking_email($pdo, $booking, 'confirmed', $payment, 'staying_guest_booking_confirmed', 'Booking confirmed for you');
+    }
+
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sent ? 'Sent' : 'Failed');
     }
