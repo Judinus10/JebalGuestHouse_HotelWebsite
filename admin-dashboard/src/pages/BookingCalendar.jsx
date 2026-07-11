@@ -259,6 +259,9 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
 
   if (!booking) return null
 
+  const paymentStatusKey = getBookingStatusKey(booking.payment_status)
+  const canProcessBooking = paymentStatusKey === 'paid' || paymentStatusKey === 'no_pay'
+
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {
       onClose()
@@ -327,10 +330,10 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
               <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'cancelled')}>
                 Cancel booking
               </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'checked_in')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_in')}>
                 Mark checked in
               </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'checked_out')}>
+              <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_out')}>
                 Mark checked out
               </Button>
             </div>
