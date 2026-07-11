@@ -306,8 +306,8 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
               <p><span className="font-semibold text-slate-500">Room code:</span> {booking.room_code}</p>
               <p><span className="font-semibold text-slate-500">Property type:</span> {booking.property_type}</p>
               <p><span className="font-semibold text-slate-500">Amount:</span> {currencyFormatter.format(booking.total_amount)}</p>
-              <p><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></p>
-              <p><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></p>
+              <div><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>
+              <div><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
             </div>
           </div>
 

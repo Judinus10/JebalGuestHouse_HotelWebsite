@@ -27,6 +27,29 @@ if ($id < 1 || !in_array($status, $allowedStatuses, true)) {
 try {
     $pdo = get_db_connection();
 
+    // Keep the database schema aligned with every status exposed by the admin UI.
+    // Older installations only allow Pending, Confirmed and Cancelled, which makes
+    // Checked In / Checked Out appear to update in React but disappear after reload.
+    $statusColumn = $pdo->query("SHOW COLUMNS FROM bookings LIKE 'status'")->fetch();
+    $statusType = strtolower((string) ($statusColumn['Type'] ?? ''));
+    $requiredStatusValues = ["'pending'", "'confirmed'", "'checked in'", "'checked out'", "'cancelled'", "'no show'"];
+    $missingStatusValue = false;
+
+    foreach ($requiredStatusValues as $requiredStatusValue) {
+        if (!str_contains($statusType, $requiredStatusValue)) {
+            $missingStatusValue = true;
+            break;
+        }
+    }
+
+    if ($missingStatusValue) {
+        $pdo->exec(
+            "ALTER TABLE bookings
+             MODIFY status ENUM('Pending','Confirmed','Checked In','Checked Out','Cancelled','No Show')
+             NOT NULL DEFAULT 'Pending'"
+        );
+    }
+
     $stmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
     $stmt->execute([':id' => $id]);
     $booking = $stmt->fetch();
@@ -35,7 +58,8 @@ try {
         json_response(false, 'Booking was not found.', 404);
     }
 
-    $oldStatus = strtolower((string) ($booking['status'] ?? ''));
+    $oldStatus = strtolower(trim((string) ($booking['status'] ?? '')));
+    $oldStatus = str_replace([' ', '-'], '_', $oldStatus);
 
     if ($oldStatus === $status) {
         json_response(true, 'Booking status is already updated.', 200, [
