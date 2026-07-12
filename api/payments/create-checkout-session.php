@@ -112,6 +112,7 @@ try {
     $pdo = get_db_connection();
     expire_pending_bookings($pdo, $bookingId, true);
     ensure_booking_audit_table($pdo);
+    ensure_email_queue_table($pdo);
     $pdo->beginTransaction();
 
     $bookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1 FOR UPDATE');
@@ -260,11 +261,45 @@ try {
         'hold_minutes' => booking_hold_minutes(),
     ]);
 
+    $booking['status'] = 'Pending';
+    $booking['payment_status'] = 'Payment Pending';
+    $booking['amount'] = $amount;
+    $booking['currency'] = $currency;
+
+    /*
+     * Commit the booking/payment transaction before touching the email queue.
+     * Queue helpers may perform one-time schema checks/upgrades, and MySQL DDL
+     * implicitly commits the current transaction. Running those helpers inside
+     * this transaction caused the later commit() call to fail with
+     * "There is no active transaction".
+     */
+    if (!$pdo->inTransaction()) {
+        throw new RuntimeException('Checkout transaction ended unexpectedly before commit.');
+    }
+
     $pdo->commit();
 
-    // No email is sent at checkout creation.
-    // The customer is already moving to PayHere, so sending a pending email here creates duplicate/noisy mail.
-    // Final success/failed emails are queued after PayHere confirms the payment outcome.
+    // Email scheduling is intentionally outside the booking transaction.
+    // A queue failure must not undo an already-created PayHere checkout session.
+    try {
+        queue_booking_pending_emails($pdo, $booking, [
+            'order_id' => $orderId,
+            'amount' => $amount,
+            'currency' => $currency,
+            'status' => 'Payment Pending',
+            'bill_url' => $returnUrl,
+        ], 10);
+    } catch (Throwable $queueException) {
+        error_log(
+            'Pending booking email scheduling failed for booking #'
+            . $bookingId
+            . ': '
+            . $queueException->getMessage()
+        );
+    }
+
+    // Pending emails are scheduled through the existing queue for ten minutes later.
+    // The queue worker re-checks the latest booking/payment state before delivery.
 
     $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
     $checkoutUrl = $baseApiUrl . '/payments/payhere-redirect.php?order_id=' . rawurlencode($orderId) . '&booking_id=' . $bookingId . '&token=' . rawurlencode($checkoutToken);

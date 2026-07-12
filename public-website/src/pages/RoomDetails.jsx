@@ -490,11 +490,11 @@ export default function RoomDetails() {
                       <div className="space-y-4 border-y border-ice-dark py-4">
                         <div>
                           <label className="text-xs tracking-wider uppercase text-muted">Staying Guest Name</label>
-                          <input type="text" name="staying_guest_name" required value={formData.staying_guest_name} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                          <input type="text" name="staying_guest_name" value={formData.staying_guest_name} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
                         </div>
                         <div>
                           <label className="text-xs tracking-wider uppercase text-muted">Staying Guest Phone</label>
-                          <input type="tel" name="staying_guest_phone" required value={formData.staying_guest_phone} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
+                          <input type="tel" name="staying_guest_phone" value={formData.staying_guest_phone} onChange={handleChange} className="mt-1 w-full border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
                         </div>
                         <div>
                           <label className="text-xs tracking-wider uppercase text-muted">Staying Guest Email</label>

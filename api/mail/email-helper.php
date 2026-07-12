@@ -1526,6 +1526,117 @@ function status_label_for_email(?string $status): string
 }
 
 
+function email_queue_job_exists(PDO $pdo, string $relatedType, int $relatedId, string $emailType, string $recipient): bool
+{
+    ensure_email_queue_table($pdo);
+
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*)
+         FROM email_queue
+         WHERE related_type = :related_type
+           AND related_id = :related_id
+           AND email_type = :email_type
+           AND recipient_email = :recipient_email"
+    );
+    $stmt->execute([
+        ':related_type' => $relatedType,
+        ':related_id' => $relatedId,
+        ':email_type' => $emailType,
+        ':recipient_email' => trim($recipient),
+    ]);
+
+    return (int) $stmt->fetchColumn() > 0;
+}
+
+function queue_booking_pending_emails(PDO $pdo, array $booking, array $payment = [], int $delayMinutes = 10): int
+{
+    $bookingId = (int) ($booking['id'] ?? 0);
+    if ($bookingId < 1 || (string) ($booking['status'] ?? '') !== 'Pending' || (string) ($booking['payment_status'] ?? '') !== 'Payment Pending') {
+        return 0;
+    }
+
+    $delayMinutes = max(1, min(1440, $delayMinutes));
+    $availableAt = (new DateTimeImmutable())->modify('+' . $delayMinutes . ' minutes')->format('Y-m-d H:i:s');
+    $orderId = trim((string) ($payment['order_id'] ?? ''));
+    $billUrl = trim((string) ($payment['bill_url'] ?? latest_booking_bill_url($pdo, $bookingId)));
+    $billButton = $billUrl !== '' ? email_button('Resume Payment / View Booking Bill', $billUrl) : '';
+    $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
+    $queued = 0;
+
+    $customerEmail = trim((string) ($booking['email'] ?? ''));
+    $customerType = 'booking_payment_pending_customer';
+    if ($customerEmail !== '' && !email_queue_job_exists($pdo, 'booking', $bookingId, $customerType, $customerEmail)) {
+        $customerBody = booking_email_html('pending', $booking, $payment, false, $billButton, [
+            'Order ID' => $orderId !== '' ? $orderId : '-',
+            'Amount Due' => $amount,
+        ]);
+
+        if (enqueue_email($pdo, 'booking', $bookingId, $customerEmail, 'Booking received - payment pending - Jebal Guest House #' . $bookingId, $customerBody, $customerType, null, 3, booking_from_email(), booking_from_name(), $availableAt)) {
+            $queued++;
+        }
+    }
+
+    $adminEmail = booking_admin_email();
+    $adminType = 'booking_payment_pending_admin';
+    if ($adminEmail !== '' && !email_queue_job_exists($pdo, 'booking', $bookingId, $adminType, $adminEmail)) {
+        $adminBody = booking_email_html('pending', $booking, $payment, true, $billButton, [
+            'Order ID' => $orderId !== '' ? $orderId : '-',
+        ]);
+
+        if (enqueue_email($pdo, 'booking', $bookingId, $adminEmail, 'New booking received - payment pending - Jebal Guest House #' . $bookingId, $adminBody, $adminType, $customerEmail !== '' ? $customerEmail : null, 3, booking_from_email(), booking_from_name(), $availableAt)) {
+            $queued++;
+        }
+    }
+
+    if ($queued > 0) {
+        update_booking_email_status($pdo, $bookingId, 'Pending Email Scheduled');
+        booking_audit_log($pdo, $bookingId, 'pending_email_scheduled', 'Pending Email Scheduled', 'Customer and admin pending-payment emails were scheduled for queue delivery.', [
+            'available_at' => $availableAt,
+            'delay_minutes' => $delayMinutes,
+            'order_id' => $orderId,
+            'queued_count' => $queued,
+        ]);
+    }
+
+    return $queued;
+}
+
+function cancel_scheduled_pending_booking_emails(PDO $pdo, int $bookingId, string $reason = 'Payment reached a final state.'): int
+{
+    if ($bookingId < 1) {
+        return 0;
+    }
+
+    ensure_email_queue_table($pdo);
+    $stmt = $pdo->prepare(
+        "UPDATE email_queue
+         SET status = 'cancelled', locked_at = NULL, last_error = :reason, updated_at = NOW()
+         WHERE related_type = 'booking'
+           AND related_id = :booking_id
+           AND email_type IN ('booking_payment_pending_customer', 'booking_payment_pending_admin')
+           AND LOWER(status) IN ('pending', 'processing')"
+    );
+    $stmt->execute([
+        ':booking_id' => $bookingId,
+        ':reason' => mb_substr($reason, 0, 1000),
+    ]);
+
+    $cancelled = $stmt->rowCount();
+    if ($cancelled > 0) {
+        booking_audit_log($pdo, $bookingId, 'pending_email_cancelled', 'Pending Email Cancelled', 'Scheduled pending-payment email jobs were cancelled because payment reached a final state.', [
+            'cancelled_count' => $cancelled,
+            'reason' => $reason,
+        ]);
+    }
+
+    return $cancelled;
+}
+
+function is_booking_pending_queue_email(string $emailType): bool
+{
+    return in_array($emailType, ['booking_payment_pending_customer', 'booking_payment_pending_admin'], true);
+}
+
 function queue_payment_success_emails(PDO $pdo, array $booking, array $payment): int
 {
     $queued = 0;
@@ -1784,6 +1895,20 @@ function email_queue_column_exists(PDO $pdo, string $column): bool
     return (int) $stmt->fetchColumn() > 0;
 }
 
+function email_queue_column_type(PDO $pdo, string $column): string
+{
+    $stmt = $pdo->prepare(
+        "SELECT COLUMN_TYPE
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'email_queue'
+           AND COLUMN_NAME = :column
+         LIMIT 1"
+    );
+    $stmt->execute([':column' => $column]);
+    return strtolower((string) ($stmt->fetchColumn() ?: ''));
+}
+
 function email_queue_index_exists(PDO $pdo, string $indexName): bool
 {
     $stmt = $pdo->prepare(
@@ -1811,6 +1936,20 @@ function email_queue_add_column_if_missing(PDO $pdo, string $column, string $def
  */
 function ensure_email_queue_table(PDO $pdo): void
 {
+    static $readyConnections = [];
+
+    $connectionId = spl_object_id($pdo);
+    if (isset($readyConnections[$connectionId])) {
+        return;
+    }
+
+    // MySQL DDL statements implicitly commit active transactions. Queue schema
+    // upgrades must therefore run before a transaction starts. Transactional
+    // callers in this project call this helper once before beginTransaction().
+    if ($pdo->inTransaction()) {
+        return;
+    }
+
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS email_queue (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -1823,7 +1962,7 @@ function ensure_email_queue_table(PDO $pdo): void
             subject VARCHAR(255) NOT NULL,
             body_html MEDIUMTEXT NULL,
             email_type VARCHAR(80) NOT NULL,
-            status ENUM('pending','processing','sent','failed','Pending','Processing','Sent','Failed') NOT NULL DEFAULT 'pending',
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
             attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
             max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3,
             last_error TEXT NULL,
@@ -1848,7 +1987,12 @@ function ensure_email_queue_table(PDO $pdo): void
     email_queue_add_column_if_missing($pdo, 'subject', "subject VARCHAR(255) NOT NULL AFTER from_name");
     email_queue_add_column_if_missing($pdo, 'body_html', "body_html MEDIUMTEXT NULL AFTER subject");
     email_queue_add_column_if_missing($pdo, 'email_type', "email_type VARCHAR(80) NOT NULL DEFAULT 'general' AFTER body_html");
-    email_queue_add_column_if_missing($pdo, 'status', "status ENUM('pending','processing','sent','failed','Pending','Processing','Sent','Failed') NOT NULL DEFAULT 'pending' AFTER email_type");
+    email_queue_add_column_if_missing($pdo, 'status', "status VARCHAR(20) NOT NULL DEFAULT 'pending' AFTER email_type");
+
+    // Upgrade the older ENUM once so skipped/cancelled jobs are first-class states.
+    if (str_starts_with(email_queue_column_type($pdo, 'status'), 'enum(')) {
+        $pdo->exec("ALTER TABLE email_queue MODIFY status VARCHAR(20) NOT NULL DEFAULT 'pending'");
+    }
     email_queue_add_column_if_missing($pdo, 'attempts', "attempts TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER status");
     email_queue_add_column_if_missing($pdo, 'max_attempts', "max_attempts TINYINT UNSIGNED NOT NULL DEFAULT 3 AFTER attempts");
     email_queue_add_column_if_missing($pdo, 'last_error', "last_error TEXT NULL AFTER max_attempts");
@@ -1865,6 +2009,8 @@ function ensure_email_queue_table(PDO $pdo): void
     if (!email_queue_index_exists($pdo, 'idx_email_queue_related')) {
         $pdo->exec("CREATE INDEX idx_email_queue_related ON email_queue (related_type, related_id)");
     }
+
+    $readyConnections[$connectionId] = true;
 }
 
 function enqueue_email(
@@ -1878,7 +2024,8 @@ function enqueue_email(
     ?string $replyTo = null,
     int $maxAttempts = 3,
     ?string $fromEmail = null,
-    ?string $fromName = null
+    ?string $fromName = null,
+    ?string $availableAt = null
 ): bool {
     ensure_email_queue_table($pdo);
 
@@ -1904,20 +2051,25 @@ function enqueue_email(
         $fromName = null;
     }
 
+    $availableAt = trim((string) $availableAt);
+    if ($availableAt === '' || DateTimeImmutable::createFromFormat('Y-m-d H:i:s', $availableAt) === false) {
+        $availableAt = date('Y-m-d H:i:s');
+    }
+
     $stmt = $pdo->prepare(
         "INSERT INTO email_queue
             (related_type, related_id, recipient_email, reply_to_email, from_email, from_name, subject, body_html, email_type, status, attempts, max_attempts, available_at, created_at, updated_at)
          VALUES
-            (:related_type, :related_id, :recipient_email, :reply_to_email, :from_email, :from_name, :subject, :body_html, :email_type, 'pending', 0, :max_attempts, NOW(), NOW(), NOW())
+            (:related_type, :related_id, :recipient_email, :reply_to_email, :from_email, :from_name, :subject, :body_html, :email_type, 'pending', 0, :max_attempts, :available_at, NOW(), NOW())
          ON DUPLICATE KEY UPDATE
             subject = VALUES(subject),
             body_html = VALUES(body_html),
             reply_to_email = VALUES(reply_to_email),
             from_email = VALUES(from_email),
             from_name = VALUES(from_name),
-            status = IF(status = 'sent', status, 'pending'),
-            last_error = IF(status = 'sent', last_error, NULL),
-            available_at = IF(status = 'sent', available_at, NOW()),
+            status = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped'), status, 'pending'),
+            last_error = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped'), last_error, NULL),
+            available_at = IF(LOWER(status) IN ('sent', 'cancelled', 'skipped'), available_at, LEAST(available_at, VALUES(available_at))),
             updated_at = NOW()"
     );
 
@@ -1932,6 +2084,7 @@ function enqueue_email(
         ':body_html' => $htmlBody,
         ':email_type' => $emailType,
         ':max_attempts' => max(1, min(10, $maxAttempts)),
+        ':available_at' => $availableAt,
     ]);
 }
 
@@ -2068,6 +2221,8 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
     $processed = 0;
     $sent = 0;
     $failed = 0;
+    $skipped = 0;
+    $cancelled = 0;
 
     foreach ($jobs as $job) {
         $processed++;
@@ -2083,6 +2238,39 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
 
         if ($fromEmail === null || trim($fromEmail) === '') {
             [$fromEmail, $fromName] = email_sender_for_type($emailType, $relatedType);
+        }
+
+        if ($relatedType === 'booking' && $relatedId !== null && is_booking_pending_queue_email($emailType)) {
+            $latest = $pdo->prepare('SELECT status, payment_status FROM bookings WHERE id = :id LIMIT 1');
+            $latest->execute([':id' => $relatedId]);
+            $latestBooking = $latest->fetch(PDO::FETCH_ASSOC);
+
+            $stillPending = is_array($latestBooking)
+                && (string) ($latestBooking['status'] ?? '') === 'Pending'
+                && (string) ($latestBooking['payment_status'] ?? '') === 'Payment Pending';
+
+            if (!$stillPending) {
+                $skipUpdate = $pdo->prepare(
+                    "UPDATE email_queue
+                     SET status = 'skipped', locked_at = NULL, last_error = :reason, updated_at = NOW()
+                     WHERE id = :id AND LOWER(status) = 'processing'"
+                );
+                $skipUpdate->execute([
+                    ':id' => $jobId,
+                    ':reason' => 'Booking or payment status changed before scheduled delivery.',
+                ]);
+
+                if ($skipUpdate->rowCount() > 0) {
+                    booking_audit_log($pdo, $relatedId, 'pending_email_skipped', 'Pending Email Skipped', 'Scheduled pending email was skipped because the booking or payment was no longer pending.', [
+                        'email_type' => $emailType,
+                        'queue_id' => $jobId,
+                    ]);
+                    $skipped++;
+                } else {
+                    $cancelled++;
+                }
+                continue;
+            }
         }
 
         try {
@@ -2107,6 +2295,13 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
                     true,
                     null
                 );
+                if ($relatedType === 'booking' && $relatedId !== null && is_booking_pending_queue_email($emailType)) {
+                    update_booking_email_status($pdo, $relatedId, 'Pending Email Sent');
+                    booking_audit_log($pdo, $relatedId, 'pending_email_sent', 'Pending Email Sent', 'A scheduled pending-payment email was sent through the email queue.', [
+                        'email_type' => $emailType,
+                        'queue_id' => $jobId,
+                    ]);
+                }
                 $sent++;
                 continue;
             }
@@ -2153,6 +2348,8 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
         'processed' => $processed,
         'sent' => $sent,
         'failed' => $failed,
+        'skipped' => $skipped,
+        'cancelled' => $cancelled,
         'remaining_pending' => (int) $pdo->query("SELECT COUNT(*) FROM email_queue WHERE status = 'pending' AND available_at <= NOW()")->fetchColumn(),
     ];
 }
