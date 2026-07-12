@@ -7,7 +7,9 @@ const PUBLIC_BOOKING_URL = buildApiUrl('/submit-booking.php')
 export const paymentStatusOptions = ['pending', 'paid', 'cancelled', 'refunded', 'no_pay']
 export const paymentMethodOptions = ['PayHere', 'Cash', 'Bank Transfer']
 
-function normalizeBookingStatus(status) {
+function normalizeBookingStatus(status, isExternal = false) {
+  if (isExternal) return 'external'
+
   const value = String(status || 'pending')
     .trim()
     .toLowerCase()
@@ -39,7 +41,9 @@ export function toApiPaymentStatus(status) {
   return 'Payment Pending'
 }
 
-export function normalizePaymentStatus(status) {
+export function normalizePaymentStatus(status, isExternal = false) {
+  if (isExternal) return 'external'
+
   const value = String(status || 'Payment Pending')
     .trim()
     .toLowerCase()
@@ -71,6 +75,7 @@ function getRoomByName(roomName) {
 }
 
 export function normalizeBooking(booking) {
+  const isExternal = String(booking.source || '').trim().toLowerCase() === 'booking.com'
   const roomName = booking.room_name || booking.roomName || booking.room || ''
   const room = getRoomByName(roomName)
   const checkIn = booking.check_in || booking.check_in_date || booking.checkIn || booking.arrival_date || booking.arrival || ''
@@ -106,8 +111,8 @@ export function normalizeBooking(booking) {
     adults: Number(booking.adults || guests || 1),
     children: Number(booking.children || 0),
     total_nights: totalNights,
-    booking_status: normalizeBookingStatus(booking.booking_status || booking.status || booking.bookingState),
-    payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus),
+    booking_status: normalizeBookingStatus(booking.booking_status || booking.status || booking.bookingState, isExternal),
+    payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus, isExternal),
     payment_method: booking.payment_method || booking.method || booking.paymentMethod || '',
     total_amount: amount,
     payment_currency: booking.payment_currency || booking.currency || 'LKR',
@@ -121,7 +126,7 @@ export function normalizeBooking(booking) {
     source: booking.source || 'website',
     sync_status: booking.sync_status || '',
     last_synced_at: booking.last_synced_at || '',
-    is_external: String(booking.source || '').toLowerCase() === 'booking.com',
+    is_external: isExternal,
   }
 }
 

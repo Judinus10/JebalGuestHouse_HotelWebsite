@@ -62,6 +62,7 @@ const bookingStatusVariant = {
   pending: 'warning',
   confirmed: 'success',
   cancelled: 'destructive',
+  external: 'default',
 }
 
 const paymentStatusVariant = {
@@ -71,6 +72,7 @@ const paymentStatusVariant = {
   cancelled: 'secondary',
   refunded: 'secondary',
   no_pay: 'secondary',
+  external: 'secondary',
 }
 
 const emptyManualBooking = {
@@ -121,6 +123,7 @@ function humanizeBookingStatus(value) {
 
   if (normalized === 'confirmed') return 'Confirmed'
   if (normalized === 'cancelled' || normalized === 'canceled') return 'Cancelled'
+  if (normalized === 'external') return 'Booked'
   return 'Pending'
 }
 
@@ -132,6 +135,7 @@ function humanizePaymentStatus(value) {
   if (normalized === 'cancelled' || normalized === 'canceled') return 'Cancelled'
   if (normalized === 'refunded') return 'Refunded'
   if (normalized === 'no_pay' || normalized === 'nopay' || normalized === 'no_payment') return 'No Pay'
+  if (normalized === 'external') return 'Booking.com'
   return 'Payment Pending'
 }
 
@@ -305,6 +309,7 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-bold text-text-primary">{booking.booking_no}</p>
+          {booking.is_external ? <p className="mt-1 text-xs font-bold text-blue-700">Booked via Booking.com</p> : null}
           <p className="mt-1 truncate text-sm font-semibold text-text-primary">{booking.room_name}</p>
           <p className="mt-1 text-xs text-text-secondary">Created {formatDate(booking.created_at)}</p>
         </div>
@@ -315,15 +320,17 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Guest</p>
           <p className="mt-1 truncate font-semibold text-text-primary">{booking.guest_name}</p>
-          <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
-          {booking.guest_email ? <p className="mt-1 truncate text-xs text-text-secondary">{booking.guest_email}</p> : null}
+          {booking.is_external ? <p className="mt-1 text-xs text-text-secondary">External reservation</p> : <>
+            <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
+            {booking.guest_email ? <p className="mt-1 truncate text-xs text-text-secondary">{booking.guest_email}</p> : null}
+          </>}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Stay</p>
             <p className="mt-1 font-semibold text-text-primary">{formatDate(booking.check_in, shortDateFormatter)} - {formatDate(booking.check_out, shortDateFormatter)}</p>
-            <p className="mt-1 text-xs text-text-secondary">{booking.total_nights} night{booking.total_nights === 1 ? '' : 's'} · {booking.guests} guest{booking.guests === 1 ? '' : 's'}</p>
+            <p className="mt-1 text-xs text-text-secondary">{booking.total_nights} night{booking.total_nights === 1 ? '' : 's'}{booking.is_external ? '' : ` · ${booking.guests} guest${booking.guests === 1 ? '' : 's'}`}</p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Amount</p>
@@ -342,6 +349,7 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
 
 function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
   const [open, setOpen] = useState(false)
+  const isExternal = Boolean(booking.is_external)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -375,19 +383,23 @@ function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
             <Eye className="h-4 w-4 text-blue-700" />
             View Details
           </button>
-          <button type="button" onClick={() => handleAction(onUpdateStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            Update Status
-          </button>
-          <button
-            type="button"
-            disabled={booking.booking_status === 'cancelled'}
-            onClick={() => handleAction(onCancel)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete Booking
-          </button>
+          {!isExternal ? (
+            <>
+              <button type="button" onClick={() => handleAction(onUpdateStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Update Status
+              </button>
+              <button
+                type="button"
+                disabled={booking.booking_status === 'cancelled'}
+                onClick={() => handleAction(onCancel)}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Booking
+              </button>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -909,12 +921,20 @@ function BookingDetailsModal({ booking, rooms, onClose }) {
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-5">
           <section className="rounded-2xl border border-border bg-white p-5">
-            <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-secondary">Guest information</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center gap-3"><UserRound className="h-4 w-4 text-blue-700" /><span className="font-semibold text-text-primary">{booking.guest_name}</span></div>
-              <div className="flex items-center gap-3 text-text-secondary"><Mail className="h-4 w-4 text-blue-700" /><span>{booking.guest_email}</span></div>
-              <div className="flex items-center gap-3 text-text-secondary"><Phone className="h-4 w-4 text-blue-700" /><span>{booking.guest_phone}</span></div>
-            </div>
+            <h3 className="mb-4 text-sm font-bold uppercase tracking-wide text-text-secondary">{booking.is_external ? 'Reservation source' : 'Guest information'}</h3>
+            {booking.is_external ? (
+              <div className="space-y-2 text-sm">
+                <p className="font-semibold text-text-primary">Booking.com</p>
+                <p className="text-text-secondary">This is an imported, read-only reservation block.</p>
+                {booking.last_synced_at ? <p className="text-text-secondary">Last synchronized: {formatDate(booking.last_synced_at)}</p> : null}
+              </div>
+            ) : (
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-3"><UserRound className="h-4 w-4 text-blue-700" /><span className="font-semibold text-text-primary">{booking.guest_name}</span></div>
+                <div className="flex items-center gap-3 text-text-secondary"><Mail className="h-4 w-4 text-blue-700" /><span>{booking.guest_email}</span></div>
+                <div className="flex items-center gap-3 text-text-secondary"><Phone className="h-4 w-4 text-blue-700" /><span>{booking.guest_phone}</span></div>
+              </div>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border bg-white p-5">
@@ -1355,6 +1375,7 @@ export default function Bookings() {
                       <div>
                         <p className="sr-only">Booking</p>
                         <p className="font-bold text-text-primary">{booking.booking_no}</p>
+                        {booking.is_external ? <p className="mt-1 text-xs font-bold text-blue-700">Booked via Booking.com</p> : null}
                         <p className="mt-1 line-clamp-1 text-sm font-semibold text-text-primary">{booking.room_name}</p>
                         <p className="mt-1 text-xs text-text-secondary">Created {formatDate(booking.created_at)}</p>
                       </div>
@@ -1362,19 +1383,21 @@ export default function Bookings() {
                       <div>
                         <p className="sr-only">Guest</p>
                         <p className="line-clamp-1 font-semibold text-text-primary">{booking.guest_name}</p>
-                        <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
-                        {booking.guest_email ? <p className="mt-1 line-clamp-1 text-xs text-text-secondary">{booking.guest_email}</p> : null}
+                        {booking.is_external ? <p className="mt-1 text-xs text-text-secondary">External reservation</p> : <>
+                          <p className="mt-1 text-xs text-text-secondary">{booking.guest_phone}</p>
+                          {booking.guest_email ? <p className="mt-1 line-clamp-1 text-xs text-text-secondary">{booking.guest_email}</p> : null}
+                        </>}
                       </div>
 
                       <div>
                         <p className="sr-only">Stay</p>
                         <p className="font-semibold text-text-primary">{formatDate(booking.check_in, shortDateFormatter)} - {formatDate(booking.check_out, shortDateFormatter)}</p>
-                        <p className="mt-1 text-xs text-text-secondary">{booking.total_nights} night{booking.total_nights === 1 ? '' : 's'} · {booking.guests} guest{booking.guests === 1 ? '' : 's'}</p>
+                        <p className="mt-1 text-xs text-text-secondary">{booking.total_nights} night{booking.total_nights === 1 ? '' : 's'}{booking.is_external ? '' : ` · ${booking.guests} guest${booking.guests === 1 ? '' : 's'}`}</p>
                       </div>
 
                       <div>
                         <p className="sr-only">Amount</p>
-                        <p className="font-bold text-text-primary">{formatMoney(booking.total_amount)}</p>
+                        <p className="font-bold text-text-primary">{booking.is_external ? '—' : formatMoney(booking.total_amount)}</p>
                       </div>
 
                       <div>

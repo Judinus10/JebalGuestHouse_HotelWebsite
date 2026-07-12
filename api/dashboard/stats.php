@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
 
@@ -89,24 +90,61 @@ function month_short_name(int $monthNumber): string
 
 function build_monthly_booking_trend(PDO $pdo): array
 {
-    $rows = fetch_all_rows(
+    $hotelRows = fetch_all_rows(
         $pdo,
-        "SELECT MONTH(created_at) AS month_number, COUNT(*) AS total
+        "SELECT YEAR(created_at) AS year_number, MONTH(created_at) AS month_number, COUNT(*) AS total
          FROM bookings
          WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
          GROUP BY YEAR(created_at), MONTH(created_at)
          ORDER BY YEAR(created_at), MONTH(created_at)"
     );
 
-    $data = [];
-    foreach ($rows as $row) {
-        $data[] = [
-            'month' => month_short_name((int) $row['month_number']),
-            'bookings' => (int) $row['total'],
+    $bookingComRows = fetch_all_rows(
+        $pdo,
+        "SELECT YEAR(created_at) AS year_number, MONTH(created_at) AS month_number, COUNT(*) AS total
+         FROM external_calendar_events
+         WHERE provider = 'booking.com'
+           AND is_active = 1
+           AND created_at >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+         GROUP BY YEAR(created_at), MONTH(created_at)
+         ORDER BY YEAR(created_at), MONTH(created_at)"
+    );
+
+    $months = [];
+    for ($offset = 5; $offset >= 0; $offset--) {
+        $date = new DateTimeImmutable('first day of this month');
+        $date = $date->modify('-' . $offset . ' months');
+        $key = $date->format('Y-m');
+        $months[$key] = [
+            'month' => $date->format('M'),
+            'hotelBookings' => 0,
+            'bookingComBookings' => 0,
+            'totalBookings' => 0,
         ];
     }
 
-    return $data;
+    foreach ($hotelRows as $row) {
+        $key = sprintf('%04d-%02d', (int) $row['year_number'], (int) $row['month_number']);
+        if (isset($months[$key])) {
+            $months[$key]['hotelBookings'] = (int) $row['total'];
+        }
+    }
+
+    foreach ($bookingComRows as $row) {
+        $key = sprintf('%04d-%02d', (int) $row['year_number'], (int) $row['month_number']);
+        if (isset($months[$key])) {
+            $months[$key]['bookingComBookings'] = (int) $row['total'];
+        }
+    }
+
+    foreach ($months as &$month) {
+        $month['totalBookings'] = $month['hotelBookings'] + $month['bookingComBookings'];
+        // Backward-compatible field for any existing export code.
+        $month['bookings'] = $month['totalBookings'];
+    }
+    unset($month);
+
+    return array_values($months);
 }
 
 function build_revenue_trend(PDO $pdo): array
@@ -333,6 +371,7 @@ function build_latest_messages(PDO $pdo): array
 
 try {
     $pdo = get_db_connection();
+    ensure_ics_schema($pdo);
 
     $totalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings");
     $pendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Pending'");

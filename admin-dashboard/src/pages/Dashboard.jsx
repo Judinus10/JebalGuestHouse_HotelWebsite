@@ -18,6 +18,9 @@ import {
 import {
   Area,
   AreaChart,
+  Legend,
+  Line,
+  LineChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -165,23 +168,28 @@ function normalizeDistribution(items = []) {
 
 function fillLastSixMonths(data = [], valueKey) {
   const now = new Date()
-
+  const isBookingTrend = valueKey === 'bookings'
   const months = []
 
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-
     months.push({
       month: d.toLocaleString('en-US', { month: 'short' }),
       [valueKey]: 0,
+      ...(isBookingTrend ? { totalBookings: 0, hotelBookings: 0, bookingComBookings: 0 } : {}),
     })
   }
 
   data.forEach((item) => {
     const existing = months.find((m) => m.month === item.month)
+    if (!existing) return
 
-    if (existing) {
-      existing[valueKey] = Number(item[valueKey] || 0)
+    existing[valueKey] = Number(item[valueKey] || 0)
+    if (isBookingTrend) {
+      existing.hotelBookings = Number(item.hotelBookings || 0)
+      existing.bookingComBookings = Number(item.bookingComBookings || 0)
+      existing.totalBookings = Number(item.totalBookings ?? (existing.hotelBookings + existing.bookingComBookings))
+      existing.bookings = existing.totalBookings
     }
   })
 
@@ -588,19 +596,16 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={monthlyBookingTrend}>
-                  <defs>
-                    <linearGradient id="bookingTrend" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563EB" stopOpacity={0.32} />
-                      <stop offset="95%" stopColor="#2563EB" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
+                <LineChart data={monthlyBookingTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
                   <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#64748B' }} />
                   <YAxis tick={{ fontSize: 12, fill: '#64748B' }} allowDecimals={false} />
                   <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '13px' }} />
-                  <Area type="monotone" dataKey="bookings" stroke="#2563EB" strokeWidth={2} fill="url(#bookingTrend)" />
-                </AreaChart>
+                  <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                  <Line type="monotone" dataKey="totalBookings" name="Total" stroke="#2563EB" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                  <Line type="monotone" dataKey="bookingComBookings" name="Booking.com" stroke="#7C3AED" strokeWidth={2} dot={{ r: 3 }} />
+                  <Line type="monotone" dataKey="hotelBookings" name="Hotel Website" stroke="#10B981" strokeWidth={2} dot={{ r: 3 }} />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
