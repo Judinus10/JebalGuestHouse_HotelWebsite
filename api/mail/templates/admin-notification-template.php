@@ -75,6 +75,8 @@ a{text-decoration:none;}
   .daily-table td{padding:9px 6px!important;font-size:9px!important;line-height:1.4!important;}
   .daily-desktop-time{display:none!important;}
   .daily-mobile-time{display:inline!important;}
+  .daily-desktop-label{display:none!important;}
+  .daily-mobile-label{display:inline!important;}
   .daily-total-cell{padding:10px 12px!important;font-size:12px!important;}
   .daily-summary-cell{padding:11px 12px!important;}
   .daily-summary-title{font-size:12px!important;}
@@ -230,7 +232,7 @@ function reminder_email_bookings_section(string $title, array $bookings, string 
         <th align="left" style="padding:10px 12px;color:#071230;font-size:11px;line-height:1.3;font-weight:800;">Guest Name</th>
         <th align="left" style="padding:10px 12px;color:#071230;font-size:11px;line-height:1.3;font-weight:800;">Room Type</th>
         <th align="left" class="daily-room-number" style="padding:10px 12px;color:#071230;font-size:11px;line-height:1.3;font-weight:800;">Room No.</th>
-        <th align="left" style="padding:10px 12px;color:#071230;font-size:11px;line-height:1.3;font-weight:800;">' . ($isCheckout ? 'Check-out Time' : 'Check-in Time') . '</th>'
+        <th align="left" style="padding:10px 12px;color:#071230;font-size:11px;line-height:1.3;font-weight:800;"><span class="daily-desktop-label">' . ($isCheckout ? 'Check-out Time' : 'Check-in Time') . '</span><span class="daily-mobile-label">Time</span></th>'
         . (!$isCheckout ? '<th align="center" style="padding:10px 12px;color:#071230;font-size:11px;line-height:1.3;font-weight:800;">Nights</th>' : '') .
       '</tr>' . $rows . '
     </table>';

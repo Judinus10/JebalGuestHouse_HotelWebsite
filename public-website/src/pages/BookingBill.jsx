@@ -829,7 +829,7 @@ export default function BookingBill() {
                 </div>
 
                 <div className="mt-10 border-t border-slate-200 py-7 print:hidden">
-                  <div className="grid gap-5 text-sm text-slate-600 sm:grid-cols-3">
+                  <div className="grid gap-5 text-sm text-slate-600 sm:grid-cols-3 justify-items-center items-center">
                     <div className="flex items-center gap-3"><Phone size={16} className="text-amber-700" /><span>{hotelPhone}</span></div>
                     <div className="flex items-center gap-3"><Mail size={16} className="text-amber-700" /><span className="break-all">{hotelEmail}</span></div>
                     <div className="flex items-center gap-3"><MapPin size={16} className="text-amber-700" /><span>Jaffna, Sri Lanka</span></div>

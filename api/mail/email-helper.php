@@ -1000,9 +1000,9 @@ function latest_booking_bill_url(PDO $pdo, int $bookingId): string
 
 function booking_email_html(string $state, array $booking, array $payment = [], bool $admin = false, string $extraButton = '', array $extraRows = [], string $customHeading = '', string $customMessage = '', string $customBadge = ''): string
 {
-    if (!$admin && in_array(strtolower($state), ['received', 'confirmed'], true)
+    if (!$admin && in_array(strtolower($state), ['received', 'confirmed', 'paid', 'pending', 'failed', 'expired', 'cancelled', 'updated'], true)
         && $customHeading === '' && $customMessage === '' && $customBadge === '') {
-        return customer_booking_confirmation_email_html($booking, email_public_url());
+        return customer_booking_email_html($booking, $state, $payment, email_public_url());
     }
 
     if ($admin && strtolower($state) === 'received'
@@ -1369,7 +1369,7 @@ function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, arra
     }
 
     if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
-        $bodyAdmin = booking_email_html('pending', $booking, $payment, true, $billButton, [
+        $bodyAdmin = admin_booking_email_html('pending', $booking, $payment, [
             'Order ID' => $orderId !== '' ? $orderId : '-',
         ]);
 
@@ -1418,7 +1418,7 @@ function send_booking_expired_emails_once(PDO $pdo, array $booking): void
     }
 
     if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
-        $bodyAdmin = booking_email_html('expired', $booking, [], true);
+        $bodyAdmin = admin_booking_email_html('expired', $booking);
 
         send_tracked_email(
             $pdo,
@@ -1446,7 +1446,7 @@ function send_booking_cancelled_emails(PDO $pdo, array $booking): void
 
     $sentCustomer = send_tracked_email($pdo, 'booking', $bookingId, (string) ($booking['email'] ?? ''), $subjectCustomer, $bodyCustomer, 'booking_cancelled');
 
-    $bodyAdmin = booking_email_html('cancelled', $booking, [], true);
+    $bodyAdmin = admin_booking_email_html('cancelled', $booking);
 
     send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Booking cancelled - Jebal Guest House #' . $bookingId, $bodyAdmin, 'admin_booking_cancelled');
 
@@ -1475,7 +1475,7 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
     }
 
     if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
-        $bodyAdmin = booking_email_html('paid', $booking, $payment, true);
+        $bodyAdmin = admin_booking_email_html('paid', $booking, $payment);
 
         send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Payment received - Jebal Guest House #' . $bookingId, $bodyAdmin, $adminType, $booking['email'] ?? null);
     }
@@ -1500,7 +1500,7 @@ function send_payment_failed_email(PDO $pdo, array $booking): void
     }
 
     if (!booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
-        $adminBody = booking_email_html('failed', $booking, [], true);
+        $adminBody = admin_booking_email_html('failed', $booking);
 
         send_tracked_email(
             $pdo,
@@ -1579,7 +1579,7 @@ function queue_booking_pending_emails(PDO $pdo, array $booking, array $payment =
     $adminEmail = booking_admin_email();
     $adminType = 'booking_payment_pending_admin';
     if ($adminEmail !== '' && !email_queue_job_exists($pdo, 'booking', $bookingId, $adminType, $adminEmail)) {
-        $adminBody = booking_email_html('pending', $booking, $payment, true, $billButton, [
+        $adminBody = admin_booking_email_html('pending', $booking, $payment, [
             'Order ID' => $orderId !== '' ? $orderId : '-',
         ]);
 
@@ -1674,7 +1674,7 @@ function queue_payment_success_emails(PDO $pdo, array $booking, array $payment):
 
     $adminEmail = booking_admin_email();
     if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, [$adminType])) {
-        $bodyAdmin = booking_email_html('paid', $booking, $payment, true);
+        $bodyAdmin = admin_booking_email_html('paid', $booking, $payment);
 
         if (enqueue_email(
             $pdo,
@@ -1735,7 +1735,7 @@ function queue_payment_failed_email(PDO $pdo, array $booking): int
 
     $adminEmail = booking_admin_email();
     if ($adminEmail !== '' && !booking_email_sent($pdo, $bookingId, ['admin_payment_failed'])) {
-        $adminBody = booking_email_html('failed', $booking, [], true);
+        $adminBody = admin_booking_email_html('failed', $booking);
 
         if (enqueue_email(
             $pdo,

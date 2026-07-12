@@ -141,7 +141,7 @@ function booking_email_info_box(string $title, string $icon, array $rows, string
     </td>';
 }
 
-function customer_booking_confirmation_email_html(array $booking, string $viewUrl = ''): string
+function customer_booking_email_html(array $booking, string $state = 'confirmed', array $payment = [], string $viewUrl = ''): string
 {
     $brand = email_brand_name();
     $guestName = trim((string) ($booking['full_name'] ?? $booking['guest_name'] ?? 'Guest'));
@@ -149,7 +149,7 @@ function customer_booking_confirmation_email_html(array $booking, string $viewUr
     $guestCount = (int) ($booking['guests'] ?? 0);
     $guests = $guestCount > 0 ? $guestCount . ($guestCount === 1 ? ' Guest' : ' Guests') : '-';
     $roomType = trim((string) ($booking['room_name'] ?? $booking['room_type'] ?? '-'));
-    $amount = format_money_amount((float) ($booking['amount'] ?? 0));
+    $amount = format_money_amount((float) ($payment['amount'] ?? $booking['amount'] ?? 0));
     $phone = email_contact_phone();
     $email = email_contact_email();
     $websiteUrl = email_public_url();
@@ -171,6 +171,75 @@ function customer_booking_confirmation_email_html(array $booking, string $viewUr
     if ($viewUrl === '') {
         $viewUrl = $websiteUrl;
     }
+
+    $stateKey = strtolower(trim($state));
+    $copyByState = [
+        'confirmed' => [
+            'subject' => 'Booking Confirmed',
+            'preheader' => 'Your booking has been confirmed. We look forward to welcoming you.',
+            'line1' => 'Thank you for choosing Jebal Guest House.',
+            'line2' => 'Your booking has been confirmed. We look forward to welcoming you!',
+            'info1' => 'You can modify or cancel your booking up to 24 hours before check-in.',
+            'info2' => 'If you have any questions, feel free to contact us.',
+        ],
+        'paid' => [
+            'subject' => 'Booking Confirmed',
+            'preheader' => 'Your booking and payment have been confirmed.',
+            'line1' => 'Thank you for choosing Jebal Guest House.',
+            'line2' => 'Your booking and payment have been confirmed. We look forward to welcoming you!',
+            'info1' => 'You can modify or cancel your booking up to 24 hours before check-in.',
+            'info2' => 'If you have any questions, feel free to contact us.',
+        ],
+        'pending' => [
+            'subject' => 'Booking Pending',
+            'preheader' => 'Your booking is waiting for payment confirmation.',
+            'line1' => 'Thank you for choosing Jebal Guest House.',
+            'line2' => 'We received your booking. It is currently waiting for payment confirmation.',
+            'info1' => 'Your room is not fully confirmed until the payment status is updated.',
+            'info2' => 'If you have already paid or need help, please contact us.',
+        ],
+        'received' => [
+            'subject' => 'Booking Received',
+            'preheader' => 'We received your booking details.',
+            'line1' => 'Thank you for choosing Jebal Guest House.',
+            'line2' => 'We received your booking details. Our team will contact you if anything else is required.',
+            'info1' => 'Please keep your booking ID for future reference.',
+            'info2' => 'If you have any questions, feel free to contact us.',
+        ],
+        'failed' => [
+            'subject' => 'Payment Failed',
+            'preheader' => 'Your payment could not be completed.',
+            'line1' => 'We could not complete the payment for your booking.',
+            'line2' => 'You can try again if the selected room is still available.',
+            'info1' => 'A failed payment does not confirm or reserve the booking.',
+            'info2' => 'Please contact us if money was deducted from your account.',
+        ],
+        'expired' => [
+            'subject' => 'Booking Expired',
+            'preheader' => 'Your booking hold has expired.',
+            'line1' => 'Your booking hold has expired.',
+            'line2' => 'The payment was not completed within the allowed time.',
+            'info1' => 'You may create a new booking if the room is still available.',
+            'info2' => 'Contact us if you need assistance.',
+        ],
+        'cancelled' => [
+            'subject' => 'Booking Cancelled',
+            'preheader' => 'Your booking has been cancelled.',
+            'line1' => 'Your booking has been cancelled.',
+            'line2' => 'Please contact us if this cancellation was unexpected.',
+            'info1' => 'Any eligible refund will follow the applicable booking and payment terms.',
+            'info2' => 'If you have any questions, feel free to contact us.',
+        ],
+        'updated' => [
+            'subject' => 'Booking Updated',
+            'preheader' => 'Your booking details have been updated.',
+            'line1' => 'Your booking details have been updated.',
+            'line2' => 'Please review the latest booking information below.',
+            'info1' => 'Keep your booking ID for future reference.',
+            'info2' => 'If any detail is incorrect, please contact us.',
+        ],
+    ];
+    $copy = $copyByState[$stateKey] ?? $copyByState['updated'];
 
     $details = [
         'Booking ID' => $bookingRef,
@@ -194,20 +263,20 @@ function customer_booking_confirmation_email_html(array $booking, string $viewUr
         $index++;
     }
 
-    $button = $viewUrl !== ''
-        ? '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" class="booking-customer-button-table" style="margin:24px auto 30px;">
-            <tr><td align="center" style="border-radius:4px;background:#071c50;">
-                <a href="' . email_safe($viewUrl) . '" class="booking-customer-button" style="display:inline-block;min-width:190px;padding:13px 26px;border-radius:4px;background:#071c50;color:#ffffff;font-size:14px;line-height:1.25;font-weight:800;text-align:center;text-decoration:none;">View Booking</a>
-            </td></tr>
-        </table>'
-        : '';
+    // $button = $viewUrl !== ''
+    //     ? '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" class="booking-customer-button-table" style="margin:24px auto 30px;">
+    //         <tr><td align="center" style="border-radius:4px;background:#071c50;">
+    //             <a href="' . email_safe($viewUrl) . '" class="booking-customer-button" style="display:inline-block;min-width:190px;padding:13px 26px;border-radius:4px;background:#071c50;color:#ffffff;font-size:14px;line-height:1.25;font-weight:800;text-align:center;text-decoration:none;">View Booking</a>
+    //         </td></tr>
+    //     </table>'
+    //     : '';
 
     return '<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Booking Confirmed - ' . email_safe($brand) . '</title>
+<title>' . email_safe($copy['subject']) . ' - ' . email_safe($brand) . '</title>
 <style>
 body{margin:0!important;padding:0!important;background:#ffffff!important;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}
 table{border-spacing:0;mso-table-lspace:0pt;mso-table-rspace:0pt;}
@@ -256,7 +325,7 @@ a{text-decoration:none;}
 </style>
 </head>
 <body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#071230;">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Your booking has been confirmed. We look forward to welcoming you.</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">' . email_safe($copy['preheader']) . '</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="booking-customer-outer" style="width:100%;background:#ffffff;padding:24px 12px;">
 <tr><td align="center">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="booking-customer-card" style="width:648px;max-width:648px;background:#ffffff;border:1px solid #dfe3ea;box-shadow:0 8px 26px rgba(15,28,55,.06);">
@@ -266,13 +335,13 @@ a{text-decoration:none;}
 <div class="booking-customer-brand" style="font-size:21px;line-height:1.25;font-weight:800;color:#071230;">' . email_safe($brand) . '</div>
 <div class="booking-customer-tagline" style="margin-top:7px;font-size:14px;line-height:1.4;color:#37415b;">A Clean and Comfortable Stay</div>
 </td>
-<td class="booking-customer-header-right" align="right" style="font-size:12px;"><a href="' . email_safe($websiteUrl) . '" style="color:#034fbd;">View in browser</a></td>
+<td class="booking-customer-header-right" align="right" style="font-size:12px;"></td>
 </tr></table>
 </td></tr>
 <tr><td style="padding:0 38px;"><div style="height:1px;background:#dfe3ea;font-size:0;line-height:0;">&nbsp;</div></td></tr>
 <tr><td class="booking-customer-main" style="padding:25px 38px 0;background:#ffffff;">
 <h1 class="booking-customer-greeting" style="margin:0 0 18px;color:#071230;font-size:17px;line-height:1.35;font-weight:800;">Hi ' . email_safe($guestName) . ',</h1>
-<p class="booking-customer-copy" style="margin:0;color:#071230;font-size:14px;line-height:1.55;">Thank you for choosing Jebal Guest House.<br>Your booking has been confirmed. We look forward to welcoming you!</p>
+<p class="booking-customer-copy" style="margin:0;color:#071230;font-size:14px;line-height:1.55;">' . email_safe($copy['line1']) . '<br>' . email_safe($copy['line2']) . '</p>
 <h2 class="booking-customer-title" style="margin:26px 0 14px;color:#071230;font-size:17px;line-height:1.3;font-weight:800;">Booking Details</h2>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border:1px solid #dfe3ea;border-radius:5px;border-collapse:separate;overflow:hidden;background:#ffffff;">' . $rows . '</table>
 
@@ -282,7 +351,7 @@ a{text-decoration:none;}
 <td class="booking-customer-info-icon" style="width:36px;vertical-align:top;"><div style="width:24px;height:24px;border-radius:50%;background:#1765bf;color:#ffffff;font-size:15px;line-height:24px;text-align:center;font-weight:800;">i</div></td>
 <td>
 <div class="booking-customer-info-title" style="color:#071230;font-size:14px;line-height:1.35;font-weight:800;">Important Information</div>
-<div class="booking-customer-info-copy" style="margin-top:5px;color:#071230;font-size:14px;line-height:1.55;">You can modify or cancel your booking up to 24 hours before check-in.<br>If you have any questions, feel free to contact us.</div>
+<div class="booking-customer-info-copy" style="margin-top:5px;color:#071230;font-size:14px;line-height:1.55;">' . email_safe($copy['info1']) . '<br>' . email_safe($copy['info2']) . '</div>
 </td>
 </tr></table>
 </td></tr>
@@ -305,3 +374,9 @@ a{text-decoration:none;}
 </html>';
 }
 
+
+
+function customer_booking_confirmation_email_html(array $booking, string $viewUrl = ''): string
+{
+    return customer_booking_email_html($booking, 'confirmed', [], $viewUrl);
+}
