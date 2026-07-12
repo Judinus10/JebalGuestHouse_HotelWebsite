@@ -211,6 +211,7 @@ export default function BookingBill() {
   const [pdfBusy, setPdfBusy] = useState(false)
   const [retryBusy, setRetryBusy] = useState(false)
   const [secondsRemaining, setSecondsRemaining] = useState(0)
+  const [openMobileSection, setOpenMobileSection] = useState('')
 
   const statusUrl = useMemo(() => {
     const params = new URLSearchParams({ booking_id: bookingId, order_id: orderId, token })
@@ -665,15 +666,35 @@ export default function BookingBill() {
     </div>
   )
 
-  const MobileAccordion = ({ icon: Icon, title }) => (
-    <div className="flex items-center justify-between rounded-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
-      <div className="flex items-center gap-3">
-        <Icon size={16} className="text-amber-700" />
-        <span className="font-serif text-sm font-semibold text-slate-900">{title}</span>
+  const MobileAccordion = ({ icon: Icon, title, sectionId, children }) => {
+    const isOpen = openMobileSection === sectionId
+
+    return (
+      <div className="overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+        <button
+          type="button"
+          aria-expanded={isOpen}
+          aria-controls={`mobile-${sectionId}-content`}
+          onClick={() => setOpenMobileSection((current) => current === sectionId ? '' : sectionId)}
+          className="flex w-full items-center justify-between bg-white px-4 py-3 text-left"
+        >
+          <div className="flex items-center gap-3">
+            <Icon size={16} className="text-amber-700" />
+            <span className="font-serif text-sm font-semibold text-slate-900">{title}</span>
+          </div>
+          <ChevronDown
+            size={15}
+            className={`text-slate-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        {isOpen && (
+          <div id={`mobile-${sectionId}-content`} className="border-t border-slate-200 px-4 py-4">
+            {children}
+          </div>
+        )}
       </div>
-      <ChevronDown size={15} className="text-slate-500" />
-    </div>
-  )
+    )
+  }
 
   return (
     <PageTransition>
@@ -784,9 +805,40 @@ export default function BookingBill() {
                 </div>
 
                 <div className="mt-5 space-y-3 md:hidden">
-                  <MobileAccordion icon={UserRound} title="Guest Information" />
-                  <MobileAccordion icon={CalendarDays} title="Stay Information" />
-                  <MobileAccordion icon={FileText} title="Price Breakdown" />
+                  <MobileAccordion icon={UserRound} title="Guest Information" sectionId="guest">
+                    <div className="space-y-5">
+                      <DetailBlock label="Guest Name" value={bill.full_name} />
+                      <DetailBlock label="Email" value={bill.email} />
+                      <DetailBlock label="Phone" value={bill.phone} />
+                    </div>
+                  </MobileAccordion>
+
+                  <MobileAccordion icon={CalendarDays} title="Stay Information" sectionId="stay">
+                    <div className="space-y-5">
+                      <DetailBlock label="Check-in" value={bill.check_in_date} />
+                      <DetailBlock label="Check-out" value={bill.check_out_date} />
+                      <DetailBlock label="Nights" value={`${nights} Night${nights === 1 ? '' : 's'}`} />
+                      <DetailBlock label="Guests" value={`${bill.guests || 1} Guest${Number(bill.guests || 1) === 1 ? '' : 's'}`} />
+                      <DetailBlock label="Room Type" value={bill.room_name} />
+                    </div>
+                  </MobileAccordion>
+
+                  <MobileAccordion icon={FileText} title="Price Breakdown" sectionId="price">
+                    <div className="grid grid-cols-[1fr_auto] border-b border-slate-200 pb-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                      <span>Description</span><span>Amount ({bill.currency || 'LKR'})</span>
+                    </div>
+                    <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-200 py-5 text-sm">
+                      <div>
+                        <p className="font-semibold text-slate-900">{bill.room_name} ({nights} Night{nights === 1 ? '' : 's'})</p>
+                        <p className="mt-1 text-xs text-slate-500">{stayDateRange(bill.check_in_date, bill.check_out_date)}</p>
+                      </div>
+                      <p className="font-semibold text-slate-950">{Number(roomTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="mt-5 flex items-center justify-between rounded-md border border-amber-100 bg-amber-50 px-4 py-4">
+                      <span className="font-bold text-slate-900">TOTAL AMOUNT</span>
+                      <span className="font-bold text-amber-800">{formatMoney(roomTotal, bill.currency)}</span>
+                    </div>
+                  </MobileAccordion>
                 </div>
 
                 <div className="mt-5 grid gap-5 md:grid-cols-2">
