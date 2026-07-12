@@ -9,6 +9,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 
@@ -180,7 +181,11 @@ try {
         ':requested_check_out' => $checkOutDate,
     ]);
 
-    if ($conflict->fetch()) {
+    $roomIdStmt = $pdo->prepare('SELECT id FROM rooms WHERE room_name = :room_name LIMIT 1');
+    $roomIdStmt->execute([':room_name' => $roomName]);
+    $roomId = (int) ($roomIdStmt->fetchColumn() ?: 0);
+
+    if ($conflict->fetch() || ($roomId > 0 && ics_room_conflict($pdo, $roomId, $checkInDate, $checkOutDate))) {
         $pdo->rollBack();
         json_response(false, 'Sorry, this room is no longer available for the selected dates.', 409, ['available' => false]);
     }

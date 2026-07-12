@@ -2,6 +2,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
 
@@ -67,9 +68,11 @@ try {
          ORDER BY b.created_at DESC"
     );
 
-    json_response(true, 'Bookings loaded successfully.', 200, [
-        'data' => $stmt->fetchAll(),
-    ]);
+    $data = $stmt->fetchAll();
+    ensure_ics_schema($pdo);
+    $external = $pdo->query("SELECT e.id, CONCAT('BC-', LPAD(e.id,5,'0')) booking_no, 'Booking.com reservation' guest_name, '' guest_email, '' guest_phone, '' booker_name, '' booker_email, '' booker_phone, 0 is_booking_for_other, NULL staying_guest_name, NULL staying_guest_email, NULL staying_guest_phone, NULL staying_guest_note, r.id room_id, r.room_name, 'External' room_type, CONCAT('R',LPAD(r.id,2,'0')) room_code, 'Guest House' property_type, e.start_date check_in_date, e.end_date check_out_date, e.start_date check_in, e.end_date check_out, 0 guests, 0 adults, 0 children, GREATEST(1,DATEDIFF(e.end_date,e.start_date)) total_nights, '' special_requests, '' special_request, 'external' booking_status, 'External' payment_status, 0 total_amount, 'LKR' payment_currency, NULL invoice_number, NULL invoice_file_path, 'N/A' email_status, e.created_at, e.updated_at, 'booking.com' source, s.last_sync_status sync_status, s.last_sync_completed_at last_synced_at FROM external_calendar_events e JOIN rooms r ON r.id=e.room_id LEFT JOIN external_calendar_sync_status s ON s.room_id=e.room_id WHERE e.is_active=1 ORDER BY e.start_date")->fetchAll();
+    $data = array_merge($data, $external);
+    json_response(true, 'Bookings loaded successfully.', 200, ['data' => $data]);
 } catch (Throwable $e) {
     error_log('Admin bookings list error: ' . $e->getMessage());
     json_response(false, 'Unable to load bookings.', 500);

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/bookings/booking-expiry-helper.php';
+require_once __DIR__ . '/calendar/ics-helper.php';
 
 apply_cors_headers();
 
@@ -45,6 +46,7 @@ try {
         }
 
         $roomName = (string) $room['room_name'];
+        $roomId = (int) $roomId;
     }
 
     $stmt = $pdo->prepare(
@@ -63,6 +65,10 @@ try {
         ':requested_check_out' => $availabilityCheckOutDate,
     ]);
     $conflict = $stmt->fetch();
+
+    if (!$conflict && $roomId > 0 && ics_room_conflict($pdo, $roomId, $checkInDate, $availabilityCheckOutDate)) {
+        $conflict = ['source' => 'external'];
+    }
 
     json_response(true, $conflict ? 'Room is unavailable for the selected dates.' : 'Room is available.', 200, [
         'available' => !$conflict,

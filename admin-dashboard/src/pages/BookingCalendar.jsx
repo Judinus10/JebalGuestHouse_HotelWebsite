@@ -17,6 +17,7 @@ const statusStyles = {
   cancelled: 'bg-red-100 text-red-900 border-red-300 hover:bg-red-200',
   canceled: 'bg-red-100 text-red-900 border-red-300 hover:bg-red-200',
   no_show: 'bg-purple-100 text-purple-900 border-purple-300 hover:bg-purple-200',
+  external: 'bg-indigo-100 text-indigo-900 border-indigo-300 hover:bg-indigo-200',
 }
 
 const statusDotStyles = {
@@ -27,6 +28,7 @@ const statusDotStyles = {
   cancelled: 'bg-red-500',
   canceled: 'bg-red-500',
   no_show: 'bg-purple-500',
+  external: 'bg-indigo-500',
 }
 
 const statusLegendItems = [
@@ -36,6 +38,7 @@ const statusLegendItems = [
   { key: 'checked_out', label: 'Checked Out', description: 'Guest has completed the stay.' },
   { key: 'cancelled', label: 'Cancelled', description: 'Booking was cancelled and should not be treated as active.' },
   { key: 'no_show', label: 'No Show', description: 'Guest did not arrive for the booking.' },
+  { key: 'external', label: 'Booking.com', description: 'Read-only block imported from Booking.com.' },
 ]
 
 const statusVariant = {
@@ -279,9 +282,9 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
       >
         <div className="flex items-start justify-between border-b border-slate-200 p-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Booking Details</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{booking.is_external ? 'External Calendar Block' : 'Booking Details'}</p>
             <h2 className="mt-1 text-xl font-bold text-slate-950">{booking.booking_no}</h2>
-            <p className="text-sm text-slate-500">{booking.guest_name} · {booking.room_name}</p>
+            <p className="text-sm text-slate-500">{booking.is_external ? `Booking.com · ${booking.room_code}` : `${booking.guest_name} · ${booking.room_name}`}</p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
@@ -289,55 +292,52 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
         </div>
 
         <div className="grid gap-5 p-6 md:grid-cols-2">
-          <div className="rounded-xl border border-slate-200 p-4">
-            <h3 className="text-sm font-bold text-slate-950">Guest & Stay</h3>
-            <div className="mt-3 space-y-2 text-sm text-slate-700">
-              <p><span className="font-semibold text-slate-500">Guest:</span> {booking.guest_name}</p>
-              <p><span className="font-semibold text-slate-500">Phone:</span> {booking.guest_phone}</p>
-              <p><span className="font-semibold text-slate-500">Adults:</span> {booking.adults}</p>
-              <p><span className="font-semibold text-slate-500">Children:</span> {booking.children}</p>
-              <p><span className="font-semibold text-slate-500">Check-in:</span> {formatDate(booking.check_in)}</p>
-              <p><span className="font-semibold text-slate-500">Check-out:</span> {formatDate(booking.check_out)}</p>
-              <p><span className="font-semibold text-slate-500">Total nights:</span> {booking.total_nights}</p>
-            </div>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 p-4">
-            <h3 className="text-sm font-bold text-slate-950">Room & Payment</h3>
-            <div className="mt-3 space-y-2 text-sm text-slate-700">
-              <p><span className="font-semibold text-slate-500">Room:</span> {booking.room_name}</p>
-              <p><span className="font-semibold text-slate-500">Room code:</span> {booking.room_code}</p>
-              <p><span className="font-semibold text-slate-500">Property type:</span> {booking.property_type}</p>
-              <p><span className="font-semibold text-slate-500">Amount:</span> {currencyFormatter.format(booking.total_amount)}</p>
-              <div><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>
-              <div><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
-            </div>
-          </div>
-
-          {booking.special_request && (
-            <div className="rounded-xl border border-slate-200 p-4 md:col-span-2">
-              <h3 className="text-sm font-bold text-slate-950">Special Request</h3>
-              <p className="mt-2 text-sm text-slate-700">{booking.special_request}</p>
-            </div>
+          {booking.is_external ? (
+            <>
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 md:col-span-2">
+                <h3 className="text-sm font-bold text-indigo-950">Booking.com Block</h3>
+                <div className="mt-3 space-y-2 text-sm text-slate-700">
+                  <p><span className="font-semibold text-slate-500">Source:</span> Booking.com</p>
+                  <p><span className="font-semibold text-slate-500">Room:</span> {booking.room_name} ({booking.room_code})</p>
+                  <p><span className="font-semibold text-slate-500">Check-in:</span> {formatDate(booking.check_in)}</p>
+                  <p><span className="font-semibold text-slate-500">Check-out:</span> {formatDate(booking.check_out)}</p>
+                  <p><span className="font-semibold text-slate-500">Sync status:</span> {normalizeStatus(booking.sync_status || 'success')}</p>
+                  {booking.last_synced_at && <p><span className="font-semibold text-slate-500">Last synchronized:</span> {booking.last_synced_at}</p>}
+                </div>
+                <p className="mt-3 text-xs font-semibold text-indigo-800">This imported block is read-only.</p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="rounded-xl border border-slate-200 p-4">
+                <h3 className="text-sm font-bold text-slate-950">Guest & Stay</h3>
+                <div className="mt-3 space-y-2 text-sm text-slate-700">
+                  <p><span className="font-semibold text-slate-500">Guest:</span> {booking.guest_name}</p>
+                  <p><span className="font-semibold text-slate-500">Phone:</span> {booking.guest_phone}</p>
+                  <p><span className="font-semibold text-slate-500">Check-in:</span> {formatDate(booking.check_in)}</p>
+                  <p><span className="font-semibold text-slate-500">Check-out:</span> {formatDate(booking.check_out)}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-4">
+                <h3 className="text-sm font-bold text-slate-950">Room & Payment</h3>
+                <div className="mt-3 space-y-2 text-sm text-slate-700">
+                  <p><span className="font-semibold text-slate-500">Room:</span> {booking.room_name}</p>
+                  <p><span className="font-semibold text-slate-500">Amount:</span> {currencyFormatter.format(booking.total_amount)}</p>
+                  <div><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>
+                  <div><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
+                </div>
+              </div>
+              <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
+                <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'confirmed')}>Confirm booking</Button>
+                  <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'cancelled')}>Cancel booking</Button>
+                  <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_in')}>Mark checked in</Button>
+                  <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_out')}>Mark checked out</Button>
+                </div>
+              </div>
+            </>
           )}
-
-          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
-            <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'confirmed')}>
-                Confirm booking
-              </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'cancelled')}>
-                Cancel booking
-              </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_in')}>
-                Mark checked in
-              </Button>
-              <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_out')}>
-                Mark checked out
-              </Button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -516,7 +516,7 @@ export default function BookingCalendar() {
                           top: `${segment.laneIndex * 31}px`,
                         }}
                       >
-                        <span className="truncate">{booking.guest_name} · {booking.room_code}</span>
+                        <span className="truncate">{booking.is_external ? `Booking.com · ${booking.room_code}` : `${booking.guest_name} · ${booking.room_code}`}</span>
                       </button>
                     )
                   })}

@@ -118,6 +118,10 @@ export function normalizeBooking(booking) {
     email_status: booking.email_status || 'Pending',
     created_at: booking.created_at || booking.createdAt || booking.booking_date || booking.date || '',
     updated_at: booking.updated_at || booking.updatedAt || booking.modified_at || '',
+    source: booking.source || 'website',
+    sync_status: booking.sync_status || '',
+    last_synced_at: booking.last_synced_at || '',
+    is_external: String(booking.source || '').toLowerCase() === 'booking.com',
   }
 }
 
