@@ -213,9 +213,9 @@ body{margin:0!important;padding:0!important;background:#ffffff!important;-webkit
 table{border-spacing:0;mso-table-lspace:0pt;mso-table-rspace:0pt;}
 img{border:0;display:inline-block;outline:none;text-decoration:none;-ms-interpolation-mode:bicubic;}
 a{text-decoration:none;}
-.booking-customer-card{width:680px;max-width:680px;}
-.booking-customer-header{padding:25px 38px 18px;}
-.booking-customer-main{padding:24px 38px 0;}
+.booking-customer-card{width:648px;max-width:648px;}
+.booking-customer-header{padding:24px 38px 18px;}
+.booking-customer-main{padding:25px 38px 0;}
 .booking-customer-help-items td{white-space:nowrap;}
 .booking-customer-footer{padding:25px 20px;}
 
@@ -229,26 +229,26 @@ a{text-decoration:none;}
 @media only screen and (max-width:520px){
   .booking-customer-outer{padding:0!important;}
   .booking-customer-card{border-left:0!important;border-right:0!important;}
-  .booking-customer-header{padding:22px 20px 17px!important;text-align:center!important;}
-  .booking-customer-header-left,.booking-customer-header-right{display:block!important;width:100%!important;text-align:center!important;}
+  .booking-customer-header{padding:22px 20px 17px!important;text-align:left!important;}
+  .booking-customer-header-left{display:block!important;width:100%!important;text-align:left!important;}
   .booking-customer-header-right{display:none!important;}
   .booking-customer-brand{font-size:20px!important;}
   .booking-customer-tagline{font-size:13px!important;margin-top:8px!important;}
-  .booking-customer-main{padding:18px 20px 0!important;}
+  .booking-customer-main{padding:21px 20px 0!important;}
   .booking-customer-greeting{font-size:16px!important;}
   .booking-customer-copy{font-size:13px!important;line-height:1.5!important;}
-  .booking-customer-title{font-size:16px!important;margin-top:24px!important;}
-  .booking-customer-label{width:48%!important;padding:11px 12px!important;font-size:13px!important;}
+  .booking-customer-title{font-size:16px!important;margin-top:22px!important;margin-bottom:12px!important;}
+  .booking-customer-label{width:52%!important;padding:10px 12px!important;font-size:13px!important;}
   .booking-customer-colon{display:none!important;width:0!important;padding:0!important;font-size:0!important;}
-  .booking-customer-value{width:52%!important;padding:11px 12px!important;font-size:13px!important;text-align:left!important;}
-  .booking-customer-info-cell{padding:11px 12px!important;}
+  .booking-customer-value{width:48%!important;padding:10px 12px!important;font-size:13px!important;text-align:left!important;}
+  .booking-customer-info-cell{padding:12px 10px!important;}
   .booking-customer-info-icon{width:29px!important;vertical-align:top!important;}
   .booking-customer-info-title{font-size:14px!important;}
   .booking-customer-info-copy{font-size:13px!important;line-height:1.5!important;}
-  .booking-customer-button-table{width:100%!important;margin:12px auto 20px!important;}
+  .booking-customer-button-table{width:100%!important;margin:10px auto 20px!important;}
   .booking-customer-button-table td{width:100%!important;}
   .booking-customer-button{display:block!important;min-width:0!important;width:auto!important;padding:11px 14px!important;font-size:13px!important;}
-  .booking-customer-help{padding:18px 0 20px!important;}
+  .booking-customer-help{padding:16px 0 20px!important;}
   .booking-customer-help-title{font-size:14px!important;}
   .booking-customer-help-items td{font-size:13px!important;}
   .booking-customer-footer{padding:18px 20px!important;font-size:12px!important;line-height:1.6!important;}
@@ -259,8 +259,8 @@ a{text-decoration:none;}
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">Your booking has been confirmed. We look forward to welcoming you.</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="booking-customer-outer" style="width:100%;background:#ffffff;padding:24px 12px;">
 <tr><td align="center">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="booking-customer-card" style="width:680px;max-width:680px;background:#ffffff;border:1px solid #dfe3ea;box-shadow:0 8px 26px rgba(15,28,55,.06);">
-<tr><td class="booking-customer-header" style="padding:25px 38px 18px;background:#ffffff;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="booking-customer-card" style="width:648px;max-width:648px;background:#ffffff;border:1px solid #dfe3ea;box-shadow:0 8px 26px rgba(15,28,55,.06);">
+<tr><td class="booking-customer-header" style="padding:24px 38px 18px;background:#ffffff;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
 <td class="booking-customer-header-left" align="left">
 <div class="booking-customer-brand" style="font-size:21px;line-height:1.25;font-weight:800;color:#071230;">' . email_safe($brand) . '</div>
@@ -270,7 +270,7 @@ a{text-decoration:none;}
 </tr></table>
 </td></tr>
 <tr><td style="padding:0 38px;"><div style="height:1px;background:#dfe3ea;font-size:0;line-height:0;">&nbsp;</div></td></tr>
-<tr><td class="booking-customer-main" style="padding:24px 38px 0;background:#ffffff;">
+<tr><td class="booking-customer-main" style="padding:25px 38px 0;background:#ffffff;">
 <h1 class="booking-customer-greeting" style="margin:0 0 18px;color:#071230;font-size:17px;line-height:1.35;font-weight:800;">Hi ' . email_safe($guestName) . ',</h1>
 <p class="booking-customer-copy" style="margin:0;color:#071230;font-size:14px;line-height:1.55;">Thank you for choosing Jebal Guest House.<br>Your booking has been confirmed. We look forward to welcoming you!</p>
 <h2 class="booking-customer-title" style="margin:26px 0 14px;color:#071230;font-size:17px;line-height:1.3;font-weight:800;">Booking Details</h2>
