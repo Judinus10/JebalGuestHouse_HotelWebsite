@@ -314,7 +314,7 @@ function contact_customer_email_html(string $name, string $email, string $phone,
         <div class="contact-brand-subtitle" style="margin-top:7px;font-size:14px;line-height:1.4;color:#37415b;">A Clean and Comfortable Stay</div>
       </td>
       <td class="contact-header-right" align="right" style="vertical-align:middle;font-size:12px;line-height:1.4;">
-        <a href="' . email_safe($websiteUrl) . '" style="color:#034fbd;text-decoration:none;">View in browser</a>
+        
       </td>
     </tr>
   </table>
