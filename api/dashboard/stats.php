@@ -187,24 +187,13 @@ function build_booking_status_distribution(PDO $pdo): array
         }
     }
 
-    // Active Booking.com calendar events behave as pending external bookings.
-    // Events removed/cancelled by Booking.com are deactivated by the next sync
-    // and are therefore shown under Cancelled.
     $counts['Pending'] += (int) fetch_single_value(
         $pdo,
-        "SELECT COUNT(*)
-         FROM external_calendar_events
-         WHERE provider = 'booking.com'
-           AND is_active = 1
-           AND UPPER(COALESCE(status, 'CONFIRMED')) <> 'CANCELLED'"
+        "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND is_active = 1 AND UPPER(COALESCE(status, '')) NOT IN ('CANCELLED', 'CANCELED')"
     );
-
     $counts['Cancelled'] += (int) fetch_single_value(
         $pdo,
-        "SELECT COUNT(*)
-         FROM external_calendar_events
-         WHERE provider = 'booking.com'
-           AND (is_active = 0 OR UPPER(COALESCE(status, '')) = 'CANCELLED')"
+        "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND (is_active = 0 OR UPPER(COALESCE(status, '')) IN ('CANCELLED', 'CANCELED'))"
     );
 
     $total = array_sum($counts);
@@ -393,38 +382,15 @@ try {
     $pdo = get_db_connection();
     ensure_ics_schema($pdo);
 
-    $internalTotalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings");
-    $internalPendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Pending'");
+    $websiteTotalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings");
+    $bookingComTotalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com'");
+    $bookingComActiveBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND is_active = 1 AND UPPER(COALESCE(status, '')) NOT IN ('CANCELLED', 'CANCELED')");
+    $bookingComCancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND (is_active = 0 OR UPPER(COALESCE(status, '')) IN ('CANCELLED', 'CANCELED'))");
+
+    $totalBookings = $websiteTotalBookings + $bookingComTotalBookings;
+    $pendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Pending'") + $bookingComActiveBookings;
     $confirmedBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Confirmed'");
-    $internalCancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Cancelled'");
-
-    $bookingComTotalBookings = (int) fetch_single_value(
-        $pdo,
-        "SELECT COUNT(*)
-         FROM external_calendar_events
-         WHERE provider = 'booking.com'"
-    );
-
-    $bookingComPendingBookings = (int) fetch_single_value(
-        $pdo,
-        "SELECT COUNT(*)
-         FROM external_calendar_events
-         WHERE provider = 'booking.com'
-           AND is_active = 1
-           AND UPPER(COALESCE(status, 'CONFIRMED')) <> 'CANCELLED'"
-    );
-
-    $bookingComCancelledBookings = (int) fetch_single_value(
-        $pdo,
-        "SELECT COUNT(*)
-         FROM external_calendar_events
-         WHERE provider = 'booking.com'
-           AND (is_active = 0 OR UPPER(COALESCE(status, '')) = 'CANCELLED')"
-    );
-
-    $totalBookings = $internalTotalBookings + $bookingComTotalBookings;
-    $pendingBookings = $internalPendingBookings + $bookingComPendingBookings;
-    $cancelledBookings = $internalCancelledBookings + $bookingComCancelledBookings;
+    $cancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Cancelled'") + $bookingComCancelledBookings;
 
     $totalEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries");
     $newEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries WHERE status = 'New'");

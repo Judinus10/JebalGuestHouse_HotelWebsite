@@ -8,14 +8,17 @@ export const paymentStatusOptions = ['pending', 'paid', 'cancelled', 'refunded',
 export const paymentMethodOptions = ['PayHere', 'Cash', 'Bank Transfer']
 
 function normalizeBookingStatus(status, isExternal = false) {
-  if (isExternal) return 'external'
-
   const value = String(status || 'pending')
     .trim()
     .toLowerCase()
     .replace(/^booking\s+/, '')
     .replace(/^payment\s+/, '')
     .replace(/\s+/g, '_')
+
+  if (isExternal) {
+    if (value === 'cancelled' || value === 'canceled') return 'cancelled'
+    return 'external'
+  }
 
   if (value === 'confirmed') return 'confirmed'
   if (value === 'checked_in' || value === 'check_in' || value === 'checkedin') return 'checked_in'

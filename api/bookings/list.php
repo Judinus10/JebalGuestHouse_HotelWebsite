@@ -70,8 +70,29 @@ try {
 
     $data = $stmt->fetchAll();
     ensure_ics_schema($pdo);
-    $external = $pdo->query("SELECT e.id, CONCAT('BC-', LPAD(e.id,5,'0')) booking_no, 'Booking.com reservation' guest_name, '' guest_email, '' guest_phone, '' booker_name, '' booker_email, '' booker_phone, 0 is_booking_for_other, NULL staying_guest_name, NULL staying_guest_email, NULL staying_guest_phone, NULL staying_guest_note, r.id room_id, r.room_name, 'External' room_type, CONCAT('R',LPAD(r.id,2,'0')) room_code, 'Guest House' property_type, e.start_date check_in_date, e.end_date check_out_date, e.start_date check_in, e.end_date check_out, 0 guests, 0 adults, 0 children, GREATEST(1,DATEDIFF(e.end_date,e.start_date)) total_nights, '' special_requests, '' special_request, 'external' booking_status, 'External' payment_status, 0 total_amount, 'LKR' payment_currency, NULL invoice_number, NULL invoice_file_path, 'N/A' email_status, e.created_at, e.updated_at, 'booking.com' source, s.last_sync_status sync_status, s.last_sync_completed_at last_synced_at FROM external_calendar_events e JOIN rooms r ON r.id=e.room_id LEFT JOIN external_calendar_sync_status s ON s.room_id=e.room_id WHERE e.is_active=1 ORDER BY e.start_date")->fetchAll();
+    $external = $pdo->query("SELECT e.id, CONCAT('BC-', LPAD(e.id,5,'0')) booking_no, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'Booking.com cancelled reservation' ELSE 'Booking.com reservation' END guest_name, '' guest_email, '' guest_phone, '' booker_name, '' booker_email, '' booker_phone, 0 is_booking_for_other, NULL staying_guest_name, NULL staying_guest_email, NULL staying_guest_phone, NULL staying_guest_note, r.id room_id, r.room_name, 'External' room_type, CONCAT('R',LPAD(r.id,2,'0')) room_code, 'Guest House' property_type, e.start_date check_in_date, e.end_date check_out_date, e.start_date check_in, e.end_date check_out, 0 guests, 0 adults, 0 children, GREATEST(1,DATEDIFF(e.end_date,e.start_date)) total_nights, '' special_requests, '' special_request, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'cancelled' ELSE 'external' END booking_status, 'External' payment_status, 0 total_amount, 'LKR' payment_currency, NULL invoice_number, NULL invoice_file_path, 'N/A' email_status, e.created_at, e.updated_at, 'booking.com' source, s.last_sync_status sync_status, s.last_sync_completed_at last_synced_at, e.is_active external_is_active, e.status external_status FROM external_calendar_events e JOIN rooms r ON r.id=e.room_id LEFT JOIN external_calendar_sync_status s ON s.room_id=e.room_id ORDER BY e.start_date DESC, e.created_at DESC")->fetchAll();
+    // Merge website and Booking.com records first, then apply one shared
+    // newest-first order. Sorting each source separately before appending
+    // forces every external booking to the bottom of the list.
     $data = array_merge($data, $external);
+
+    usort($data, static function (array $left, array $right): int {
+        $leftCreatedAt = strtotime((string) ($left['created_at'] ?? '')) ?: 0;
+        $rightCreatedAt = strtotime((string) ($right['created_at'] ?? '')) ?: 0;
+
+        if ($leftCreatedAt !== $rightCreatedAt) {
+            return $rightCreatedAt <=> $leftCreatedAt;
+        }
+
+        // Keep the result deterministic when two records have the same
+        // creation/import timestamp. The numeric part of the booking number
+        // is used as a stable newest-first fallback.
+        $leftNumber = (int) preg_replace('/\D+/', '', (string) ($left['booking_no'] ?? '0'));
+        $rightNumber = (int) preg_replace('/\D+/', '', (string) ($right['booking_no'] ?? '0'));
+
+        return $rightNumber <=> $leftNumber;
+    });
+
     json_response(true, 'Bookings loaded successfully.', 200, ['data' => $data]);
 } catch (Throwable $e) {
     error_log('Admin bookings list error: ' . $e->getMessage());
