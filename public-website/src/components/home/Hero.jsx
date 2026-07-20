@@ -1,37 +1,122 @@
-import { useRef } from 'react'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  AnimatePresence,
+  motion,
+  useReducedMotion,
+  useScroll,
+  useTransform,
+} from 'framer-motion'
+import hero01 from '../../assets/images/home/jebal-hero-01.jpg'
+import hero02 from '../../assets/images/home/jebal-hero-02.jpg'
+import hero03 from '../../assets/images/home/jebal-hero-03.jpg'
+
+const slides = [
+  { src: hero01, alt: 'Luxury guest house exterior at dusk' },
+  { src: hero02, alt: 'Luxury swimming pool and relaxation area' },
+  { src: hero03, alt: 'Tropical guest house pool and garden' },
+]
+
+const AUTOPLAY_DELAY = 6500
+const SWIPE_DISTANCE = 45
 
 /**
- * Full-width hero with parallax image effect.
+ * Jebal home hero with a smooth, automatic crossfade slideshow.
+ * The copy stays fixed while only the background scene changes.
  */
 export default function Hero() {
-  const ref = useRef(null)
+  const sectionRef = useRef(null)
+  const touchStartX = useRef(null)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [isPageVisible, setIsPageVisible] = useState(true)
+  const reduceMotion = useReducedMotion()
+
   const { scrollYProgress } = useScroll({
-    target: ref,
+    target: sectionRef,
     offset: ['start start', 'end start'],
   })
 
-  const y = useTransform(scrollYProgress, [0, 1], ['0%', '30%'])
-  const opacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
+  const backgroundY = useTransform(scrollYProgress, [0, 1], ['0%', '22%'])
+  const contentOpacity = useTransform(scrollYProgress, [0, 0.8], [1, 0])
+
+  const showNext = useCallback(() => {
+    setActiveIndex((current) => (current + 1) % slides.length)
+  }, [])
+
+  const showPrevious = useCallback(() => {
+    setActiveIndex((current) => (current - 1 + slides.length) % slides.length)
+  }, [])
+
+  useEffect(() => {
+    slides.forEach(({ src }) => {
+      const image = new Image()
+      image.src = src
+    })
+  }, [])
+
+  useEffect(() => {
+    const handleVisibilityChange = () => setIsPageVisible(!document.hidden)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
+  useEffect(() => {
+    if (!isPageVisible) return undefined
+    const timer = window.setInterval(showNext, AUTOPLAY_DELAY)
+    return () => window.clearInterval(timer)
+  }, [isPageVisible, showNext])
+
+  const handleTouchStart = (event) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null
+  }
+
+  const handleTouchEnd = (event) => {
+    if (touchStartX.current === null) return
+    const endX = event.changedTouches[0]?.clientX ?? touchStartX.current
+    const distance = endX - touchStartX.current
+    touchStartX.current = null
+
+    if (Math.abs(distance) < SWIPE_DISTANCE) return
+    if (distance < 0) showNext()
+    else showPrevious()
+  }
 
   return (
-    <section ref={ref} className="relative h-[85vh] min-h-[500px] overflow-hidden md:h-[90vh]">
-      {/* Parallax background image */}
-      <motion.div style={{ y }} className="absolute inset-0">
-        <img
-          src="https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1920&q=80"
-          alt="Jebal Guest House guest house exterior"
-          className="h-[120%] w-full object-cover"
-        />
+    <section
+      ref={sectionRef}
+      className="relative h-[85vh] min-h-[500px] overflow-hidden md:h-[90vh]"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      aria-roledescription="carousel"
+      aria-label="Jebal Guest House highlights"
+    >
+      <motion.div style={{ y: backgroundY }} className="absolute inset-0 -top-[10%] h-[120%]">
+        <AnimatePresence initial={false} mode="sync">
+          <motion.div
+            key={activeIndex}
+            className="absolute inset-0 overflow-hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0.4 : 1.5, ease: 'easeInOut' }}
+          >
+            <motion.img
+              src={slides[activeIndex].src}
+              alt={slides[activeIndex].alt}
+              className="h-full w-full object-cover"
+              initial={{ scale: 1 }}
+              animate={{ scale: reduceMotion ? 1 : 1.05 }}
+              transition={{ duration: AUTOPLAY_DELAY / 1000 + 1, ease: 'linear' }}
+              draggable="false"
+            />
+          </motion.div>
+        </AnimatePresence>
       </motion.div>
 
-      {/* Gradient overlay for text legibility */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/10 to-black/50" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/15 to-black/55" />
 
-      {/* Hero content */}
       <motion.div
-        style={{ opacity }}
-        className="relative flex h-full flex-col items-center justify-center px-6 text-center text-white"
+        style={{ opacity: contentOpacity }}
+        className="relative z-20 flex h-full flex-col items-center justify-center px-6 text-center text-white"
       >
         <motion.p
           initial={{ opacity: 0, y: 20 }}
@@ -59,6 +144,7 @@ export default function Hero() {
           conditioning, WiFi, parking, and easy booking inquiries.
         </motion.p>
       </motion.div>
+
     </section>
   )
 }
