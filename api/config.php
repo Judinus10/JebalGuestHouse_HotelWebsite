@@ -183,7 +183,7 @@ jebal_define('PAYHERE_MERCHANT_SECRET', (string) jebal_env_value('PAYHERE_MERCHA
 
 jebal_define('ALLOWED_ORIGINS', jebal_env_csv('ALLOWED_ORIGINS'));
 
-jebal_define('PAYMENT_CURRENCY', (string) jebal_env_value('PAYMENT_CURRENCY', 'LKR'));
+jebal_define('PAYMENT_CURRENCY', 'USD');
 jebal_define(
     'INVOICE_PUBLIC_BASE_URL',
     ($apiBaseUrl !== '' ? $apiBaseUrl : 'http://localhost/HotelWebsite/api') . '/invoices/download.php'

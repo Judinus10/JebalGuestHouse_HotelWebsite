@@ -84,7 +84,7 @@ function normalize_room(array $room, array $images = []): array
 
     $type = infer_room_type($room);
     $price = (float) ($room['base_price'] ?? 0);
-    $currency = (string) ($room['currency'] ?? 'LKR');
+    $currency = (string) ($room['currency'] ?? 'USD');
     $guests = (int) ($room['max_guests'] ?? 2);
     $bedType = (string) ($room['bed_type'] ?? 'Double Bed');
 

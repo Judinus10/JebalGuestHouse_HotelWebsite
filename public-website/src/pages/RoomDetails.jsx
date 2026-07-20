@@ -45,7 +45,7 @@ function calculateNights(checkInDate, checkOutDate) {
 
 function formatRoomPrice(currency, amount) {
   const safeAmount = Number(amount || 0)
-  return `${currency || 'LKR'} ${safeAmount.toLocaleString()}`
+  return `${currency || 'USD'} ${safeAmount.toLocaleString()}`
 }
 
 /**

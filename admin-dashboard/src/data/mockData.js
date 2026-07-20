@@ -27,12 +27,12 @@ export const occupancyChartData = [
 export const recentBookings = []
 
 export const rooms = [
-  { id: 'R-001', name: 'Ground Floor Room 1', type: 'Ground Floor', price: 'LKR 0', status: 'Available', floor: 'Ground' },
-  { id: 'R-002', name: 'Ground Floor Room 2', type: 'Ground Floor', price: 'LKR 0', status: 'Available', floor: 'Ground' },
-  { id: 'R-003', name: 'First Floor Room 1', type: 'First Floor', price: 'LKR 0', status: 'Available', floor: 'First' },
-  { id: 'R-004', name: 'First Floor Room 2', type: 'First Floor', price: 'LKR 0', status: 'Available', floor: 'First' },
-  { id: 'R-005', name: 'Family Room', type: 'Family', price: 'LKR 0', status: 'Available', floor: 'Ground' },
-  { id: 'R-006', name: 'Private Cottage', type: 'Cottage', price: 'LKR 0', status: 'Available', floor: 'Ground' },
+  { id: 'R-001', name: 'Ground Floor Room 1', type: 'Ground Floor', price: 'USD 0', status: 'Available', floor: 'Ground' },
+  { id: 'R-002', name: 'Ground Floor Room 2', type: 'Ground Floor', price: 'USD 0', status: 'Available', floor: 'Ground' },
+  { id: 'R-003', name: 'First Floor Room 1', type: 'First Floor', price: 'USD 0', status: 'Available', floor: 'First' },
+  { id: 'R-004', name: 'First Floor Room 2', type: 'First Floor', price: 'USD 0', status: 'Available', floor: 'First' },
+  { id: 'R-005', name: 'Family Room', type: 'Family', price: 'USD 0', status: 'Available', floor: 'Ground' },
+  { id: 'R-006', name: 'Private Cottage', type: 'Cottage', price: 'USD 0', status: 'Available', floor: 'Ground' },
 ]
 
 export const bookings = []
@@ -128,7 +128,7 @@ export const settings = {
   email: 'bookings@jebalhomes.com',
   address: 'Jebal Homes, Sri Lanka',
   timezone: 'Asia/Colombo',
-  currency: 'LKR',
+  currency: 'USD',
 }
 
 export const profile = {

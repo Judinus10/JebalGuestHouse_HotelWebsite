@@ -43,7 +43,7 @@ const BOOKINGS_PER_PAGE = 6
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'LKR',
+  currency: 'USD',
   maximumFractionDigits: 0,
 })
 

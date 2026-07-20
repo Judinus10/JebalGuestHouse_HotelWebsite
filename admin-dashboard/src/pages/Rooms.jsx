@@ -35,7 +35,7 @@ const emptyForm = {
   price_per_night: '',
   capacity: '',
   bed_type: '',
-  currency: 'LKR',
+  currency: 'USD',
   description: '',
   status: 'Available',
   images: [],
@@ -65,7 +65,7 @@ const amenityIcons = {
 function formatCurrency(value) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'LKR',
+    currency: 'USD',
     maximumFractionDigits: 0,
   }).format(Number(value || 0))
 }
@@ -793,7 +793,7 @@ export default function Rooms() {
       price_per_night: room.price_per_night ?? room.base_price ?? room.price,
       capacity: room.capacity ?? room.max_guests ?? room.guests,
       bed_type: room.bed_type || room.beds || '',
-      currency: room.currency || 'LKR',
+      currency: room.currency || 'USD',
       amenity_ids: room.amenity_ids || [],
     })
     setFormMode('edit')
@@ -818,7 +818,7 @@ export default function Rooms() {
     payload.append('bed_type', form.bed_type || form.room_type)
     payload.append('base_price', form.price_per_night)
     payload.append('price_per_night', form.price_per_night)
-    payload.append('currency', form.currency || 'LKR')
+    payload.append('currency', form.currency || 'USD')
     payload.append('amenities', JSON.stringify(amenityNames))
     payload.append('status', form.status)
     payload.append('sort_order', form.sort_order || 0)

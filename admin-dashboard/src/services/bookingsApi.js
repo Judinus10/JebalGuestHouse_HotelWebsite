@@ -118,7 +118,7 @@ export function normalizeBooking(booking) {
     payment_status: normalizePaymentStatus(booking.payment_status || booking.paymentStatus, isExternal),
     payment_method: booking.payment_method || booking.method || booking.paymentMethod || '',
     total_amount: amount,
-    payment_currency: booking.payment_currency || booking.currency || 'LKR',
+    payment_currency: booking.payment_currency || booking.currency || 'USD',
     special_requests: booking.special_requests || booking.special_request || booking.message || booking.note || '',
     special_request: booking.special_request || booking.special_requests || booking.message || booking.note || '',
     invoice_number: booking.invoice_number || '',

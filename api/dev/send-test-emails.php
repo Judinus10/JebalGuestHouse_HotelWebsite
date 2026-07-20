@@ -59,7 +59,7 @@ function test_email_dummy_booking(string $recipient): array
         'check_out_date' => $today->modify('+3 days')->format('Y-m-d'),
         'guests' => 2,
         'amount' => 28500.00,
-        'currency' => 'LKR',
+        'currency' => 'USD',
         'status' => 'Pending',
         'payment_status' => 'Payment Pending',
         'payment_method' => 'PayHere',
@@ -79,7 +79,7 @@ function test_email_dummy_payment(array $booking): array
         'payment_method' => 'PayHere',
         'status' => 'Paid',
         'amount' => $booking['amount'] ?? 0,
-        'currency' => $booking['currency'] ?? 'LKR',
+        'currency' => $booking['currency'] ?? 'USD',
         'bill_url' => rtrim((string) (defined('PUBLIC_APP_URL') ? PUBLIC_APP_URL : 'http://localhost:5173'), '/') . '/booking-bill?token=TEST-BOOKING-BILL-TOKEN',
     ];
 }

@@ -71,7 +71,7 @@ function normalizePayment(payment) {
     order_id: payment.order_id || '',
     payment_id: payment.payment_id || '',
     amount: Number(payment.amount || 0),
-    currency: payment.currency || 'LKR',
+    currency: payment.currency || 'USD',
     payment_status: paymentStatus,
     payment_method: normalizePaymentMethod(payment.payment_method || payment.method),
     payment_gateway: payment.payment_gateway || normalizePaymentMethod(payment.payment_method || payment.method),

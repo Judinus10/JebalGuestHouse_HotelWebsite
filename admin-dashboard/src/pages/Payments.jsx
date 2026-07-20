@@ -26,7 +26,7 @@ const PAGE_SIZE = 6
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
-  currency: 'LKR',
+  currency: 'USD',
   maximumFractionDigits: 0,
 })
 

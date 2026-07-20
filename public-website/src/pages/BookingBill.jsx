@@ -36,7 +36,7 @@ const FALLBACK_HOTEL_NAME = 'Jebal Guest House'
 const FALLBACK_HOTEL_PHONE = '0707894862'
 const FALLBACK_HOTEL_EMAIL = 'jebalguesthouse@gmail.com'
 
-function formatMoney(amount, currency = 'LKR') {
+function formatMoney(amount, currency = 'USD') {
   const value = Number(amount || 0)
   return `${currency} ${value.toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -323,7 +323,7 @@ export default function BookingBill() {
     const billReference = getBillReference(bill, bookingNumber)
     const paymentReference = getPaymentReference(bill, paymentHistory)
     const currentPayment = paymentHistory[paymentHistory.length - 1] || {}
-    const currency = bill.currency || currentPayment.currency || 'LKR'
+    const currency = bill.currency || currentPayment.currency || 'USD'
     const paymentMethod = bill.payment_method || currentPayment.method || 'PayHere'
 
     const safePaymentReference = pdfText(paymentReference)
@@ -788,7 +788,7 @@ export default function BookingBill() {
                       <h2 className="font-serif text-xl text-slate-950">Price Breakdown</h2>
                     </div>
                     <div className="grid grid-cols-[1fr_auto] border-b border-slate-200 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      <span>Description</span><span>Amount ({bill.currency || 'LKR'})</span>
+                      <span>Description</span><span>Amount ({bill.currency || 'USD'})</span>
                     </div>
                     <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-200 py-5 text-sm">
                       <div>
@@ -825,7 +825,7 @@ export default function BookingBill() {
 
                   <MobileAccordion icon={FileText} title="Price Breakdown" sectionId="price">
                     <div className="grid grid-cols-[1fr_auto] border-b border-slate-200 pb-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-                      <span>Description</span><span>Amount ({bill.currency || 'LKR'})</span>
+                      <span>Description</span><span>Amount ({bill.currency || 'USD'})</span>
                     </div>
                     <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-200 py-5 text-sm">
                       <div>

@@ -35,7 +35,7 @@ function shouldSkipTranslation(text) {
   if (value.length > MAX_TEXT_LENGTH) return true
   if (/^[\d\s.,:;!?()[\]{}+\-/%&|@#$*_=<>]+$/.test(value)) return true
   if (/^[A-Z]{2,6}$/.test(value)) return true
-  if (/^LKR\b/i.test(value)) return true
+  if (/^USD\b/i.test(value)) return true
   if (/^\+?\d[\d\s()-]+$/.test(value)) return true
 
   return false

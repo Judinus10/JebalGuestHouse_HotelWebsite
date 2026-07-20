@@ -95,7 +95,7 @@ function titleCaseStatus(status) {
   return value.replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function money(amount, currency = 'LKR') {
+function money(amount, currency = 'USD') {
   const number = Number(amount || 0)
   if (!number) return currency
   return `${currency} ${number.toLocaleString()}`

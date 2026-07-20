@@ -19,7 +19,7 @@ try {
         ':max_guests' => max(1, (int) ($data['max_guests'] ?? $data['capacity'] ?? 2)),
         ':bed_type' => clean_string($data['bed_type'] ?? '', 100),
         ':base_price' => max(0, (float) ($data['base_price'] ?? $data['price_per_night'] ?? 0)),
-        ':currency' => clean_string($data['currency'] ?? 'LKR', 10),
+        ':currency' => clean_string($data['currency'] ?? 'USD', 10),
         ':amenities' => json_encode($amenities, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
         ':status' => in_array($data['status'] ?? 'Available', ['Available', 'Unavailable', 'Maintenance'], true) ? $data['status'] : 'Available',
         ':sort_order' => max(0, (int) ($data['sort_order'] ?? 0)),

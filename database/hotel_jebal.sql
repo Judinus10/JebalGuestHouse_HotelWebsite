@@ -614,3 +614,25 @@ CREATE TABLE IF NOT EXISTS external_calendar_sync_status (
   PRIMARY KEY (room_id),
   CONSTRAINT fk_external_sync_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Run this once against the existing Jebal database.
+-- It changes currency codes only. It intentionally does not convert amounts.
+-- Update every room's numeric price in the admin dashboard immediately after running it.
+
+START TRANSACTION;
+
+ALTER TABLE rooms
+    MODIFY currency VARCHAR(10) NOT NULL DEFAULT 'USD';
+
+ALTER TABLE bookings
+    MODIFY currency VARCHAR(10) NOT NULL DEFAULT 'USD';
+
+ALTER TABLE payments
+    MODIFY currency VARCHAR(10) NOT NULL DEFAULT 'USD';
+
+ALTER TABLE invoices
+    MODIFY currency VARCHAR(10) NOT NULL DEFAULT 'USD';
+
+UPDATE rooms SET currency = 'USD';
+
+COMMIT;
