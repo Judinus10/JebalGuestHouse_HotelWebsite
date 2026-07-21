@@ -1,13 +1,14 @@
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
+import termsBanner from '../assets/images/banners/terms-banner.webp'
 
 export default function TermsOfService() {
   return (
     <PageTransition>
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
-          src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=1920&q=80"
+          src={termsBanner}
           alt="Terms of service"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />

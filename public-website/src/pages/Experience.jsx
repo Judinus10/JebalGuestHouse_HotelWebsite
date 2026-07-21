@@ -4,6 +4,7 @@ import PageTransition from '../components/layout/PageTransition'
 import SectionHeading from '../components/ui/SectionHeading'
 import FadeUp from '../components/ui/FadeUp'
 import { fetchExperiences } from '../services/experienceApi'
+import experienceBanner from '../assets/images/banners/experience-banner.webp'
 
 export default function Experience() {
   const [items, setItems] = useState([])
@@ -28,7 +29,7 @@ export default function Experience() {
     <PageTransition>
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
-          src="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1920&q=85"
+          src={experienceBanner}
           alt="Experience Jaffna"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />

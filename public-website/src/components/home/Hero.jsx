@@ -6,9 +6,9 @@ import {
   useScroll,
   useTransform,
 } from 'framer-motion'
-import hero01 from '../../assets/images/home/jebal-hero-01.jpg'
-import hero02 from '../../assets/images/home/jebal-hero-02.jpg'
-import hero03 from '../../assets/images/home/jebal-hero-03.jpg'
+import hero01 from '../../assets/images/home/home-hero-01.webp'
+import hero02 from '../../assets/images/home/home-hero-02.webp'
+import hero03 from '../../assets/images/home/home-hero-03.webp'
 
 const slides = [
   { src: hero01, alt: 'Luxury guest house exterior at dusk' },

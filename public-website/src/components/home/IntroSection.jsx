@@ -1,6 +1,7 @@
 import FadeUp from '../ui/FadeUp'
 import ImageReveal from '../ui/ImageReveal'
 import Button from '../ui/Button'
+import storyImage from '../../assets/images/home/home-story.webp'
 
 /**
  * Intro welcome section with text left and portrait image right.
@@ -38,7 +39,7 @@ export default function IntroSection() {
           <div className="relative mx-auto max-w-md lg:max-w-none">
             <div className="aspect-[3/4] overflow-hidden">
               <img
-                src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80"
+                src={storyImage}
                 alt="Comfortable guest house interior"
                 className="h-full w-full object-cover"
               />

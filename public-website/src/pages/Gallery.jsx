@@ -3,8 +3,7 @@ import PageTransition from '../components/layout/PageTransition'
 import SectionHeading from '../components/ui/SectionHeading'
 import FadeUp from '../components/ui/FadeUp'
 import { fetchPublicGallery } from '../services/galleryApi'
-
-const fallbackHero = 'https://images.unsplash.com/photo-1571896349842-33c89424de2d?auto=format&fit=crop&w=1920&q=85'
+import galleryBanner from '../assets/images/banners/gallery-banner.webp'
 
 export default function Gallery() {
   const [folders, setFolders] = useState([])
@@ -48,7 +47,7 @@ export default function Gallery() {
     <PageTransition>
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
-          src={images[0]?.image_path || fallbackHero}
+          src={galleryBanner}
           alt="Jebal Guest House gallery"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />

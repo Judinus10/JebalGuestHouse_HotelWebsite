@@ -1,6 +1,8 @@
 import FadeUp from '../ui/FadeUp'
 import ImageReveal from '../ui/ImageReveal'
 import Button from '../ui/Button'
+import comfortMainImage from '../../assets/images/home/home-comfort-main.webp'
+import comfortDetailImage from '../../assets/images/home/home-comfort-detail.webp'
 
 /**
  * Private stay / room collection section with overlapping editorial images.
@@ -16,7 +18,7 @@ export default function PrivateStaySection() {
               {/* Main oval image */}
               <div className="aspect-[3/4] overflow-hidden rounded-[50%]">
                 <img
-                  src="https://images.unsplash.com/photo-1578683010236-d716f9a3f461?w=800&q=80"
+                  src={comfortMainImage}
                   alt="Comfortable guest house room"
                   className="h-full w-full object-cover"
                 />
@@ -24,7 +26,7 @@ export default function PrivateStaySection() {
               {/* Overlapping rectangular image */}
               <div className="absolute -bottom-8 -right-4 w-2/3 overflow-hidden shadow-xl md:-right-8">
                 <img
-                  src="https://images.unsplash.com/photo-1618773928121-c32242e63f39?w=600&q=80"
+                  src={comfortDetailImage}
                   alt="Clean room interior detail"
                   className="aspect-[4/3] w-full object-cover"
                 />

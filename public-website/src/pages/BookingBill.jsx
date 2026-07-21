@@ -7,6 +7,7 @@ import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import Button from '../components/ui/Button'
 import logo from '../assets/logo.png'
+import bookingBillBanner from '../assets/images/banners/booking-bill-banner.webp'
 
 const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 
@@ -717,7 +718,7 @@ export default function BookingBill() {
             <div id="booking-bill-print-area" className="bg-white">
               <div className="relative overflow-hidden bg-slate-900 print:hidden">
                 <img
-                  src="https://images.unsplash.com/photo-1590490360182-c33d57733427?auto=format&fit=crop&w=1920&q=85"
+                  src={bookingBillBanner}
                   alt="Jebal Guest House room"
                   className="absolute inset-0 h-full w-full object-cover opacity-55"
                 />

@@ -4,6 +4,7 @@ import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
 import Button from '../components/ui/Button'
+import contactBanner from '../assets/images/banners/contact-banner.webp'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
@@ -134,7 +135,7 @@ export default function Contact() {
       <div className="contact-page overflow-x-hidden">
         <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
           <img
-            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1920&q=85"
+            src={contactBanner}
             alt="Contact us"
             className="absolute inset-0 h-full w-full object-cover opacity-50"
           />
@@ -345,7 +346,7 @@ export default function Contact() {
                     ) : (
                       <>
                         <img
-                          src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80"
+                          src={contactBanner}
                           alt="Location map"
                           className="h-full w-full object-cover opacity-50"
                         />

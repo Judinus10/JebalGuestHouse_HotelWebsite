@@ -1,13 +1,14 @@
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
+import privacyBanner from '../assets/images/banners/privacy-banner.webp'
 
 export default function PrivacyPolicy() {
   return (
     <PageTransition>
       <section className="relative flex h-[40vh] min-h-[300px] items-end bg-charcoal">
         <img
-          src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1920&q=80"
+          src={privacyBanner}
           alt="Privacy policy"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
         />
