@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_experience_helpers.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    json_response(false, 'Only POST requests are allowed.', 405);
+}
+require_admin_auth();
+
 try {
     $pdo = experience_db();
 
@@ -46,8 +51,9 @@ try {
         'message' => 'Experience item created successfully.',
     ]);
 } catch (Throwable $e) {
+    error_log('Experience create error: ' . $e->getMessage());
     experience_json([
         'success' => false,
-        'message' => $e->getMessage(),
+        'message' => 'Unable to create experience item.',
     ], 500);
 }

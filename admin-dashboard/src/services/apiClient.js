@@ -1,32 +1,44 @@
-import { clearStoredSession, getStoredToken } from '@/utils/auth'
+import { clearStoredSession } from '@/utils/auth'
 
 const localApiBaseUrl = 'http://localhost/HotelWebsite/api'
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || localApiBaseUrl).replace(/\/$/, '')
+
+let csrfToken = ''
 
 export function buildApiUrl(path) {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path}`
   return `${API_BASE_URL}${normalizedPath}`
 }
 
+export function setCsrfToken(token) {
+  csrfToken = String(token || '')
+}
+
+export function getCsrfToken() {
+  return csrfToken
+}
+
 export async function apiFetch(url, options = {}) {
-  const token = getStoredToken()
   const headers = new Headers(options.headers || {})
 
   if (!headers.has('Accept')) {
     headers.set('Accept', 'application/json')
   }
 
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`)
+  const method = String(options.method || 'GET').toUpperCase()
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
   }
 
   const response = await fetch(url, {
     ...options,
     headers,
+    credentials: 'include',
   })
 
   if (response.status === 401) {
+    setCsrfToken('')
     clearStoredSession()
     if (!window.location.pathname.includes('/login')) {
       window.location.href = '/login'

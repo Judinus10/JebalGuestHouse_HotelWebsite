@@ -36,11 +36,12 @@ function apply_cors_headers(): void
 
     if ($origin !== '' && in_array($origin, $allowedOrigins, true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Credentials: true');
         header('Vary: Origin, Access-Control-Request-Method, Access-Control-Request-Headers');
     }
 
     header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-Requested-With, Cache-Control, Pragma, X-HTTP-Method-Override');
+    header('Access-Control-Allow-Headers: Origin, Content-Type, Accept, Authorization, X-CSRF-Token, X-Requested-With, Cache-Control, Pragma, X-HTTP-Method-Override');
     header('Access-Control-Max-Age: 86400');
     header('Content-Type: application/json; charset=utf-8');
 
@@ -90,6 +91,19 @@ function get_client_ip(): string
     return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
+function security_event(string $event, array $context = []): void
+{
+    unset($context['password'], $context['token'], $context['csrf']);
+    error_log(json_encode([
+        'type' => 'security_event',
+        'event' => $event,
+        'ip' => get_client_ip(),
+        'user_agent' => mb_substr($_SERVER['HTTP_USER_AGENT'] ?? '', 0, 255),
+        'context' => $context,
+        'occurred_at' => gmdate('c'),
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+}
+
 function rate_limit_or_fail(string $action, int $maxAttempts = PUBLIC_RATE_LIMIT_MAX, int $windowMinutes = PUBLIC_RATE_LIMIT_WINDOW_MINUTES): void
 {
     $pdo = get_db_connection();
@@ -115,6 +129,28 @@ function rate_limit_or_fail(string $action, int $maxAttempts = PUBLIC_RATE_LIMIT
         ':ip_address' => $ip,
         ':action' => $action,
     ]);
+}
+
+function rate_limit_subject_or_fail(string $action, string $subject, int $maxAttempts, int $windowMinutes): void
+{
+    $pdo = get_db_connection();
+    $subjectKey = 'subject:' . substr(hash('sha256', strtolower(trim($subject))), 0, 32);
+    $windowStart = (new DateTimeImmutable('-' . $windowMinutes . ' minutes'))->format('Y-m-d H:i:s');
+
+    $count = $pdo->prepare('SELECT COUNT(*) FROM rate_limits WHERE ip_address = :subject_key AND action = :action AND created_at >= :window_start');
+    $count->execute([
+        ':subject_key' => $subjectKey,
+        ':action' => $action,
+        ':window_start' => $windowStart,
+    ]);
+
+    if ((int) $count->fetchColumn() >= $maxAttempts) {
+        security_event('rate_limit_exceeded', ['action' => $action]);
+        json_response(false, 'Too many attempts. Please try again later.', 429);
+    }
+
+    $insert = $pdo->prepare('INSERT INTO rate_limits (ip_address, action, created_at) VALUES (:subject_key, :action, NOW())');
+    $insert->execute([':subject_key' => $subjectKey, ':action' => $action]);
 }
 
 function get_bearer_token(): ?string
@@ -144,9 +180,66 @@ function get_bearer_token(): ?string
 
     return trim($matches[1]);
 }
+
+function admin_cookie_options(bool $httpOnly): array
+{
+    return [
+        'expires' => 0,
+        'path' => '/',
+        'secure' => defined('APP_ENV') && APP_ENV === 'production',
+        'httponly' => $httpOnly,
+        'samesite' => 'Lax',
+    ];
+}
+
+function set_admin_auth_cookies(string $token, string $csrfToken): void
+{
+    setcookie(ADMIN_AUTH_COOKIE, $token, admin_cookie_options(true));
+    setcookie(ADMIN_CSRF_COOKIE, $csrfToken, admin_cookie_options(false));
+}
+
+function clear_admin_auth_cookies(): void
+{
+    $authOptions = admin_cookie_options(true);
+    $csrfOptions = admin_cookie_options(false);
+    $authOptions['expires'] = time() - 3600;
+    $csrfOptions['expires'] = time() - 3600;
+    setcookie(ADMIN_AUTH_COOKIE, '', $authOptions);
+    setcookie(ADMIN_CSRF_COOKIE, '', $csrfOptions);
+}
+
+function get_admin_session_token(): ?string
+{
+    $cookieToken = trim((string) ($_COOKIE[ADMIN_AUTH_COOKIE] ?? ''));
+    if ($cookieToken !== '') {
+        return $cookieToken;
+    }
+
+    if (defined('ADMIN_ALLOW_BEARER_AUTH') && ADMIN_ALLOW_BEARER_AUTH) {
+        return get_bearer_token();
+    }
+
+    return null;
+}
+
+function enforce_admin_csrf(): void
+{
+    if (in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'HEAD', 'OPTIONS'], true)) {
+        return;
+    }
+
+    $cookieToken = (string) ($_COOKIE[ADMIN_CSRF_COOKIE] ?? '');
+    $headerToken = (string) ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+
+    if ($cookieToken === '' || $headerToken === '' || !hash_equals($cookieToken, $headerToken)) {
+        security_event('csrf_validation_failed');
+        json_response(false, 'Invalid security token.', 403);
+    }
+}
+
 function require_admin_auth(): array
 {
-    $token = get_bearer_token();
+    $token = get_admin_session_token();
 
     if ($token === null || $token === '') {
         json_response(false, 'Authentication required.', 401);
@@ -156,7 +249,7 @@ function require_admin_auth(): array
     $pdo = get_db_connection();
 
     $stmt = $pdo->prepare(
-        "SELECT s.id AS session_id, s.expires_at, u.id, u.name, u.email, u.role, u.is_active
+        "SELECT s.id AS session_id, s.expires_at, s.last_used_at, u.id, u.name, u.email, u.role, u.is_active
          FROM admin_sessions s
          INNER JOIN admin_users u ON u.id = s.admin_user_id
          WHERE s.token_hash = :token_hash
@@ -168,8 +261,21 @@ function require_admin_auth(): array
     $session = $stmt->fetch();
 
     if (!$session || (int) $session['is_active'] !== 1) {
+        clear_admin_auth_cookies();
         json_response(false, 'Invalid or expired session.', 401);
     }
+
+    $idleMinutes = max(15, min(30, (int) ADMIN_IDLE_TIMEOUT_MINUTES));
+    $lastUsed = new DateTimeImmutable((string) $session['last_used_at']);
+    if ($lastUsed < new DateTimeImmutable('-' . $idleMinutes . ' minutes')) {
+        $revoke = $pdo->prepare('UPDATE admin_sessions SET revoked_at = NOW() WHERE id = :id AND revoked_at IS NULL');
+        $revoke->execute([':id' => $session['session_id']]);
+        clear_admin_auth_cookies();
+        security_event('admin_session_idle_expired', ['session_id' => $session['session_id']]);
+        json_response(false, 'Invalid or expired session.', 401);
+    }
+
+    enforce_admin_csrf();
 
     $touch = $pdo->prepare('UPDATE admin_sessions SET last_used_at = NOW() WHERE id = :id');
     $touch->execute([':id' => $session['session_id']]);

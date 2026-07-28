@@ -19,5 +19,6 @@ $user = require_admin_auth();
 json_response(true, 'Session is valid.', 200, [
     'data' => [
         'user' => $user,
+        'csrf_token' => (string) ($_COOKIE[ADMIN_CSRF_COOKIE] ?? ''),
     ],
 ]);

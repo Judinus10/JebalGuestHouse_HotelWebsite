@@ -1,39 +1,30 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import { clearStoredSession, getStoredToken, getStoredUser, storeSession } from '@/utils/auth'
+import { clearStoredSession } from '@/utils/auth'
 import { loginAdmin, logoutAdmin, verifyAdminSession } from '@/services/authApi'
+import { setCsrfToken } from '@/services/apiClient'
 
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [token, setToken] = useState(null)
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
     let cancelled = false
 
     async function restoreSession() {
-      const storedToken = getStoredToken()
-      const storedUser = getStoredUser()
-
-      if (!storedToken || !storedUser) {
-        clearStoredSession()
-        if (!cancelled) setInitializing(false)
-        return
-      }
-
-      const verifiedUser = await verifyAdminSession(storedToken)
+      clearStoredSession()
+      const session = await verifyAdminSession()
 
       if (cancelled) return
 
-      if (verifiedUser) {
-        setUser(verifiedUser)
-        setToken(storedToken)
-        storeSession({ user: verifiedUser, token: storedToken, rememberMe: localStorage.getItem('jebal_admin_storage_mode') === 'local' })
+      if (session?.user) {
+        setCsrfToken(session.csrf_token)
+        setUser(session.user)
       } else {
+        setCsrfToken('')
         clearStoredSession()
         setUser(null)
-        setToken(null)
       }
 
       setInitializing(false)
@@ -46,36 +37,33 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const login = async ({ email, password, rememberMe }) => {
+  const login = async ({ email, password }) => {
     const payload = await loginAdmin({ email, password })
     const nextUser = payload.data.user
-    const nextToken = payload.data.token
 
-    storeSession({ user: nextUser, token: nextToken, rememberMe })
+    setCsrfToken(payload.data.csrf_token)
     setUser(nextUser)
-    setToken(nextToken)
 
     return nextUser
   }
 
   const logout = async () => {
-    const currentToken = token || getStoredToken()
     clearStoredSession()
+    const logoutRequest = logoutAdmin()
+    setCsrfToken('')
     setUser(null)
-    setToken(null)
-    await logoutAdmin(currentToken)
+    await logoutRequest
   }
 
   const value = useMemo(
     () => ({
       user,
-      token,
       initializing,
-      isAuthenticated: Boolean(user && token),
+      isAuthenticated: Boolean(user),
       login,
       logout,
     }),
-    [user, token, initializing]
+    [user, initializing]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

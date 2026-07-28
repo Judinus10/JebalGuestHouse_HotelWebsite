@@ -9,18 +9,16 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
 }
 
-rate_limit_or_fail('admin_login', 6, 15);
-
 $data = read_request_data();
 $email = strtolower(clean_string($data['email'] ?? '', 190));
 $password = (string) ($data['password'] ?? '');
 
-if ($email === '' || $password === '') {
-    json_response(false, 'Email and password are required.', 422);
-}
+rate_limit_or_fail('admin_login_ip', 6, 15);
+rate_limit_subject_or_fail('admin_login_account', $email !== '' ? $email : 'missing-email', 8, 30);
 
-if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    json_response(false, 'Enter a valid email address.', 422);
+if ($email === '' || $password === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    security_event('admin_login_failed', ['reason' => 'invalid_input']);
+    json_response(false, 'Invalid login details.', 401);
 }
 
 try {
@@ -30,6 +28,7 @@ try {
     $user = $stmt->fetch();
 
     if (!$user || (int) $user['is_active'] !== 1 || !password_verify($password, $user['password_hash'])) {
+        security_event('admin_login_failed', ['account' => substr(hash('sha256', $email), 0, 16)]);
         json_response(false, 'Invalid login details.', 401);
     }
 
@@ -40,6 +39,7 @@ try {
     }
 
     $token = bin2hex(random_bytes(32));
+    $csrfToken = bin2hex(random_bytes(32));
     $tokenHash = hash('sha256', $token);
     $expiresAt = (new DateTimeImmutable('+' . ADMIN_SESSION_HOURS . ' hours'))->format('Y-m-d H:i:s');
 
@@ -58,9 +58,12 @@ try {
     $updateLogin = $pdo->prepare('UPDATE admin_users SET last_login_at = NOW(), updated_at = NOW() WHERE id = :id');
     $updateLogin->execute([':id' => $user['id']]);
 
+    set_admin_auth_cookies($token, $csrfToken);
+    security_event('admin_login_succeeded', ['admin_user_id' => (int) $user['id']]);
+
     json_response(true, 'Login successful.', 200, [
         'data' => [
-            'token' => $token,
+            'csrf_token' => $csrfToken,
             'expires_at' => $expiresAt,
             'user' => [
                 'id' => (int) $user['id'],

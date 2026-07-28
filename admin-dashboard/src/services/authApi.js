@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '@/services/apiClient'
+import { API_BASE_URL, getCsrfToken } from '@/services/apiClient'
 
 async function readJsonResponse(response) {
   const payload = await response.json().catch(() => null)
@@ -17,35 +17,32 @@ export async function loginAdmin({ email, password }) {
       Accept: 'application/json',
       'Content-Type': 'application/json',
     },
+    credentials: 'include',
     body: JSON.stringify({ email, password }),
   })
 
   return readJsonResponse(response)
 }
 
-export async function logoutAdmin(token) {
-  if (!token) return
-
+export async function logoutAdmin() {
+  const csrfToken = getCsrfToken()
   await fetch(`${API_BASE_URL}/auth/logout.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
+    credentials: 'include',
   }).catch(() => null)
 }
 
-export async function verifyAdminSession(token) {
-  if (!token) {
-    return null
-  }
-
+export async function verifyAdminSession() {
   const response = await fetch(`${API_BASE_URL}/auth/me.php`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
     },
+    credentials: 'include',
   })
 
   const payload = await response.json().catch(() => null)
@@ -54,5 +51,5 @@ export async function verifyAdminSession(token) {
     return null
   }
 
-  return payload.data?.user || null
+  return payload.data || null
 }

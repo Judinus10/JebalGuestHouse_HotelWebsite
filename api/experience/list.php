@@ -3,6 +3,11 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/_experience_helpers.php';
 
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    json_response(false, 'Only GET requests are allowed.', 405);
+}
+require_admin_auth();
+
 try {
     $pdo = experience_db();
 
@@ -19,8 +24,9 @@ try {
         'data' => $items,
     ]);
 } catch (Throwable $e) {
+    error_log('Experience list error: ' . $e->getMessage());
     experience_json([
         'success' => false,
-        'message' => $e->getMessage(),
+        'message' => 'Unable to load experience items.',
     ], 500);
 }

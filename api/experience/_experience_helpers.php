@@ -33,7 +33,7 @@ function experience_upload_dir(): string
     $dir = __DIR__ . '/../uploads/experience';
 
     if (!is_dir($dir)) {
-        mkdir($dir, 0777, true);
+        mkdir($dir, 0755, true);
     }
 
     return $dir;

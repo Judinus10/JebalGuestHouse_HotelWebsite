@@ -191,6 +191,10 @@ jebal_define(
 jebal_define('INVOICE_STORAGE_DIR', __DIR__ . '/storage/invoices');
 
 jebal_define('ADMIN_SESSION_HOURS', (int) jebal_env_value('ADMIN_SESSION_HOURS', 12));
+jebal_define('ADMIN_IDLE_TIMEOUT_MINUTES', (int) jebal_env_value('ADMIN_IDLE_TIMEOUT_MINUTES', 30));
+jebal_define('ADMIN_AUTH_COOKIE', (string) jebal_env_value('ADMIN_AUTH_COOKIE', 'jebal_admin_session'));
+jebal_define('ADMIN_CSRF_COOKIE', (string) jebal_env_value('ADMIN_CSRF_COOKIE', 'jebal_admin_csrf'));
+jebal_define('ADMIN_ALLOW_BEARER_AUTH', filter_var(jebal_env_value('ADMIN_ALLOW_BEARER_AUTH', 'false'), FILTER_VALIDATE_BOOLEAN));
 jebal_define('PUBLIC_RATE_LIMIT_MAX', (int) jebal_env_value('PUBLIC_RATE_LIMIT_MAX', 8));
 jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', (int) jebal_env_value('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', 15));
 

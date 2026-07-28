@@ -9,9 +9,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
 }
 
-$token = get_bearer_token();
+$token = get_admin_session_token();
 
-if ($token !== '') {
+if ($token !== null && $token !== '') {
+    enforce_admin_csrf();
     try {
         $pdo = get_db_connection();
         $stmt = $pdo->prepare('UPDATE admin_sessions SET revoked_at = NOW() WHERE token_hash = :token_hash AND revoked_at IS NULL');
@@ -21,4 +22,5 @@ if ($token !== '') {
     }
 }
 
+clear_admin_auth_cookies();
 json_response(true, 'Logged out successfully.');
