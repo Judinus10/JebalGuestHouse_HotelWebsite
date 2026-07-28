@@ -13,11 +13,16 @@ if (!$isCli) {
         ? trim((string) jebal_env_value('STAY_REMINDER_CRON_TOKEN', ''))
         : '';
 
-    if ($configuredToken !== '') {
-        $requestToken = trim((string) ($_GET['token'] ?? ''));
-        if (!hash_equals($configuredToken, $requestToken)) {
-            json_response(false, 'Unauthorized cron request.', 401);
-        }
+    // HTTP execution must fail closed. CLI execution remains available for
+    // server-managed scheduled jobs and does not require an HTTP token.
+    if ($configuredToken === '') {
+        error_log('Stay reminder HTTP cron disabled: STAY_REMINDER_CRON_TOKEN is not configured.');
+        json_response(false, 'HTTP cron execution is disabled.', 503);
+    }
+
+    $requestToken = trim((string) ($_SERVER['HTTP_X_CRON_TOKEN'] ?? $_GET['token'] ?? ''));
+    if ($requestToken === '' || !hash_equals($configuredToken, $requestToken)) {
+        json_response(false, 'Forbidden.', 403);
     }
 }
 

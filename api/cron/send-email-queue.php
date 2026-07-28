@@ -9,18 +9,20 @@ $isCli = PHP_SAPI === 'cli';
 if (!$isCli) {
     apply_cors_headers();
 
-    $configuredToken = '';
-    if (function_exists('jebal_env_value')) {
-        $configuredToken = trim((string) jebal_env_value('EMAIL_QUEUE_CRON_TOKEN', ''));
+    $configuredToken = function_exists('jebal_env_value')
+        ? trim((string) jebal_env_value('EMAIL_QUEUE_CRON_TOKEN', ''))
+        : '';
+
+    // HTTP execution must fail closed. CLI execution remains available for
+    // server-managed scheduled jobs and does not require an HTTP token.
+    if ($configuredToken === '') {
+        error_log('Email queue HTTP cron disabled: EMAIL_QUEUE_CRON_TOKEN is not configured.');
+        json_response(false, 'HTTP cron execution is disabled.', 503);
     }
 
-    // Optional protection for production: add EMAIL_QUEUE_CRON_TOKEN=your-secret in api/.env
-    // Then call: /api/cron/send-email-queue.php?token=your-secret
-    if ($configuredToken !== '') {
-        $requestToken = trim((string) ($_GET['token'] ?? ''));
-        if (!hash_equals($configuredToken, $requestToken)) {
-            json_response(false, 'Unauthorized cron request.', 401);
-        }
+    $requestToken = trim((string) ($_SERVER['HTTP_X_CRON_TOKEN'] ?? $_GET['token'] ?? ''));
+    if ($requestToken === '' || !hash_equals($configuredToken, $requestToken)) {
+        json_response(false, 'Forbidden.', 403);
     }
 }
 
