@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 
 apply_cors_headers();
+rate_limit_or_fail('password_otp_verify', 8, 30);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);

@@ -8,6 +8,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
 
 $contactHelpers = __DIR__ . '/../settings/contact_helpers.php';
 if (is_file($contactHelpers)) {
@@ -937,20 +938,22 @@ function otp_email_html(string $title, string $otp, int $validMinutes = 1): stri
 function invoice_download_link(array $booking): string
 {
     $bookingId = (int) ($booking['id'] ?? 0);
-    $secret = defined('PAYHERE_MERCHANT_SECRET') ? (string) PAYHERE_MERCHANT_SECRET : '';
-
-    if ($bookingId < 1 || $secret === '') {
+    if ($bookingId < 1) {
         return '';
     }
 
-    $token = hash_hmac('sha256', (string) $bookingId, $secret);
+    $token = create_public_token('invoice-download', ['booking_id' => $bookingId], INVOICE_LINK_TTL_SECONDS);
 
     return INVOICE_PUBLIC_BASE_URL . '?id=' . $bookingId . '&token=' . $token;
 }
 
 function booking_bill_access_token(string $orderId, int $bookingId, string $amount): string
 {
-    return hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+    return create_public_token('payment-status', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amount,
+    ], PUBLIC_LINK_TTL_SECONDS);
 }
 
 function booking_bill_public_base_url(): string

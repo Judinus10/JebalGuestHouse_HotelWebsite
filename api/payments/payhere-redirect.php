@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
 
 function redirect_error(string $message, int $statusCode = 400): void
 {
@@ -24,12 +25,16 @@ function payhere_redirect_format_amount(float $amount): string
 
 function expected_checkout_token(string $orderId, int $bookingId, string $amount): string
 {
-    return hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+    return create_public_token('payment-status', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amount,
+    ], PUBLIC_LINK_TTL_SECONDS);
 }
 
 $orderId = clean_string($_GET['order_id'] ?? '', 100);
 $bookingId = (int) ($_GET['booking_id'] ?? 0);
-$token = clean_string($_GET['token'] ?? '', 128);
+$token = clean_string($_GET['token'] ?? '', 1024);
 
 if ($orderId === '' || $bookingId < 1 || $token === '') {
     redirect_error('Invalid checkout link.', 422);
@@ -49,9 +54,16 @@ try {
     }
 
     $amount = payhere_redirect_format_amount((float) $payment['amount']);
-    $expectedToken = expected_checkout_token($orderId, $bookingId, $amount);
-
-    if (!hash_equals($expectedToken, $token)) {
+    $validToken = verify_public_token($token, 'payment-status', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amount,
+    ]);
+    if (!$validToken && legacy_public_tokens_allowed()) {
+        $legacy = hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+        $validToken = hash_equals($legacy, $token);
+    }
+    if (!$validToken) {
         redirect_error('Invalid checkout token.', 403);
     }
 

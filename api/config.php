@@ -112,7 +112,12 @@ $defaultRoomRates = [
     'Private Cottage' => 18000.00,
 ];
 
-jebal_define('APP_ENV', (string) jebal_env_value('APP_ENV', 'local'));
+$appEnvironment = strtolower(trim((string) jebal_env_value('APP_ENV', '')));
+if (!in_array($appEnvironment, ['local', 'development', 'testing', 'production'], true)) {
+    http_response_code(500);
+    exit('APP_ENV must be explicitly configured.');
+}
+jebal_define('APP_ENV', $appEnvironment);
 jebal_define('APP_TIMEZONE', $appTimezone);
 $frontendUrl = rtrim((string) jebal_env_value('FRONTEND_URL', jebal_env_value('PUBLIC_APP_URL', jebal_env_value('APP_BASE_URL', ''))), '/');
 $publicAppUrl = $frontendUrl;
@@ -125,11 +130,11 @@ jebal_define('APP_BASE_URL', $publicAppUrl);
 jebal_define('PUBLIC_APP_URL', $publicAppUrl);
 jebal_define('ADMIN_APP_URL', $adminAppUrl);
 jebal_define('API_BASE_URL', $apiBaseUrl);
-jebal_define('ASSET_BASE_URL', $assetBaseUrl !== '' ? $assetBaseUrl : ($apiBaseUrl !== '' ? $apiBaseUrl : 'http://localhost/HotelWebsite/api'));
+jebal_define('ASSET_BASE_URL', $assetBaseUrl !== '' ? $assetBaseUrl : $apiBaseUrl);
 
-jebal_define('DB_HOST', (string) jebal_env_value('DB_HOST', 'localhost'));
-jebal_define('DB_NAME', (string) jebal_env_value('DB_NAME', 'hotel_jebal'));
-jebal_define('DB_USER', (string) jebal_env_value('DB_USER', 'root'));
+jebal_define('DB_HOST', (string) jebal_env_value('DB_HOST', ''));
+jebal_define('DB_NAME', (string) jebal_env_value('DB_NAME', ''));
+jebal_define('DB_USER', (string) jebal_env_value('DB_USER', ''));
 jebal_define('DB_PASS', (string) jebal_env_value('DB_PASS', ''));
 jebal_define('DB_CHARSET', (string) jebal_env_value('DB_CHARSET', 'utf8mb4'));
 
@@ -180,13 +185,17 @@ jebal_define('ADMIN_SMTP_SECURE', (string) jebal_env_value('ADMIN_SMTP_SECURE', 
 
 jebal_define('PAYHERE_MERCHANT_ID', (string) jebal_env_value('PAYHERE_MERCHANT_ID', ''));
 jebal_define('PAYHERE_MERCHANT_SECRET', (string) jebal_env_value('PAYHERE_MERCHANT_SECRET', ''));
+jebal_define('PUBLIC_LINK_SIGNING_KEY', (string) jebal_env_value('PUBLIC_LINK_SIGNING_KEY', ''));
+jebal_define('PUBLIC_LINK_TTL_SECONDS', (int) jebal_env_value('PUBLIC_LINK_TTL_SECONDS', 86400));
+jebal_define('INVOICE_LINK_TTL_SECONDS', (int) jebal_env_value('INVOICE_LINK_TTL_SECONDS', 604800));
+jebal_define('PUBLIC_LINK_LEGACY_UNTIL', (string) jebal_env_value('PUBLIC_LINK_LEGACY_UNTIL', ''));
 
 jebal_define('ALLOWED_ORIGINS', jebal_env_csv('ALLOWED_ORIGINS'));
 
 jebal_define('PAYMENT_CURRENCY', 'USD');
 jebal_define(
     'INVOICE_PUBLIC_BASE_URL',
-    ($apiBaseUrl !== '' ? $apiBaseUrl : 'http://localhost/HotelWebsite/api') . '/invoices/download.php'
+    $apiBaseUrl . '/invoices/download.php'
 );
 jebal_define('INVOICE_STORAGE_DIR', __DIR__ . '/storage/invoices');
 
@@ -201,6 +210,32 @@ jebal_define('PUBLIC_RATE_LIMIT_WINDOW_MINUTES', (int) jebal_env_value('PUBLIC_R
 jebal_define('ROOM_RATES', jebal_env_json_array('ROOM_RATES', $defaultRoomRates));
 
 if (defined('APP_ENV') && APP_ENV === 'production') {
+    $requiredProductionValues = [
+        'FRONTEND_URL' => FRONTEND_URL,
+        'ADMIN_APP_URL' => ADMIN_APP_URL,
+        'API_BASE_URL' => API_BASE_URL,
+        'DB_HOST' => DB_HOST,
+        'DB_NAME' => DB_NAME,
+        'DB_USER' => DB_USER,
+        'DB_PASS' => DB_PASS,
+        'PAYHERE_MERCHANT_ID' => PAYHERE_MERCHANT_ID,
+        'PAYHERE_MERCHANT_SECRET' => PAYHERE_MERCHANT_SECRET,
+        'PUBLIC_LINK_SIGNING_KEY' => PUBLIC_LINK_SIGNING_KEY,
+    ];
+    foreach ($requiredProductionValues as $key => $value) {
+        if (trim((string) $value) === '') {
+            http_response_code(500);
+            exit('Required production configuration is missing: ' . $key);
+        }
+    }
+    if (strtolower(DB_USER) === 'root') {
+        http_response_code(500);
+        exit('Production database root access is forbidden.');
+    }
+    if (strlen(PUBLIC_LINK_SIGNING_KEY) < 32) {
+        http_response_code(500);
+        exit('PUBLIC_LINK_SIGNING_KEY must contain at least 32 characters.');
+    }
     ini_set('display_errors', '0');
     ini_set('display_startup_errors', '0');
     ini_set('log_errors', '1');

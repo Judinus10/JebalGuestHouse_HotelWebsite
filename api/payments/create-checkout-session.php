@@ -12,6 +12,7 @@ require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
 
 apply_cors_headers();
 
@@ -42,7 +43,11 @@ function generate_payhere_order_id(int $bookingId): string
 
 function create_checkout_token(string $orderId, int $bookingId, string $amount): string
 {
-    return hash_hmac('sha256', $orderId . '|' . $bookingId . '|' . $amount, PAYHERE_MERCHANT_SECRET);
+    return create_public_token('payment-status', [
+        'order_id' => $orderId,
+        'booking_id' => $bookingId,
+        'amount' => $amount,
+    ], PUBLIC_LINK_TTL_SECONDS);
 }
 
 function get_public_base_url(): string

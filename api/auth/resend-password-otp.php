@@ -5,6 +5,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 
 apply_cors_headers();
+rate_limit_or_fail('password_otp_resend', 4, 30);
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);

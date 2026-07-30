@@ -9,6 +9,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../security/public-token-helper.php';
 
 apply_cors_headers();
 
@@ -22,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 $bookingId = (int) ($_GET['id'] ?? 0);
-$token = (string) ($_GET['token'] ?? '');
+$token = clean_string($_GET['token'] ?? '', 1024);
 
 if ($bookingId < 1) {
     header('Content-Type: application/json; charset=utf-8');
@@ -34,10 +35,15 @@ function invoice_download_token(int $bookingId): string
     return hash_hmac('sha256', (string) $bookingId, PAYHERE_MERCHANT_SECRET);
 }
 
-$hasGuestToken = $token !== '' && hash_equals(invoice_download_token($bookingId), $token);
+$hasGuestToken = $token !== '' && verify_public_token($token, 'invoice-download', ['booking_id' => $bookingId]);
+if (!$hasGuestToken && $token !== '' && legacy_public_tokens_allowed()) {
+    $hasGuestToken = hash_equals(invoice_download_token($bookingId), $token);
+}
 
 if (!$hasGuestToken) {
     require_admin_auth();
+} else {
+    rate_limit_or_fail('invoice_download', 20, 15);
 }
 
 try {

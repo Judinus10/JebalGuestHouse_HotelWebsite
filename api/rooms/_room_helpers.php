@@ -137,11 +137,12 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
     if (!isset($files['name']) || $files['name'] === []) return;
 
     $uploadDir = __DIR__ . '/../uploads/rooms';
-    if (!is_dir($uploadDir)) mkdir($uploadDir, 0775, true);
+    if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
     $names = is_array($files['name']) ? $files['name'] : [$files['name']];
     $tmpNames = is_array($files['tmp_name']) ? $files['tmp_name'] : [$files['tmp_name']];
     $errors = is_array($files['error']) ? $files['error'] : [$files['error']];
+    $sizes = is_array($files['size'] ?? null) ? $files['size'] : [($files['size'] ?? 0)];
 
     $sortStmt = $pdo->prepare('SELECT COALESCE(MAX(sort_order), 0) FROM room_images WHERE room_id = :room_id');
     $sortStmt->execute([':room_id' => $roomId]);
@@ -151,17 +152,47 @@ function save_room_images(PDO $pdo, int $roomId, array $files): void
     $hasMainStmt->execute([':room_id' => $roomId]);
     $hasMain = (int) $hasMainStmt->fetchColumn() > 0;
 
+    $maxBytes = 8 * 1024 * 1024;
+    $maxWidth = 6000;
+    $maxHeight = 6000;
+    $maxPixels = 24000000;
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    if (!function_exists('imagecreatefromjpeg') || !function_exists('imagecreatefrompng')) {
+        error_log('Room upload rejected because the PHP GD image extension is unavailable.');
+        return;
+    }
+
     foreach ($names as $index => $originalName) {
         if (($errors[$index] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
         $tmpName = $tmpNames[$index] ?? '';
         if (!is_uploaded_file($tmpName)) continue;
+        if (($sizes[$index] ?? 0) < 1 || ($sizes[$index] ?? 0) > $maxBytes) continue;
 
-        $extension = strtolower(pathinfo((string) $originalName, PATHINFO_EXTENSION));
-        if (!in_array($extension, ['jpg', 'jpeg', 'png', 'webp'], true)) continue;
+        $mime = $finfo->file($tmpName);
+        $imageInfo = @getimagesize($tmpName);
+        if ($imageInfo === false || !in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) continue;
+        $width = (int) ($imageInfo[0] ?? 0);
+        $height = (int) ($imageInfo[1] ?? 0);
+        if ($width < 1 || $height < 1 || $width > $maxWidth || $height > $maxHeight || ($width * $height) > $maxPixels) continue;
 
-        $filename = 'room_' . $roomId . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
+        $source = match ($mime) {
+            'image/jpeg' => @imagecreatefromjpeg($tmpName),
+            'image/png' => @imagecreatefrompng($tmpName),
+            'image/webp' => function_exists('imagecreatefromwebp') ? @imagecreatefromwebp($tmpName) : false,
+            default => false,
+        };
+        if ($source === false) continue;
+
+        $outputMime = function_exists('imagewebp') ? 'image/webp' : 'image/jpeg';
+        $extension = $outputMime === 'image/webp' ? 'webp' : 'jpg';
+        $filename = 'room_' . $roomId . '_' . bin2hex(random_bytes(16)) . '.' . $extension;
         $target = $uploadDir . '/' . $filename;
-        if (!move_uploaded_file($tmpName, $target)) continue;
+        $written = $outputMime === 'image/webp'
+            ? imagewebp($source, $target, 82)
+            : imagejpeg($source, $target, 85);
+        imagedestroy($source);
+        if (!$written || !is_file($target)) continue;
+        @chmod($target, 0644);
 
         $relativePath = 'uploads/rooms/' . $filename;
         $sortOrder++;
