@@ -32,7 +32,7 @@ const currencyFormatter = new Intl.NumberFormat('en-US', {
 
 const paymentStatuses = ['pending', 'paid', 'failed', 'cancelled', 'refunded', 'no_pay']
 const editablePaymentStatuses = ['pending', 'paid', 'cancelled', 'refunded', 'no_pay']
-const bookingStatuses = ['pending', 'confirmed', 'cancelled']
+const bookingStatuses = ['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show']
 const defaultPaymentMethods = ['PayHere', 'Cash', 'Bank Transfer', 'Card', 'No Pay', 'Other']
 
 const statusVariant = {
@@ -139,7 +139,7 @@ function Toast({ message, type, onClose }) {
   const tone = type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-100 bg-white text-blue-900'
 
   return (
-    <div className={`fixed right-4 top-4 z-50 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg shadow-slate-200 ${tone}`}>
+    <div className={`fixed right-4 top-4 z-[100] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg shadow-slate-200 ${tone}`} role="status" aria-live="polite">
       <span>{message}</span>
       <button type="button" onClick={onClose} className="rounded p-1 hover:bg-slate-100" aria-label="Close toast">
         <X className="h-4 w-4" />
@@ -337,7 +337,7 @@ function PaymentDetailsModal({ payment, onClose }) {
 
 function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
   const normalizedBookingStatus = String(payment.booking_status || 'pending').toLowerCase()
-  const [bookingStatus, setBookingStatus] = useState(['pending', 'confirmed', 'cancelled'].includes(normalizedBookingStatus) ? normalizedBookingStatus : 'pending')
+  const [bookingStatus, setBookingStatus] = useState(bookingStatuses.includes(normalizedBookingStatus) ? normalizedBookingStatus : 'pending')
   const [paymentStatus, setPaymentStatus] = useState(payment.payment_status || 'pending')
   const [paymentMethod, setPaymentMethod] = useState(payment.payment_method || 'PayHere')
   const [reference, setReference] = useState(payment.payment_id || payment.transaction_id || '')
@@ -401,7 +401,7 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
                 className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               >
                 {bookingStatuses.map((status) => (
-                  <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+                  <option key={status} value={status}>{status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>
                 ))}
               </select>
             </div>
@@ -634,6 +634,26 @@ export default function Payments() {
       setEditingPayment(null)
       showToast('Statuses updated successfully. Email handled by the server.')
     } catch (err) {
+      try {
+        const freshPayments = await fetchPayments()
+        setPayments(freshPayments)
+        const fresh = freshPayments.find((item) => item.booking_id === payment.booking_id)
+        const expectedStatus = String(payload.payment_status || '').toLowerCase().replace(/^payment\s+/, '').replace(/[\s-]+/g, '_')
+        const expectedMethod = String(payload.payment_method || '').trim().toLowerCase()
+
+        if (
+          fresh
+          && fresh.payment_status === expectedStatus
+          && String(fresh.payment_method || '').trim().toLowerCase() === expectedMethod
+        ) {
+          setEditingPayment(null)
+          showToast('Statuses updated successfully.')
+          return
+        }
+      } catch {
+        // Keep the original server error when the follow-up read also fails.
+      }
+
       showToast(err.message || 'Unable to update statuses.', 'error')
     } finally {
       setSavingPayment(false)
@@ -794,7 +814,7 @@ export default function Payments() {
                 ) : (
                   paginatedPayments.map((payment) => (
                     <tr
-                      key={payment.id}
+                      key={`${payment.booking_id}:${payment.id}:${payment.transaction_id}`}
                       ref={(element) => {
                         if (element) focusRefs.current[payment.transaction_id] = element
                       }}

@@ -636,3 +636,10 @@ ALTER TABLE invoices
 UPDATE rooms SET currency = 'USD';
 
 COMMIT;
+
+ALTER TABLE gallery_folders
+ADD COLUMN sort_order INT UNSIGNED NOT NULL DEFAULT 1
+AFTER status;
+
+UPDATE gallery_folders
+SET sort_order = id;

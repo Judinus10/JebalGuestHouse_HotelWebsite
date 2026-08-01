@@ -28,9 +28,7 @@ function admin_payment_status_for_db(mixed $status): string
     $value = preg_replace('/^payment_/', '', $value) ?? '';
 
     return match ($value) {
-        // Online PayHere payment must be marked Paid only by api/payments/payhere-notify.php.
-        // Admin may still use Cancelled/Refunded/No Pay for non-success adjustments.
-        'paid' => 'Payment Pending',
+        'paid' => 'Paid',
         'cancelled', 'canceled' => 'Cancelled',
         'refunded' => 'Refunded',
         'no_pay', 'nopay', 'no_payment' => 'No Pay',
@@ -66,18 +64,20 @@ try {
 
     $requestedStatusRaw = (string) ($data['payment_status'] ?? $data['status'] ?? 'Payment Pending');
     $requestedStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedStatusRaw)));
+    $paymentMethod = admin_payment_method_for_db($data['payment_method'] ?? $data['method'] ?? 'PayHere');
 
-    if (in_array($requestedStatusNormalized, ['paid', 'payment_paid'], true)) {
+    if ($paymentMethod === 'PayHere' && in_array($requestedStatusNormalized, ['paid', 'payment_paid'], true)) {
         json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 403);
     }
 
     $paymentStatus = admin_payment_status_for_db($requestedStatusRaw);
-    $paymentMethod = admin_payment_method_for_db($data['payment_method'] ?? $data['method'] ?? 'PayHere');
     $reference = clean_string($data['transaction_reference'] ?? $data['reference'] ?? '', 100);
 
     $pdo = get_db_connection();
 
-    $currentStmt = $pdo->prepare('SELECT id, booking_id FROM payments WHERE id = :id LIMIT 1');
+    $pdo->beginTransaction();
+
+    $currentStmt = $pdo->prepare('SELECT id, booking_id FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
     $currentStmt->execute([':id' => $paymentId]);
     $currentPayment = $currentStmt->fetch();
 
@@ -145,10 +145,15 @@ try {
     $selectStmt->execute([':id' => $paymentId]);
     $updatedPayment = $selectStmt->fetch();
 
+    $pdo->commit();
+
     json_response(true, 'Payment updated successfully.', 200, [
         'data' => $updatedPayment,
     ]);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log('Admin payment update error: ' . $e->getMessage());
     json_response(false, 'Unable to update payment. Check the server error log for details.', 500);
 }

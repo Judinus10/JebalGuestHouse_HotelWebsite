@@ -9,6 +9,7 @@ if (!configuredApiBaseUrl) {
 export const API_BASE_URL = configuredApiBaseUrl.replace(/\/$/, '')
 
 let csrfToken = ''
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000
 
 export function buildApiUrl(path) {
   const normalizedPath = String(path || '').startsWith('/') ? path : `/${path}`
@@ -24,6 +25,17 @@ export function getCsrfToken() {
 }
 
 export async function apiFetch(url, options = {}) {
+  const controller = new AbortController()
+  const timeoutMs = Number(options.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS)
+  const externalSignal = options.signal
+  const abortFromExternalSignal = () => controller.abort()
+
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort()
+    else externalSignal.addEventListener('abort', abortFromExternalSignal, { once: true })
+  }
+
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs)
   const headers = new Headers(options.headers || {})
 
   if (!headers.has('Accept')) {
@@ -35,11 +47,25 @@ export async function apiFetch(url, options = {}) {
     if (csrfToken) headers.set('X-CSRF-Token', csrfToken)
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers,
-    credentials: 'include',
-  })
+  let response
+
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers,
+      credentials: 'include',
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('The server took too long to respond. Check Apache and MySQL, then retry.')
+    }
+
+    throw new Error('Unable to contact the server. Check Apache and the API configuration.')
+  } finally {
+    window.clearTimeout(timeoutId)
+    externalSignal?.removeEventListener?.('abort', abortFromExternalSignal)
+  }
 
   if (response.status === 401) {
     setCsrfToken('')

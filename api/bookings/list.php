@@ -2,7 +2,6 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
-require_once __DIR__ . '/../calendar/ics-helper.php';
 
 apply_cors_headers();
 
@@ -69,8 +68,16 @@ try {
     );
 
     $data = $stmt->fetchAll();
-    ensure_ics_schema($pdo);
-    $external = $pdo->query("SELECT e.id, CONCAT('BC-', LPAD(e.id,5,'0')) booking_no, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'Booking.com cancelled reservation' ELSE 'Booking.com reservation' END guest_name, '' guest_email, '' guest_phone, '' booker_name, '' booker_email, '' booker_phone, 0 is_booking_for_other, NULL staying_guest_name, NULL staying_guest_email, NULL staying_guest_phone, NULL staying_guest_note, r.id room_id, r.room_name, 'External' room_type, CONCAT('R',LPAD(r.id,2,'0')) room_code, 'Guest House' property_type, e.start_date check_in_date, e.end_date check_out_date, e.start_date check_in, e.end_date check_out, 0 guests, 0 adults, 0 children, GREATEST(1,DATEDIFF(e.end_date,e.start_date)) total_nights, '' special_requests, '' special_request, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'cancelled' ELSE 'external' END booking_status, 'External' payment_status, 0 total_amount, 'USD' payment_currency, NULL invoice_number, NULL invoice_file_path, 'N/A' email_status, e.created_at, e.updated_at, 'booking.com' source, s.last_sync_status sync_status, s.last_sync_completed_at last_synced_at, e.is_active external_is_active, e.status external_status FROM external_calendar_events e JOIN rooms r ON r.id=e.room_id LEFT JOIN external_calendar_sync_status s ON s.room_id=e.room_id ORDER BY e.start_date DESC, e.created_at DESC")->fetchAll();
+    // Schema creation belongs in migrations/ICS sync, not in this read endpoint.
+    // DDL here can wait on a MySQL metadata lock and leave the dashboard loading forever.
+    $external = [];
+    try {
+        $external = $pdo->query("SELECT e.id, CONCAT('BC-', LPAD(e.id,5,'0')) booking_no, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'Booking.com cancelled reservation' ELSE 'Booking.com reservation' END guest_name, '' guest_email, '' guest_phone, '' booker_name, '' booker_email, '' booker_phone, 0 is_booking_for_other, NULL staying_guest_name, NULL staying_guest_email, NULL staying_guest_phone, NULL staying_guest_note, r.id room_id, r.room_name, 'External' room_type, CONCAT('R',LPAD(r.id,2,'0')) room_code, 'Guest House' property_type, e.start_date check_in_date, e.end_date check_out_date, e.start_date check_in, e.end_date check_out, 0 guests, 0 adults, 0 children, GREATEST(1,DATEDIFF(e.end_date,e.start_date)) total_nights, '' special_requests, '' special_request, CASE WHEN e.is_active=0 OR UPPER(COALESCE(e.status,'')) IN ('CANCELLED','CANCELED') THEN 'cancelled' ELSE 'external' END booking_status, 'External' payment_status, 0 total_amount, 'USD' payment_currency, NULL invoice_number, NULL invoice_file_path, 'N/A' email_status, e.created_at, e.updated_at, 'booking.com' source, s.last_sync_status sync_status, s.last_sync_completed_at last_synced_at, e.is_active external_is_active, e.status external_status FROM external_calendar_events e JOIN rooms r ON r.id=e.room_id LEFT JOIN external_calendar_sync_status s ON s.room_id=e.room_id ORDER BY e.start_date DESC, e.created_at DESC")->fetchAll();
+    } catch (Throwable $externalError) {
+        // Optional Booking.com data must not prevent normal website bookings
+        // from rendering when its tables are absent or temporarily unavailable.
+        error_log('Booking.com list data unavailable: ' . $externalError->getMessage());
+    }
     // Merge website and Booking.com records first, then apply one shared
     // newest-first order. Sorting each source separately before appending
     // forces every external booking to the bottom of the list.
