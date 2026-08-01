@@ -6,12 +6,6 @@
 
 declare(strict_types=1);
 
-// Keep PHP/runtime warnings out of the JSON body. A corrupted success response
-// made the dashboard report a failure even though the transaction committed.
-ini_set('display_errors', '0');
-ini_set('log_errors', '1');
-ob_start();
-
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 
@@ -35,8 +29,8 @@ function admin_booking_status_for_db(mixed $status): string
 
     return match ($value) {
         'confirmed' => 'Confirmed',
-        'checked_in', 'check_in', 'checkedin' => 'Checked In',
-        'checked_out', 'check_out', 'checkedout' => 'Checked Out',
+        'checked_in', 'checkedin' => 'Checked In',
+        'checked_out', 'checkedout' => 'Checked Out',
         'cancelled', 'canceled' => 'Cancelled',
         'no_show', 'noshow' => 'No Show',
         default => 'Pending',
@@ -50,6 +44,7 @@ function admin_payment_status_for_db_unified(mixed $status): string
     $value = str_replace([' ', '-'], '_', $value);
 
     return match ($value) {
+        // Online PayHere payment must be marked Paid only by api/payments/payhere-notify.php.
         'paid' => 'Paid',
         'cancelled', 'canceled' => 'Cancelled',
         'refunded' => 'Refunded',
@@ -87,13 +82,14 @@ try {
     $bookingStatus = admin_booking_status_for_db($data['booking_status'] ?? $data['status'] ?? 'Pending');
     $requestedPaymentStatusRaw = (string) ($data['payment_status'] ?? 'Payment Pending');
     $requestedPaymentStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedPaymentStatusRaw)));
-    $paymentMethod = admin_payment_method_for_db_unified($data['payment_method'] ?? 'Manual');
 
-    if ($paymentMethod === 'PayHere' && in_array($requestedPaymentStatusNormalized, ['paid', 'payment_paid'], true)) {
+    $submittedPaymentMethod = admin_payment_method_for_db_unified($data['payment_method'] ?? 'Manual');
+    if ($submittedPaymentMethod === 'PayHere' && in_array($requestedPaymentStatusNormalized, ['paid', 'payment_paid'], true)) {
         json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 403);
     }
 
     $paymentStatus = admin_payment_status_for_db_unified($requestedPaymentStatusRaw);
+    $paymentMethod = $submittedPaymentMethod;
     $reference = clean_string($data['transaction_reference'] ?? $data['reference'] ?? '', 100);
     $remarks = clean_string($data['remarks'] ?? '', 1000);
 
@@ -112,19 +108,25 @@ try {
     $oldBookingStatus = (string) ($booking['status'] ?? 'Pending');
     $oldPaymentStatus = (string) ($booking['payment_status'] ?? 'Payment Pending');
 
-    $canProcessBooking = in_array($paymentStatus, ['Paid', 'No Pay'], true);
-
-    if (in_array($bookingStatus, ['Confirmed', 'Checked In'], true) && !$canProcessBooking) {
+    if (in_array($bookingStatus, ['Confirmed', 'Checked In'], true) && $paymentStatus !== 'Paid' && $paymentStatus !== 'No Pay') {
         $pdo->rollBack();
-        json_response(false, 'Confirm and check-in require payment status Paid or No Pay.', 403);
+        json_response(false, 'Payment must be Paid or No Pay before confirming or checking in.', 409);
     }
 
-    if ($bookingStatus === 'Checked Out' && strcasecmp($oldBookingStatus, 'Checked In') !== 0 && strcasecmp($oldBookingStatus, 'Checked Out') !== 0) {
+    $allowedTransitions = [
+        'Pending' => ['Pending', 'Confirmed', 'Cancelled', 'No Show'],
+        'Confirmed' => ['Confirmed', 'Checked In', 'Cancelled', 'No Show'],
+        'Checked In' => ['Checked In', 'Checked Out'],
+        'Checked Out' => ['Checked Out'],
+        'Cancelled' => ['Cancelled'],
+        'No Show' => ['No Show'],
+    ];
+    if (!in_array($bookingStatus, $allowedTransitions[$oldBookingStatus] ?? [$oldBookingStatus], true)) {
         $pdo->rollBack();
-        json_response(false, 'The booking must be Checked In before it can be Checked Out.', 409);
+        json_response(false, 'This booking status change is not allowed from its current status.', 409);
     }
 
-    if (in_array($bookingStatus, ['Confirmed', 'Checked In'], true) && strcasecmp($oldBookingStatus, $bookingStatus) !== 0) {
+    if ($bookingStatus === 'Confirmed' && strcasecmp($oldBookingStatus, $bookingStatus) !== 0) {
         $conflict = $pdo->prepare(
             "SELECT id
              FROM bookings
@@ -252,16 +254,6 @@ try {
         }
     }
 
-    // Email libraries or local mail configuration can emit warnings after the
-    // database commit. Log and discard that output before returning clean JSON.
-    $unexpectedOutput = ob_get_contents();
-    if (is_string($unexpectedOutput) && trim($unexpectedOutput) !== '') {
-        error_log('Discarded unexpected unified status output: ' . trim($unexpectedOutput));
-    }
-    if (ob_get_level() > 0) {
-        ob_clean();
-    }
-
     json_response(true, 'Statuses updated successfully.', 200, [
         'data' => [
             'id' => $bookingId,
@@ -278,8 +270,5 @@ try {
     }
 
     error_log('Unified admin status update error: ' . $e->getMessage());
-    if (ob_get_level() > 0) {
-        ob_clean();
-    }
     json_response(false, 'Unable to update statuses.', 500);
 }

@@ -32,6 +32,13 @@ function normalizePaymentMethod(method) {
   return value
 }
 
+function normalizeBookingStatus(status) {
+  const value = String(status || 'pending').trim().toLowerCase().replace(/[\s-]+/g, '_')
+  if (['pending', 'confirmed', 'checked_in', 'checked_out', 'cancelled', 'no_show'].includes(value)) return value
+  if (value === 'canceled') return 'cancelled'
+  return 'pending'
+}
+
 function dbPaymentStatus(status) {
   const value = normalizePaymentStatus(status)
   if (value === 'paid') return 'Paid'
@@ -61,7 +68,7 @@ function normalizePayment(payment) {
     staying_guest_email: payment.staying_guest_email || '',
     staying_guest_phone: payment.staying_guest_phone || '',
     staying_guest_note: payment.staying_guest_note || '',
-    booking_status: payment.booking_status || payment.status_booking || '',
+    booking_status: normalizeBookingStatus(payment.booking_status || payment.status_booking),
     check_in: payment.check_in || payment.check_in_date || '',
     check_out: payment.check_out || payment.check_out_date || '',
     guests: Number(payment.guests || payment.total_guests || 0),

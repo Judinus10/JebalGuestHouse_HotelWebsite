@@ -12,7 +12,6 @@ import {
   TrendingUp,
   WalletCards,
   X,
-  AlertTriangle,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -51,6 +50,15 @@ const statusLabel = {
   cancelled: 'Cancelled',
   refunded: 'Refunded',
   no_pay: 'No Pay',
+}
+
+const bookingStatusLabel = {
+  pending: 'Pending',
+  confirmed: 'Confirmed',
+  checked_in: 'Checked In',
+  checked_out: 'Checked Out',
+  cancelled: 'Cancelled',
+  no_show: 'No Show',
 }
 
 function formatCurrency(value) {
@@ -137,15 +145,10 @@ function PaymentStatusBadge({ status }) {
 function Toast({ message, type, onClose }) {
   if (!message) return null
 
-  const tone = type === 'error'
-    ? 'border-red-200 bg-red-50 text-red-800'
-    : type === 'warning'
-      ? 'border-amber-300 bg-amber-50 text-amber-900'
-      : 'border-blue-100 bg-white text-blue-900'
+  const tone = type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-100 bg-white text-blue-900'
 
   return (
-    <div className={`fixed right-4 top-4 z-[100] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg shadow-slate-200 ${tone}`} role="status" aria-live="polite">
-      {type === 'warning' ? <AlertTriangle className="h-5 w-5 shrink-0" /> : null}
+    <div className={`fixed right-4 top-4 z-50 flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg shadow-slate-200 ${tone}`}>
       <span>{message}</span>
       <button type="button" onClick={onClose} className="rounded p-1 hover:bg-slate-100" aria-label="Close toast">
         <X className="h-4 w-4" />
@@ -343,7 +346,8 @@ function PaymentDetailsModal({ payment, onClose }) {
 
 function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
   const normalizedBookingStatus = String(payment.booking_status || 'pending').toLowerCase()
-  const [bookingStatus, setBookingStatus] = useState(bookingStatuses.includes(normalizedBookingStatus) ? normalizedBookingStatus : 'pending')
+  const normalizedBookingStatusKey = normalizedBookingStatus.replace(/[\s-]+/g, '_')
+  const [bookingStatus, setBookingStatus] = useState(bookingStatuses.includes(normalizedBookingStatusKey) ? normalizedBookingStatusKey : 'pending')
   const [paymentStatus, setPaymentStatus] = useState(payment.payment_status || 'pending')
   const [paymentMethod, setPaymentMethod] = useState(payment.payment_method || 'PayHere')
   const [reference, setReference] = useState(payment.payment_id || payment.transaction_id || '')
@@ -407,7 +411,7 @@ function EditPaymentModal({ payment, methodOptions, onClose, onSave, saving }) {
                 className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
               >
                 {bookingStatuses.map((status) => (
-                  <option key={status} value={status}>{status.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())}</option>
+                  <option key={status} value={status}>{bookingStatusLabel[status]}</option>
                 ))}
               </select>
             </div>
@@ -633,26 +637,6 @@ export default function Payments() {
   }
 
   const handleSavePayment = async (payment, payload) => {
-    const nextBookingStatus = String(payload.booking_status || '').toLowerCase().replace(/[\s-]+/g, '_')
-    const nextPaymentStatus = String(payload.payment_status || '').toLowerCase().replace(/^payment\s+/, '').replace(/[\s-]+/g, '_')
-    const nextPaymentMethod = String(payload.payment_method || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
-    const currentBookingStatus = String(payment.booking_status || '').toLowerCase().replace(/[\s-]+/g, '_')
-
-    if (nextPaymentMethod === 'payhere' && nextPaymentStatus === 'paid') {
-      showToast('PayHere payments can only be marked Paid after PayHere verifies the payment.', 'warning')
-      return
-    }
-
-    if (['confirmed', 'checked_in'].includes(nextBookingStatus) && !['paid', 'no_pay'].includes(nextPaymentStatus)) {
-      showToast('Payment must be Paid or No Pay before confirming or checking in.', 'warning')
-      return
-    }
-
-    if (nextBookingStatus === 'checked_out' && currentBookingStatus !== 'checked_in') {
-      showToast('The booking must be Checked In before it can be Checked Out.', 'warning')
-      return
-    }
-
     try {
       setSavingPayment(true)
       const refreshedPayments = await updateCombinedStatusByBooking(payment.booking_id, payload)
@@ -660,26 +644,6 @@ export default function Payments() {
       setEditingPayment(null)
       showToast('Statuses updated successfully. Email handled by the server.')
     } catch (err) {
-      try {
-        const freshPayments = await fetchPayments()
-        setPayments(freshPayments)
-        const fresh = freshPayments.find((item) => item.booking_id === payment.booking_id)
-        const expectedStatus = String(payload.payment_status || '').toLowerCase().replace(/^payment\s+/, '').replace(/[\s-]+/g, '_')
-        const expectedMethod = String(payload.payment_method || '').trim().toLowerCase()
-
-        if (
-          fresh
-          && fresh.payment_status === expectedStatus
-          && String(fresh.payment_method || '').trim().toLowerCase() === expectedMethod
-        ) {
-          setEditingPayment(null)
-          showToast('Statuses updated successfully.')
-          return
-        }
-      } catch {
-        // Keep the original server error when the follow-up read also fails.
-      }
-
       showToast(err.message || 'Unable to update statuses.', 'error')
     } finally {
       setSavingPayment(false)
@@ -840,7 +804,7 @@ export default function Payments() {
                 ) : (
                   paginatedPayments.map((payment) => (
                     <tr
-                      key={`${payment.booking_id}:${payment.id}:${payment.transaction_id}`}
+                      key={payment.id}
                       ref={(element) => {
                         if (element) focusRefs.current[payment.transaction_id] = element
                       }}

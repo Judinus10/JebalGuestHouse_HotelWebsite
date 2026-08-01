@@ -263,7 +263,10 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
   if (!booking) return null
 
   const paymentStatusKey = getBookingStatusKey(booking.payment_status)
-  const canProcessBooking = paymentStatusKey === 'paid' || paymentStatusKey === 'no_pay'
+  const bookingStatusKey = getBookingStatusKey(booking.booking_status)
+  const isPaid = paymentStatusKey === 'paid'
+  const noShowDateReached = Boolean(booking.check_in) && booking.check_in <= new Date().toISOString().slice(0, 10)
+  const actionDisabled = (allowed) => updatingStatus || !allowed
 
   const handleBackdropClick = (event) => {
     if (event.target === event.currentTarget) {
@@ -325,15 +328,17 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
                   <p><span className="font-semibold text-slate-500">Amount:</span> {currencyFormatter.format(booking.total_amount)}</p>
                   <div><span className="font-semibold text-slate-500">Booking status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.booking_status)] || 'secondary'}>{normalizeStatus(booking.booking_status)}</Badge></div>
                   <div><span className="font-semibold text-slate-500">Payment status:</span> <Badge variant={statusVariant[getBookingStatusKey(booking.payment_status)] || 'secondary'}>{normalizeStatus(booking.payment_status)}</Badge></div>
+                  <p><span className="font-semibold text-slate-500">Payment method:</span> {booking.payment_method || '-'}</p>
                 </div>
               </div>
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
                 <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'confirmed')}>Confirm booking</Button>
-                  <Button size="sm" variant="outline" disabled={updatingStatus} onClick={() => onStatusChange(booking.id, 'cancelled')}>Cancel booking</Button>
-                  <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_in')}>Mark checked in</Button>
-                  <Button size="sm" variant="outline" disabled={updatingStatus || !canProcessBooking} onClick={() => onStatusChange(booking.id, 'checked_out')}>Mark checked out</Button>
+                  <Button title={!isPaid ? 'Payment must be Paid first.' : ''} size="sm" variant="outline" disabled={actionDisabled(bookingStatusKey === 'pending' && isPaid)} onClick={() => onStatusChange(booking, 'confirmed')}>Confirm booking</Button>
+                  <Button size="sm" variant="outline" disabled={actionDisabled(['pending', 'confirmed'].includes(bookingStatusKey))} onClick={() => onStatusChange(booking, 'cancelled')}>Cancel booking</Button>
+                  <Button size="sm" variant="outline" disabled={actionDisabled(bookingStatusKey === 'confirmed')} onClick={() => onStatusChange(booking, 'checked_in')}>Mark checked in</Button>
+                  <Button size="sm" variant="outline" disabled={actionDisabled(bookingStatusKey === 'checked_in')} onClick={() => onStatusChange(booking, 'checked_out')}>Mark checked out</Button>
+                  <Button title={!noShowDateReached ? 'Available on or after the check-in date.' : ''} size="sm" className="border-purple-300 bg-purple-50 text-purple-800 hover:bg-purple-100" variant="outline" disabled={actionDisabled(['pending', 'confirmed'].includes(bookingStatusKey) && noShowDateReached)} onClick={() => onStatusChange(booking, 'no_show')}>Mark no show</Button>
                 </div>
               </div>
             </>
@@ -351,6 +356,7 @@ export default function BookingCalendar() {
   const [tooltip, setTooltip] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState(null)
   const [updatingStatus, setUpdatingStatus] = useState(false)
 
   const year = currentDate.getFullYear()
@@ -401,29 +407,45 @@ export default function BookingCalendar() {
     setSelectedBooking(booking)
   }
 
-  const handleStatusChange = async (bookingId, status) => {
+  const handleStatusChange = async (booking, status) => {
+    if (updatingStatus || booking.is_external) return
+
+    const actionLabel = normalizeStatus(status)
+    const paymentKey = getBookingStatusKey(booking.payment_status)
+    let confirmation = `Change this booking status to ${actionLabel}?`
+    if (status === 'no_show' && paymentKey === 'paid') {
+      confirmation = String(booking.payment_method || '').toLowerCase() === 'payhere'
+        ? 'Mark this booking as No Show? The PayHere payment will remain Paid until a real refund is completed.'
+        : 'Mark this booking as No Show and record the paid Cash/Bank Transfer amount as Refunded?'
+    }
+    if (!window.confirm(confirmation)) return
+
     try {
       setUpdatingStatus(true)
       setError('')
-      const updatedBooking = await updateBookingStatus(bookingId, status)
+      setNotice(null)
+      const updatedBooking = await updateBookingStatus(booking.id, status)
 
       setCalendarBookings((current) =>
-        current.map((booking) =>
-          booking.id === bookingId
-            ? { ...booking, ...updatedBooking, booking_status: updatedBooking.booking_status || status }
-            : booking
+        current.map((item) =>
+          !item.is_external && item.id === booking.id
+            ? { ...item, ...updatedBooking, booking_status: updatedBooking.booking_status || status }
+            : item
         )
       )
 
       setSelectedBooking((current) =>
-        current && current.id === bookingId
+        current && !current.is_external && current.id === booking.id
           ? { ...current, ...updatedBooking, booking_status: updatedBooking.booking_status || status }
           : current
       )
+      setNotice({
+        type: updatedBooking.refund_required ? 'warning' : 'success',
+        message: updatedBooking.message || 'Booking status updated successfully.',
+      })
     } catch (err) {
       const message = err.message || 'Unable to update booking status.'
-      setError(message)
-      window.alert(message)
+      setNotice({ type: 'warning', message })
     } finally {
       setUpdatingStatus(false)
     }
@@ -451,6 +473,12 @@ export default function BookingCalendar() {
 
       {error ? (
         <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{error}</div>
+      ) : null}
+
+      {notice ? (
+        <div className={`mb-4 rounded-xl border px-4 py-3 text-sm font-medium ${notice.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+          {notice.message}
+        </div>
       ) : null}
 
       {isLoading ? (
@@ -501,7 +529,7 @@ export default function BookingCalendar() {
 
                     return (
                       <button
-                        key={`${booking.id}-${weekIndex}`}
+                        key={`${booking.source || 'website'}-${booking.id}-${weekIndex}`}
                         type="button"
                         onClick={() => openBookingModal(booking)}
                         onMouseEnter={(event) => showTooltip(event, booking)}
@@ -535,7 +563,7 @@ export default function BookingCalendar() {
           ) : null}
           {calendarBookings.map((booking) => (
             <button
-              key={booking.id}
+              key={`${booking.source || 'website'}-${booking.id}`}
               type="button"
               onClick={() => openBookingModal(booking)}
               className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm"

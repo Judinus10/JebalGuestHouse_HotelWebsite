@@ -19,7 +19,6 @@ import {
   WalletCards,
   X,
   XCircle,
-  AlertTriangle,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -62,7 +61,10 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
 const bookingStatusVariant = {
   pending: 'warning',
   confirmed: 'success',
+  checked_in: 'default',
+  checked_out: 'secondary',
   cancelled: 'destructive',
+  no_show: 'purple',
   external: 'default',
 }
 
@@ -123,7 +125,10 @@ function humanizeBookingStatus(value) {
   const normalized = String(value || 'pending').trim().toLowerCase().replace(/^booking\s+/, '').replace(/\s+/g, '_')
 
   if (normalized === 'confirmed') return 'Confirmed'
+  if (normalized === 'checked_in' || normalized === 'checkedin') return 'Checked In'
+  if (normalized === 'checked_out' || normalized === 'checkedout') return 'Checked Out'
   if (normalized === 'cancelled' || normalized === 'canceled') return 'Cancelled'
+  if (normalized === 'no_show' || normalized === 'noshow') return 'No Show'
   if (normalized === 'external') return 'Booked'
   return 'Pending'
 }
@@ -180,7 +185,7 @@ function isActiveBookingForAvailability(booking) {
   if (bookingStatus === 'cancelled' || bookingStatus === 'canceled') return false
   if (['failed', 'cancelled', 'canceled', 'refunded'].includes(paymentStatus)) return false
 
-  return ['pending', 'confirmed'].includes(bookingStatus)
+  return ['pending', 'confirmed', 'checked_in', 'checked in'].includes(bookingStatus)
 }
 
 function hasDateOverlap(requestedCheckIn, requestedCheckOut, existingCheckIn, existingCheckOut) {
@@ -273,15 +278,11 @@ function Modal({ title, description, children, onClose, size = 'max-w-3xl' }) {
 function Toast({ toast, onClose }) {
   if (!toast) return null
 
-  const Icon = toast.type === 'error' ? XCircle : toast.type === 'warning' ? AlertTriangle : CheckCircle2
-  const tone = toast.type === 'error'
-    ? 'border-red-200 bg-red-50 text-red-800'
-    : toast.type === 'warning'
-      ? 'border-amber-300 bg-amber-50 text-amber-900'
-      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  const Icon = toast.type === 'error' ? XCircle : CheckCircle2
+  const tone = toast.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
 
   return (
-    <div className={`fixed right-5 top-5 z-[100] flex max-w-[calc(100vw-2.5rem)] items-center gap-3 rounded-xl border px-4 py-3 shadow-lg ${tone}`} role="status" aria-live="polite">
+    <div className={`fixed right-5 top-5 z-[60] flex items-center gap-3 rounded-xl border px-4 py-3 shadow-lg ${tone}`}>
       <Icon className="h-5 w-5" />
       <p className="text-sm font-semibold">{toast.message}</p>
       <button type="button" onClick={onClose} className="ml-2 rounded p-1 hover:bg-white/60">
@@ -525,31 +526,23 @@ function CombinedStatusModal({ booking, focus = 'booking', onClose, onSave }) {
   const [reference, setReference] = useState('')
   const [remarks, setRemarks] = useState('')
   const [sendEmail, setSendEmail] = useState(true)
-  const [saving, setSaving] = useState(false)
 
-  const handleSubmit = async (event) => {
+  const handleSubmit = (event) => {
     event.preventDefault()
-
-    if (saving) return
 
     if (booking.booking_status !== 'cancelled' && bookingStatus === 'cancelled') {
       const confirmed = window.confirm('Cancel this booking? The customer can be notified by email if Send email is checked.')
       if (!confirmed) return
     }
 
-    setSaving(true)
-    try {
-      await onSave(booking.id, {
-        booking_status: bookingStatus,
-        payment_status: paymentStatus,
-        payment_method: paymentMethod,
-        transaction_reference: reference.trim(),
-        remarks: remarks.trim(),
-        send_email: sendEmail,
-      })
-    } finally {
-      setSaving(false)
-    }
+    onSave(booking.id, {
+      booking_status: bookingStatus,
+      payment_status: paymentStatus,
+      payment_method: paymentMethod,
+      transaction_reference: reference.trim(),
+      remarks: remarks.trim(),
+      send_email: sendEmail,
+    })
   }
 
   return (
@@ -610,8 +603,8 @@ function CombinedStatusModal({ booking, focus = 'booking', onClose, onSave }) {
         </label>
 
         <div className="flex justify-end gap-3 pt-2">
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Statuses'}</Button>
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit">Save Statuses</Button>
         </div>
       </form>
     </Modal>
@@ -1168,7 +1161,7 @@ export default function Bookings() {
         if (booking.payment_status === 'paid') acc.revenue += Number(booking.total_amount || 0)
         return acc
       },
-      { total: 0, pending: 0, confirmed: 0, cancelled: 0, revenue: 0 }
+      { total: 0, pending: 0, confirmed: 0, checked_in: 0, checked_out: 0, cancelled: 0, no_show: 0, revenue: 0 }
     )
   }, [bookings])
 
@@ -1182,61 +1175,14 @@ export default function Bookings() {
   }
 
   const handleCombinedStatusSave = async (bookingId, updates) => {
-    const currentBooking = bookings.find((booking) => !booking.is_external && booking.id === bookingId)
-    const nextBookingStatus = String(updates.booking_status || '').toLowerCase().replace(/[\s-]+/g, '_')
-    const nextPaymentStatus = String(updates.payment_status || '').toLowerCase().replace(/^payment\s+/, '').replace(/[\s-]+/g, '_')
-    const nextPaymentMethod = String(updates.payment_method || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
-
-    if (nextPaymentMethod === 'payhere' && nextPaymentStatus === 'paid') {
-      showToast('PayHere payments can only be marked Paid after PayHere verifies the payment.', 'warning')
-      return false
-    }
-
-    if (['confirmed', 'checked_in'].includes(nextBookingStatus) && !['paid', 'no_pay'].includes(nextPaymentStatus)) {
-      showToast('Payment must be Paid or No Pay before confirming or checking in.', 'warning')
-      return false
-    }
-
-    if (nextBookingStatus === 'checked_out' && currentBooking?.booking_status !== 'checked_in') {
-      showToast('The booking must be Checked In before it can be Checked Out.', 'warning')
-      return false
-    }
-
     try {
       const updatedBooking = await updateBookingAndPaymentStatus(bookingId, updates)
-      setBookings((current) => current.map((booking) => (!booking.is_external && booking.id === bookingId ? { ...booking, ...updatedBooking } : booking)))
+      setBookings((current) => current.map((booking) => (booking.id === bookingId ? { ...booking, ...updatedBooking } : booking)))
       setStatusBooking(null)
       setPaymentBooking(null)
       showToast('Statuses updated successfully. Email handled by the server.')
-      return true
     } catch (error) {
-      // A connection/response failure can happen after PHP has committed the
-      // transaction. Reload once and compare instead of asking the admin to
-      // submit the same mutation again (which may duplicate email/audit work).
-      try {
-        const freshBookings = await fetchBookings()
-        setBookings(freshBookings)
-        const fresh = freshBookings.find((booking) => !booking.is_external && booking.id === bookingId)
-        const expectedBookingStatus = String(updates.booking_status || '').toLowerCase().replace(/[\s-]+/g, '_')
-        const expectedPaymentStatus = String(updates.payment_status || '').toLowerCase().replace(/^payment\s+/, '').replace(/[\s-]+/g, '_')
-        const expectedMethod = String(updates.payment_method || '').trim().toLowerCase()
-        const updateWasCommitted = fresh
-          && fresh.booking_status === expectedBookingStatus
-          && fresh.payment_status === expectedPaymentStatus
-          && String(fresh.payment_method || '').trim().toLowerCase() === expectedMethod
-
-        if (updateWasCommitted) {
-          setStatusBooking(null)
-          setPaymentBooking(null)
-          showToast('Statuses updated successfully.')
-          return true
-        }
-      } catch {
-        // Preserve the original server error below when reconciliation fails.
-      }
-
       showToast(error.message || 'Unable to update statuses.', 'error')
-      return false
     }
   }
 
@@ -1393,7 +1339,7 @@ export default function Bookings() {
 
                   return (
                     <MobileBookingCard
-                      key={`${booking.source || 'website'}:${booking.id}:${booking.booking_no}`}
+                      key={booking.id}
                       booking={booking}
                       shouldFlashBooking={shouldFlashBooking}
                       setRef={(element) => {
@@ -1422,7 +1368,7 @@ export default function Bookings() {
 
                   return (
                     <div
-                      key={`${booking.source || 'website'}:${booking.id}:${booking.booking_no}`}
+                      key={booking.id}
                       ref={(element) => {
                         if (element) {
                           if (booking.booking_no) focusRefs.current[booking.booking_no] = element

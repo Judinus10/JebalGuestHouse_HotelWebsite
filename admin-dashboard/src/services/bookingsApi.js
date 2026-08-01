@@ -204,6 +204,10 @@ export async function updateBookingStatus(bookingId, status) {
   return {
     id: Number(data.id || bookingId),
     booking_status: normalizeBookingStatus(data.booking_status || data.status || status),
+    payment_status: normalizePaymentStatus(data.payment_status),
+    payment_method: data.payment_method || '',
+    refund_required: Boolean(data.refund_required),
+    message: payload.message || '',
   }
 }
 

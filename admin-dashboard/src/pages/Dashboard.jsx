@@ -47,7 +47,11 @@ const defaultDashboardData = {
     totalBookings: 0,
     pendingBookings: 0,
     confirmedBookings: 0,
+    checkedInBookings: 0,
+    checkedOutBookings: 0,
     cancelledBookings: 0,
+    noShowBookings: 0,
+    bookingComBookings: 0,
     totalEnquiries: 0,
     totalRevenue: 0,
     paidBookings: 0,
@@ -93,12 +97,16 @@ const defaultDashboardData = {
   },
 }
 
-const chartColors = ['#2563EB', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6']
+const chartColors = ['#F59E0B', '#10B981', '#2563EB', '#64748B', '#EF4444', '#8B5CF6', '#7C3AED']
 
 const bookingStatusColors = {
   Pending: '#F59E0B',
   Confirmed: '#10B981',
+  'Checked In': '#2563EB',
+  'Checked Out': '#64748B',
   Cancelled: '#EF4444',
+  'No Show': '#8B5CF6',
+  'Booking.com': '#7C3AED',
 }
 
 const paymentStatusColors = {
@@ -120,7 +128,10 @@ const statusVariant = {
   Occupied: 'secondary',
   Pending: 'warning',
   Confirmed: 'success',
+  'Checked In': 'default',
+  'Checked Out': 'secondary',
   Cancelled: 'destructive',
+  'No Show': 'purple',
   Completed: 'default',
   Paid: 'success',
   Failed: 'destructive',
@@ -203,6 +214,7 @@ function buildDashboardReportRows(data, monthlyBookingTrend, revenueTrend) {
     { Section: 'Bookings', Metric: 'Pending Bookings', Value: data.cards.pendingBookings },
     { Section: 'Bookings', Metric: 'Confirmed Bookings', Value: data.cards.confirmedBookings },
     { Section: 'Bookings', Metric: 'Cancelled Bookings', Value: data.cards.cancelledBookings },
+    { Section: 'Bookings', Metric: 'Booking.com Bookings', Value: data.cards.bookingComBookings },
     { Section: 'Payments', Metric: 'Total Revenue', Value: currencyFormatter.format(data.cards.totalRevenue) },
     { Section: 'Payments', Metric: 'Paid Bookings', Value: data.cards.paidBookings },
     { Section: 'Payments', Metric: 'Payment Pending', Value: data.cards.paymentPendingBookings },
@@ -482,11 +494,15 @@ export default function Dashboard() {
     { title: 'Total Bookings', value: dashboardData.cards.totalBookings, helper: 'All booking requests', icon: CalendarCheck, to: '/bookings' },
     { title: 'Pending Bookings', value: dashboardData.cards.pendingBookings, helper: 'Need confirmation', icon: TrendingUp, to: '/bookings' },
     { title: 'Confirmed Bookings', value: dashboardData.cards.confirmedBookings, helper: 'Confirmed stays', icon: CalendarCheck, to: '/bookings' },
+    { title: 'Checked In', value: dashboardData.cards.checkedInBookings, helper: 'Guests currently checked in', icon: Home, to: '/bookings' },
+    { title: 'Checked Out', value: dashboardData.cards.checkedOutBookings, helper: 'Completed stays', icon: BedDouble, to: '/bookings' },
     { title: 'Cancelled Bookings', value: dashboardData.cards.cancelledBookings, helper: 'Cancelled requests', icon: BedDouble, to: '/bookings' },
+    { title: 'No Show', value: dashboardData.cards.noShowBookings, helper: 'Guests who did not arrive', icon: CalendarCheck, to: '/bookings' },
     { title: 'Total Enquiries', value: dashboardData.cards.totalEnquiries, helper: 'Guest messages', icon: Mail, to: '/messages' },
     { title: 'Total Revenue', value: currencyFormatter.format(dashboardData.cards.totalRevenue), helper: 'Paid bookings only', icon: DollarSign, to: '/payments' },
     { title: 'Paid Bookings', value: dashboardData.cards.paidBookings, helper: 'Payment completed', icon: CreditCard, to: '/payments' },
     { title: 'Payment Pending', value: dashboardData.cards.paymentPendingBookings, helper: 'Awaiting payment', icon: CreditCard, to: '/payments' },
+    { title: 'Booking.com Bookings', value: dashboardData.cards.bookingComBookings, helper: 'Reservations from Booking.com', icon: Building2, to: '/booking-calendar' },
   ]
 
   const quickActions = [

@@ -28,6 +28,8 @@ function admin_payment_status_for_db(mixed $status): string
     $value = preg_replace('/^payment_/', '', $value) ?? '';
 
     return match ($value) {
+        // Online PayHere payment must be marked Paid only by api/payments/payhere-notify.php.
+        // Admin may still use Cancelled/Refunded/No Pay for non-success adjustments.
         'paid' => 'Paid',
         'cancelled', 'canceled' => 'Cancelled',
         'refunded' => 'Refunded',
@@ -64,24 +66,25 @@ try {
 
     $requestedStatusRaw = (string) ($data['payment_status'] ?? $data['status'] ?? 'Payment Pending');
     $requestedStatusNormalized = strtolower(str_replace([' ', '-'], '_', trim($requestedStatusRaw)));
-    $paymentMethod = admin_payment_method_for_db($data['payment_method'] ?? $data['method'] ?? 'PayHere');
 
-    if ($paymentMethod === 'PayHere' && in_array($requestedStatusNormalized, ['paid', 'payment_paid'], true)) {
+    $submittedPaymentMethod = admin_payment_method_for_db($data['payment_method'] ?? $data['method'] ?? 'PayHere');
+    if ($submittedPaymentMethod === 'PayHere' && in_array($requestedStatusNormalized, ['paid', 'payment_paid'], true)) {
         json_response(false, 'Paid status is locked. PayHere payments can only be marked Paid by the verified PayHere notify webhook.', 403);
     }
 
     $paymentStatus = admin_payment_status_for_db($requestedStatusRaw);
+    $paymentMethod = $submittedPaymentMethod;
     $reference = clean_string($data['transaction_reference'] ?? $data['reference'] ?? '', 100);
 
     $pdo = get_db_connection();
-
     $pdo->beginTransaction();
 
-    $currentStmt = $pdo->prepare('SELECT id, booking_id FROM payments WHERE id = :id LIMIT 1 FOR UPDATE');
+    $currentStmt = $pdo->prepare('SELECT id, booking_id FROM payments WHERE id = :id LIMIT 1');
     $currentStmt->execute([':id' => $paymentId]);
     $currentPayment = $currentStmt->fetch();
 
     if (!$currentPayment) {
+        $pdo->rollBack();
         json_response(false, 'Payment record not found.', 404);
     }
 
