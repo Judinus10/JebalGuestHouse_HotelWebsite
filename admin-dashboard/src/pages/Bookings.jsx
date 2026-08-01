@@ -19,6 +19,7 @@ import {
   WalletCards,
   X,
   XCircle,
+  AlertTriangle,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -272,8 +273,12 @@ function Modal({ title, description, children, onClose, size = 'max-w-3xl' }) {
 function Toast({ toast, onClose }) {
   if (!toast) return null
 
-  const Icon = toast.type === 'error' ? XCircle : CheckCircle2
-  const tone = toast.type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+  const Icon = toast.type === 'error' ? XCircle : toast.type === 'warning' ? AlertTriangle : CheckCircle2
+  const tone = toast.type === 'error'
+    ? 'border-red-200 bg-red-50 text-red-800'
+    : toast.type === 'warning'
+      ? 'border-amber-300 bg-amber-50 text-amber-900'
+      : 'border-emerald-200 bg-emerald-50 text-emerald-800'
 
   return (
     <div className={`fixed right-5 top-5 z-[100] flex max-w-[calc(100vw-2.5rem)] items-center gap-3 rounded-xl border px-4 py-3 shadow-lg ${tone}`} role="status" aria-live="polite">
@@ -1177,6 +1182,26 @@ export default function Bookings() {
   }
 
   const handleCombinedStatusSave = async (bookingId, updates) => {
+    const currentBooking = bookings.find((booking) => !booking.is_external && booking.id === bookingId)
+    const nextBookingStatus = String(updates.booking_status || '').toLowerCase().replace(/[\s-]+/g, '_')
+    const nextPaymentStatus = String(updates.payment_status || '').toLowerCase().replace(/^payment\s+/, '').replace(/[\s-]+/g, '_')
+    const nextPaymentMethod = String(updates.payment_method || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
+
+    if (nextPaymentMethod === 'payhere' && nextPaymentStatus === 'paid') {
+      showToast('PayHere payments can only be marked Paid after PayHere verifies the payment.', 'warning')
+      return false
+    }
+
+    if (['confirmed', 'checked_in'].includes(nextBookingStatus) && !['paid', 'no_pay'].includes(nextPaymentStatus)) {
+      showToast('Payment must be Paid or No Pay before confirming or checking in.', 'warning')
+      return false
+    }
+
+    if (nextBookingStatus === 'checked_out' && currentBooking?.booking_status !== 'checked_in') {
+      showToast('The booking must be Checked In before it can be Checked Out.', 'warning')
+      return false
+    }
+
     try {
       const updatedBooking = await updateBookingAndPaymentStatus(bookingId, updates)
       setBookings((current) => current.map((booking) => (!booking.is_external && booking.id === bookingId ? { ...booking, ...updatedBooking } : booking)))

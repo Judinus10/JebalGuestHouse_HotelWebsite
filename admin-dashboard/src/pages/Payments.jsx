@@ -12,6 +12,7 @@ import {
   TrendingUp,
   WalletCards,
   X,
+  AlertTriangle,
 } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -136,10 +137,15 @@ function PaymentStatusBadge({ status }) {
 function Toast({ message, type, onClose }) {
   if (!message) return null
 
-  const tone = type === 'error' ? 'border-red-200 bg-red-50 text-red-800' : 'border-blue-100 bg-white text-blue-900'
+  const tone = type === 'error'
+    ? 'border-red-200 bg-red-50 text-red-800'
+    : type === 'warning'
+      ? 'border-amber-300 bg-amber-50 text-amber-900'
+      : 'border-blue-100 bg-white text-blue-900'
 
   return (
     <div className={`fixed right-4 top-4 z-[100] flex max-w-[calc(100vw-2rem)] items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lg shadow-slate-200 ${tone}`} role="status" aria-live="polite">
+      {type === 'warning' ? <AlertTriangle className="h-5 w-5 shrink-0" /> : null}
       <span>{message}</span>
       <button type="button" onClick={onClose} className="rounded p-1 hover:bg-slate-100" aria-label="Close toast">
         <X className="h-4 w-4" />
@@ -627,6 +633,26 @@ export default function Payments() {
   }
 
   const handleSavePayment = async (payment, payload) => {
+    const nextBookingStatus = String(payload.booking_status || '').toLowerCase().replace(/[\s-]+/g, '_')
+    const nextPaymentStatus = String(payload.payment_status || '').toLowerCase().replace(/^payment\s+/, '').replace(/[\s-]+/g, '_')
+    const nextPaymentMethod = String(payload.payment_method || '').trim().toLowerCase().replace(/[\s_-]+/g, '')
+    const currentBookingStatus = String(payment.booking_status || '').toLowerCase().replace(/[\s-]+/g, '_')
+
+    if (nextPaymentMethod === 'payhere' && nextPaymentStatus === 'paid') {
+      showToast('PayHere payments can only be marked Paid after PayHere verifies the payment.', 'warning')
+      return
+    }
+
+    if (['confirmed', 'checked_in'].includes(nextBookingStatus) && !['paid', 'no_pay'].includes(nextPaymentStatus)) {
+      showToast('Payment must be Paid or No Pay before confirming or checking in.', 'warning')
+      return
+    }
+
+    if (nextBookingStatus === 'checked_out' && currentBookingStatus !== 'checked_in') {
+      showToast('The booking must be Checked In before it can be Checked Out.', 'warning')
+      return
+    }
+
     try {
       setSavingPayment(true)
       const refreshedPayments = await updateCombinedStatusByBooking(payment.booking_id, payload)

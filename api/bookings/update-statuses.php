@@ -6,6 +6,12 @@
 
 declare(strict_types=1);
 
+// Keep PHP/runtime warnings out of the JSON body. A corrupted success response
+// made the dashboard report a failure even though the transaction committed.
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+ob_start();
+
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 
@@ -246,6 +252,16 @@ try {
         }
     }
 
+    // Email libraries or local mail configuration can emit warnings after the
+    // database commit. Log and discard that output before returning clean JSON.
+    $unexpectedOutput = ob_get_contents();
+    if (is_string($unexpectedOutput) && trim($unexpectedOutput) !== '') {
+        error_log('Discarded unexpected unified status output: ' . trim($unexpectedOutput));
+    }
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
+
     json_response(true, 'Statuses updated successfully.', 200, [
         'data' => [
             'id' => $bookingId,
@@ -262,5 +278,8 @@ try {
     }
 
     error_log('Unified admin status update error: ' . $e->getMessage());
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
     json_response(false, 'Unable to update statuses.', 500);
 }
