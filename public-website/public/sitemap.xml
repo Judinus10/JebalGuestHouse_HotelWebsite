@@ -1,37 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://jebalhomes.com/</loc>
+    <loc>https://jebalguesthouse.com/</loc>
     <priority>1.00</priority>
   </url>
   <url>
-    <loc>https://jebalhomes.com/rooms</loc>
+    <loc>https://jebalguesthouse.com/rooms</loc>
     <priority>0.90</priority>
   </url>
   <url>
-    <loc>https://jebalhomes.com/contact</loc>
+    <loc>https://jebalguesthouse.com/contact</loc>
     <priority>0.80</priority>
   </url>
   <url>
-    <loc>https://jebalhomes.com/gallery</loc>
+    <loc>https://jebalguesthouse.com/gallery</loc>
     <priority>0.70</priority>
   </url>
   <url>
-    <loc>https://jebalhomes.com/experience</loc>
+    <loc>https://jebalguesthouse.com/experience</loc>
     <priority>0.70</priority>
   </url>
   <url>
-    <loc>https://jebalhomes.com/privacy-policy</loc>
+    <loc>https://jebalguesthouse.com/privacy-policy</loc>
     <priority>0.30</priority>
   </url>
   <url>
-    <loc>https://jebalhomes.com/terms-of-service</loc>
+    <loc>https://jebalguesthouse.com/terms-of-service</loc>
     <priority>0.30</priority>
   </url>
-  <url><loc>https://jebalhomes.com/rooms/ground-floor-room-1</loc><priority>0.80</priority></url>
-  <url><loc>https://jebalhomes.com/rooms/ground-floor-room-2</loc><priority>0.80</priority></url>
-  <url><loc>https://jebalhomes.com/rooms/first-floor-room-1</loc><priority>0.80</priority></url>
-  <url><loc>https://jebalhomes.com/rooms/first-floor-room-2</loc><priority>0.80</priority></url>
-  <url><loc>https://jebalhomes.com/rooms/family-room</loc><priority>0.80</priority></url>
-  <url><loc>https://jebalhomes.com/rooms/private-cottage</loc><priority>0.80</priority></url>
+  <url><loc>https://jebalguesthouse.com/rooms/ground-floor-room-1</loc><priority>0.80</priority></url>
+  <url><loc>https://jebalguesthouse.com/rooms/ground-floor-room-2</loc><priority>0.80</priority></url>
+  <url><loc>https://jebalguesthouse.com/rooms/first-floor-room-1</loc><priority>0.80</priority></url>
+  <url><loc>https://jebalguesthouse.com/rooms/first-floor-room-2</loc><priority>0.80</priority></url>
+  <url><loc>https://jebalguesthouse.com/rooms/family-room</loc><priority>0.80</priority></url>
+  <url><loc>https://jebalguesthouse.com/rooms/private-cottage</loc><priority>0.80</priority></url>
 </urlset>

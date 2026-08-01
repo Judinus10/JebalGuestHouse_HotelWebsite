@@ -1,5 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import SEO from './SEO'
+import { breadcrumbSchema, lodgingSchema } from '../data/business'
 
 const pages = {
   '/': {
@@ -47,6 +48,11 @@ export default function RouteSEO() {
     robots: 'noindex, nofollow',
   }
 
-  return <SEO {...page} path={pathname} />
-}
+  const structuredData = pathname === '/'
+    ? [lodgingSchema()]
+    : page.robots?.startsWith('noindex')
+      ? []
+      : [breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.title.split('|')[0].trim(), path: pathname }])]
 
+  return <SEO {...page} path={pathname} structuredData={structuredData} />
+}

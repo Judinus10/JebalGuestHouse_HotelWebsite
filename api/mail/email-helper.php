@@ -418,7 +418,7 @@ function email_public_url(): string
         return rtrim((string) FRONTEND_BASE_URL, '/');
     }
 
-    return 'http://localhost/HotelWebsite';
+    return 'http://localhost/project_Jebal';
 }
 
 function email_asset_file(array $relativePaths): string

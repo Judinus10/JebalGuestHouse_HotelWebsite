@@ -172,7 +172,7 @@ export default function Rooms() {
           <SectionHeading
             subtitle="Choose Your Stay"
             title="Rooms at Jebal Guest House"
-            description="Choose from ground floor rooms, first floor rooms, a family room, or a private cottage with practical guest house comforts."
+            description="Choose ground-floor or first-floor rooms in Anaiccoddai, Jaffna. Each room has a king-size bed, accommodates up to 3 guests, and includes air conditioning, free Wi-Fi, a kitchen, refrigerator, attached bathroom, and free parking. Full-day packages are available."
           />
 
           {!hasBookingFilter && (

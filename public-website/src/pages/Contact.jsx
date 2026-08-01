@@ -5,6 +5,7 @@ import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
 import Button from '../components/ui/Button'
 import contactBanner from '../assets/images/banners/contact-banner.webp'
+import { business } from '../data/business'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
@@ -12,12 +13,12 @@ const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 const CONTACT_SUBMIT_TIMEOUT_MS = 8000
 
 const fallbackContactDetails = {
-  address: 'Jebal Guest House, Jaffna, Sri Lanka',
-  phone: '+94 77 123 4567',
-  reception_contact_number: '+94 21 222 4567',
-  whatsapp_reservation_number: '+94 77 123 4567',
-  email: 'reservations@jebalguesthouse.com',
-  business_hours: 'Daily · 7:00 AM – 10:00 PM',
+  address: 'Jebal Guest House, Uyarappulam, Anaiccoddai, Jaffna',
+  phone: business.displayTelephone,
+  reception_contact_number: '',
+  whatsapp_reservation_number: business.displayTelephone,
+  email: business.email,
+  business_hours: 'Check-in 2:00 PM · Check-out 12:00 PM',
   business_name: 'Jebal Guest House',
   map_embed_url: '',
 }
@@ -356,6 +357,9 @@ export default function Contact() {
                             <p className="mt-2 font-serif text-charcoal">
                               {contactDetails.business_name}
                             </p>
+                            <a href={business.mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-medium text-gold underline">
+                              Open in Google Maps
+                            </a>
                           </div>
                         </div>
                       </>

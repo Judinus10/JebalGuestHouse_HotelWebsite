@@ -8,4 +8,4 @@ Disallow: /booking-bill
 Disallow: /*?*order_id=
 Disallow: /*?*token=
 
-Sitemap: https://jebalhomes.com/sitemap.xml
+Sitemap: https://jebalguesthouse.com/sitemap.xml

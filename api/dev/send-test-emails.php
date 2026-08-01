@@ -7,10 +7,10 @@
  * - Use this only for UI testing so you do not need to create real bookings or enquiries.
  *
  * Browser usage:
- *   http://localhost/HotelWebsite/api/dev/send-test-emails.php
+ *   http://localhost/project_Jebal/api/dev/send-test-emails.php
  *
  * JSON POST usage:
- *   POST /HotelWebsite/api/dev/send-test-emails.php
+ *   POST /project_Jebal/api/dev/send-test-emails.php
  *   {"email":"you@example.com","types":["booking_reminder","contact_customer"]}
  *
  * Safety:

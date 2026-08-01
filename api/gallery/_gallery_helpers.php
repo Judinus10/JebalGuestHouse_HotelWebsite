@@ -14,7 +14,7 @@ function gallery_upload_public_base(): string
 {
     $base = defined('API_BASE_URL') && API_BASE_URL !== ''
         ? rtrim(API_BASE_URL, '/')
-        : 'http://localhost/HotelWebsite/api';
+        : 'http://localhost/project_Jebal/api';
 
     return $base . '/uploads/gallery';
 }

@@ -5,6 +5,7 @@ import SectionHeading from '../components/ui/SectionHeading'
 import FadeUp from '../components/ui/FadeUp'
 import { fetchExperiences } from '../services/experienceApi'
 import experienceBanner from '../assets/images/banners/experience-banner.webp'
+import { nearbyPlaces } from '../data/business'
 
 export default function Experience() {
   const [items, setItems] = useState([])
@@ -104,6 +105,17 @@ export default function Experience() {
       </section>
 
       <section className="bg-ice-light py-20">
+        <div className="mx-auto mb-20 max-w-6xl px-6">
+          <SectionHeading subtitle="Nearby Jaffna Attractions" title="Places Near Jebal Guest House" description="Approximate travel distances from Jebal Guest House in Uyarappulam, Anaiccoddai. Travel time depends on the route and transport conditions." />
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {nearbyPlaces.map(([place, distance]) => (
+              <div key={place} className="flex items-center justify-between gap-4 bg-white px-5 py-4">
+                <span className="text-sm text-charcoal">{place}</span>
+                <span className="shrink-0 text-sm font-medium text-gold">{distance}</span>
+              </div>
+            ))}
+          </div>
+        </div>
         <div className="mx-auto max-w-5xl px-6 text-center">
           <FadeUp>
             <p className="text-xs tracking-[0.3em] uppercase text-gold">

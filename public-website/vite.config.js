@@ -12,7 +12,7 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/HotelWebsite/api': {
+      '/project_Jebal/api': {
         target: 'http://localhost',
         changeOrigin: true,
         secure: false,

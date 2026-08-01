@@ -21,7 +21,7 @@ function resolveApiBaseUrl() {
   const isLocalFrontend = ['localhost', '127.0.0.1'].includes(window.location.hostname)
   const isVitePort = ['5173', '5174'].includes(window.location.port)
 
-  if (isLocalFrontend && isVitePort && baseUrl.startsWith('/HotelWebsite/api')) {
+  if (isLocalFrontend && isVitePort && baseUrl.startsWith('/project_Jebal/api')) {
     return `http://${window.location.hostname}${baseUrl}`
   }
 

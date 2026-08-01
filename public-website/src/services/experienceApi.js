@@ -1,5 +1,4 @@
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || '/HotelWebsite/api'
+import { API_BASE_URL } from './config'
 
 export async function fetchExperiences() {
   const response = await fetch(

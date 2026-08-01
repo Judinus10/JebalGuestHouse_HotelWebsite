@@ -8,6 +8,7 @@ import Button from '../components/ui/Button'
 import RoomCard from '../components/ui/RoomCard'
 import { checkRoomAvailability, fetchRoom, fetchRooms } from '../services/roomsApi'
 import SEO from '../components/SEO'
+import { breadcrumbSchema, SITE_URL } from '../data/business'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
@@ -341,6 +342,21 @@ export default function RoomDetails() {
         path={`/rooms/${encodeURIComponent(room.id || id)}`}
         image={room.main_image || room.images?.[0]}
         type="product"
+        structuredData={[
+          breadcrumbSchema([
+            { name: 'Home', path: '/' }, { name: 'Rooms', path: '/rooms' },
+            { name: room.name, path: `/rooms/${encodeURIComponent(room.id || id)}` },
+          ]),
+          {
+            '@context': 'https://schema.org', '@type': 'HotelRoom', name: room.name,
+            description: room.description,
+            url: `${SITE_URL}/rooms/${encodeURIComponent(room.id || id)}`,
+            image: (room.images?.length ? room.images : [room.main_image]).filter(Boolean),
+            occupancy: (room.guests || room.max_guests) ? { '@type': 'QuantitativeValue', maxValue: Number(room.guests || room.max_guests) } : undefined,
+            bed: room.beds ? { '@type': 'BedDetails', typeOfBed: room.beds } : undefined,
+            containedInPlace: { '@id': `${SITE_URL}/#lodging` },
+          },
+        ]}
       />
       <PageTransition>
       {/* Hero image */}

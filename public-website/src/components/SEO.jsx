@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 
-const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://jebalhomes.com').replace(/\/$/, '')
+const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://jebalguesthouse.com').replace(/\/$/, '')
 const DEFAULT_IMAGE = `${SITE_URL}/favicon.svg`
 
 function upsertMeta(selector, attributes) {
@@ -25,6 +25,7 @@ export default function SEO({
   image,
   robots = 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1',
   type = 'website',
+  structuredData,
 }) {
   useEffect(() => {
     const canonicalUrl = `${SITE_URL}${path === '/' ? '/' : path.replace(/\/$/, '')}`
@@ -54,8 +55,21 @@ export default function SEO({
       document.head.appendChild(canonical)
     }
     canonical.href = canonicalUrl
-  }, [description, image, path, robots, title, type])
+
+    document.head.querySelectorAll('script[data-jebal-jsonld]').forEach((node) => node.remove())
+    const entries = (Array.isArray(structuredData) ? structuredData : [structuredData]).filter(Boolean)
+    entries.forEach((entry, index) => {
+      const script = document.createElement('script')
+      script.type = 'application/ld+json'
+      script.dataset.jebalJsonld = String(index)
+      script.textContent = JSON.stringify(entry).replace(/</g, '\\u003c')
+      document.head.appendChild(script)
+    })
+
+    return () => {
+      document.head.querySelectorAll('script[data-jebal-jsonld]').forEach((node) => node.remove())
+    }
+  }, [description, image, path, robots, structuredData, title, type])
 
   return null
 }
-
