@@ -418,7 +418,9 @@ function email_public_url(): string
         return rtrim((string) FRONTEND_BASE_URL, '/');
     }
 
-    return 'http://localhost/project_Jebal';
+    $scriptName = str_replace('\\\\', '/', (string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    $apiPosition = strpos($scriptName, '/api/');
+    return $apiPosition !== false ? substr($scriptName, 0, $apiPosition) : '';
 }
 
 function email_asset_file(array $relativePaths): string

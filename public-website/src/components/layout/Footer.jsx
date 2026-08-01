@@ -4,7 +4,7 @@ import { Mail } from 'lucide-react'
 import { FaFacebookF, FaInstagram } from 'react-icons/fa'
 import companyLogo from '../../assets/company_logo.png'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+import { API_BASE_URL } from '@/services/config'
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 
 const footerLinks = [

@@ -8,27 +8,8 @@ import FadeUp from '../components/ui/FadeUp'
 import Button from '../components/ui/Button'
 import logo from '../assets/logo.png'
 import bookingBillBanner from '../assets/images/banners/booking-bill-banner.webp'
+import { API_BASE_URL } from '../services/config'
 
-const RAW_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
-
-function resolveApiBaseUrl() {
-  const baseUrl = String(RAW_API_BASE_URL || '/api').replace(/\/$/, '')
-
-  if (/^https?:\/\//i.test(baseUrl)) {
-    return baseUrl
-  }
-
-  const isLocalFrontend = ['localhost', '127.0.0.1'].includes(window.location.hostname)
-  const isVitePort = ['5173', '5174'].includes(window.location.port)
-
-  if (isLocalFrontend && isVitePort && baseUrl.startsWith('/project_Jebal/api')) {
-    return `http://${window.location.hostname}${baseUrl}`
-  }
-
-  return baseUrl
-}
-
-const API_BASE_URL = resolveApiBaseUrl()
 const PAYMENT_STATUS_API_URL = `${API_BASE_URL}/payments/status.php`
 const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`

@@ -7,7 +7,7 @@ import Button from '../components/ui/Button'
 import contactBanner from '../assets/images/banners/contact-banner.webp'
 import { business } from '../data/business'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+import { API_BASE_URL } from '@/services/config'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 const CONTACT_SUBMIT_TIMEOUT_MS = 8000

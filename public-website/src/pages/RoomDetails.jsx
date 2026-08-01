@@ -10,7 +10,7 @@ import { checkRoomAvailability, fetchRoom, fetchRooms } from '../services/roomsA
 import SEO from '../components/SEO'
 import { breadcrumbSchema, SITE_URL } from '../data/business'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+import { API_BASE_URL } from '@/services/config'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
 const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
 

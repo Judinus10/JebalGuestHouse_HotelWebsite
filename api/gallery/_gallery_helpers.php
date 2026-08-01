@@ -14,7 +14,7 @@ function gallery_upload_public_base(): string
 {
     $base = defined('API_BASE_URL') && API_BASE_URL !== ''
         ? rtrim(API_BASE_URL, '/')
-        : 'http://localhost/project_Jebal/api';
+        : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/gallery')), '/');
 
     return $base . '/uploads/gallery';
 }

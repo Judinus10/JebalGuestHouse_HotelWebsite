@@ -12,10 +12,11 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/project_Jebal/api': {
+      '/api': {
         target: 'http://localhost',
         changeOrigin: true,
         secure: false,
+        rewrite: (requestPath) => requestPath.replace(/^\/api/, '/project_Jebal/api'),
       },
     },
   },
