@@ -18,6 +18,9 @@ export default function RoomCard({ room, index = 0, variant = 'default', searchQ
             alt={room.name}
             className="h-full w-full object-cover"
             loading="lazy"
+            decoding="async"
+            width="800"
+            height="1000"
           />
           {/* Price badge */}
           <div className="absolute right-4 top-4 bg-white/95 px-4 py-2 backdrop-blur-sm">

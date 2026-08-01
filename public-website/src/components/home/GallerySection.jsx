@@ -106,6 +106,9 @@ export default function GallerySection() {
                       alt={item.display_name || 'Property image'}
                       className="h-full w-full object-cover"
                       loading="lazy"
+                      decoding="async"
+                      width="600"
+                      height="900"
                     />
                   </div>
 

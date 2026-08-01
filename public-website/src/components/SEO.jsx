@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 
 const SITE_URL = (import.meta.env.VITE_SITE_URL || 'https://jebalguesthouse.com').replace(/\/$/, '')
-const DEFAULT_IMAGE = `${SITE_URL}/favicon.svg`
+const DEFAULT_IMAGE = `${SITE_URL}/jebal-guest-house-social.webp`
 
 function upsertMeta(selector, attributes) {
   let element = document.head.querySelector(selector)

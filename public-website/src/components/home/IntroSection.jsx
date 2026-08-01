@@ -42,6 +42,10 @@ export default function IntroSection() {
                 src={storyImage}
                 alt="Comfortable guest house interior"
                 className="h-full w-full object-cover"
+                width="1086"
+                height="1448"
+                loading="lazy"
+                decoding="async"
               />
             </div>
             {/* Decorative offset frame */}

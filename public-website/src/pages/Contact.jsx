@@ -139,6 +139,9 @@ export default function Contact() {
             src={contactBanner}
             alt="Contact us"
             className="absolute inset-0 h-full w-full object-cover opacity-50"
+            width="1942"
+            height="809"
+            fetchPriority="high"
           />
 
           <div className="relative mx-auto w-full max-w-7xl px-6 pb-12">
@@ -350,6 +353,10 @@ export default function Contact() {
                           src={contactBanner}
                           alt="Location map"
                           className="h-full w-full object-cover opacity-50"
+                          width="1942"
+                          height="809"
+                          loading="lazy"
+                          decoding="async"
                         />
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="bg-white px-6 py-4 text-center shadow-md">

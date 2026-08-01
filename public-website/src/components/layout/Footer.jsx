@@ -149,6 +149,10 @@ export default function Footer() {
                 src={companyLogo}
                 alt="CompylX"
                 className="mt-2 w-16 h-auto object-contain opacity-90 transition-opacity duration-300 hover:opacity-100"
+                width="256"
+                height="199"
+                loading="lazy"
+                decoding="async"
               />
             </div>
           </div>

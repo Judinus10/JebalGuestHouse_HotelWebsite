@@ -61,6 +61,9 @@ export default function Navbar() {
               className={`navbar-logo-image ${
                 showSolid || mobileOpen ? 'dark' : 'light'
               }`}
+              width="512"
+              height="512"
+              decoding="async"
             />
           </Link>
 

@@ -21,6 +21,10 @@ export default function PrivateStaySection() {
                   src={comfortMainImage}
                   alt="Comfortable guest house room"
                   className="h-full w-full object-cover"
+                  width="1086"
+                  height="1448"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
               {/* Overlapping rectangular image */}
@@ -29,6 +33,10 @@ export default function PrivateStaySection() {
                   src={comfortDetailImage}
                   alt="Clean room interior detail"
                   className="aspect-[4/3] w-full object-cover"
+                  width="1448"
+                  height="1086"
+                  loading="lazy"
+                  decoding="async"
                 />
               </div>
             </div>

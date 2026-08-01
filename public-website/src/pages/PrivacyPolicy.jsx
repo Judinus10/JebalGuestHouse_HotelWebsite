@@ -11,6 +11,9 @@ export default function PrivacyPolicy() {
           src={privacyBanner}
           alt="Privacy policy"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
+          width="1942"
+          height="809"
+          fetchPriority="high"
         />
         <div className="relative mx-auto w-full max-w-7xl px-6 pb-12">
           <FadeUp>

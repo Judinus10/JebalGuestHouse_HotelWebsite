@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { AlertTriangle, ArrowLeft, Bookmark, CalendarDays, ChevronDown, Clock, Download, FileText, Globe2, Headphones, Mail, MapPin, Phone, RotateCcw, Share2, UserRound } from 'lucide-react'
-import { jsPDF } from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import Button from '../components/ui/Button'
@@ -296,6 +294,10 @@ export default function BookingBill() {
   const createBillPdfBlob = async () => {
     if (!bill) throw new Error('Bill data is not ready.')
 
+    const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ])
     const pdf = new jsPDF('p', 'mm', 'a4')
     const pageWidth = pdf.internal.pageSize.getWidth()
     const pageHeight = pdf.internal.pageSize.getHeight()
@@ -702,6 +704,9 @@ export default function BookingBill() {
                   src={bookingBillBanner}
                   alt="Jebal Guest House room"
                   className="absolute inset-0 h-full w-full object-cover opacity-55"
+                  width="1942"
+                  height="809"
+                  fetchPriority="high"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-black/25 to-black/45" />
                 <div className="relative mx-auto flex min-h-[260px] max-w-7xl flex-col items-center justify-center px-5 py-14 text-center text-white sm:min-h-[320px]">

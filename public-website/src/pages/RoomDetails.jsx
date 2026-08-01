@@ -365,6 +365,9 @@ export default function RoomDetails() {
           src={images[activeImage]}
           alt={room.name}
           className="h-full w-full object-cover"
+          width="1600"
+          height="900"
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
         <div className="absolute bottom-0 left-0 w-full px-6 pb-10">
@@ -409,6 +412,10 @@ export default function RoomDetails() {
                         src={img}
                         alt={`${room.name} view ${i + 1}`}
                         className="h-full w-full object-cover"
+                        width="800"
+                        height="600"
+                        loading="lazy"
+                        decoding="async"
                       />
                     </button>
                   ))}
@@ -629,6 +636,9 @@ export default function RoomDetails() {
               src={images[activeImage]}
               alt={`${room.name} view ${activeImage + 1}`}
               className="max-h-[82vh] w-full animate-[roomImageFade_0.28s_ease] object-cover"
+              width="1600"
+              height="900"
+              decoding="async"
             />
 
             {images.length > 1 && (

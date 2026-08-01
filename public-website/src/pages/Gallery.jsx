@@ -50,6 +50,9 @@ export default function Gallery() {
           src={galleryBanner}
           alt="Jebal Guest House gallery"
           className="absolute inset-0 h-full w-full object-cover opacity-50"
+          width="1942"
+          height="809"
+          fetchPriority="high"
         />
         <div className="relative mx-auto w-full max-w-7xl px-6 pb-12">
           <FadeUp>
@@ -123,6 +126,9 @@ export default function Gallery() {
                             alt={item.title || 'Gallery image'}
                             className="h-full w-full object-cover"
                             loading="lazy"
+                            decoding="async"
+                            width="800"
+                            height="600"
                           />
                         </div>
 

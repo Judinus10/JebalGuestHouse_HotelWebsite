@@ -47,13 +47,6 @@ export default function Hero() {
   }, [])
 
   useEffect(() => {
-    slides.forEach(({ src }) => {
-      const image = new Image()
-      image.src = src
-    })
-  }, [])
-
-  useEffect(() => {
     const handleVisibilityChange = () => setIsPageVisible(!document.hidden)
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
@@ -107,6 +100,11 @@ export default function Hero() {
               animate={{ scale: reduceMotion ? 1 : 1.05 }}
               transition={{ duration: AUTOPLAY_DELAY / 1000 + 1, ease: 'linear' }}
               draggable="false"
+              width="1672"
+              height="941"
+              loading={activeIndex === 0 ? 'eager' : 'lazy'}
+              fetchPriority={activeIndex === 0 ? 'high' : 'auto'}
+              decoding="async"
             />
           </motion.div>
         </AnimatePresence>

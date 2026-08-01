@@ -28,11 +28,16 @@ LimitRequestBody 10485760
   AddOutputFilterByType DEFLATE text/plain text/xml text/css text/javascript application/javascript application/json image/svg+xml
 </IfModule>
 
+<IfModule mod_brotli.c>
+  AddOutputFilterByType BROTLI_COMPRESS text/plain text/xml text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
 <IfModule mod_expires.c>
   ExpiresActive On
   ExpiresByType application/json "access plus 0 seconds"
   ExpiresByType image/jpeg "access plus 6 months"
   ExpiresByType image/png "access plus 6 months"
   ExpiresByType image/webp "access plus 6 months"
+  ExpiresByType image/avif "access plus 6 months"
   ExpiresByType image/svg+xml "access plus 6 months"
 </IfModule>

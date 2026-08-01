@@ -1,18 +1,20 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
 import Layout from './components/layout/Layout'
-import Home from './pages/Home'
-import Rooms from './pages/Rooms'
-import RoomDetails from './pages/RoomDetails'
-import BookingBill from './pages/BookingBill'
-import Contact from './pages/Contact'
-import Gallery from './pages/Gallery'
-import Experience from './pages/Experience'
-import PrivacyPolicy from './pages/PrivacyPolicy'
-import TermsOfService from './pages/TermsOfService'
-import NotFound from './pages/NotFound'
 import ScrollToTop from './components/layout/ScrollToTop'
 import RouteSEO from './components/RouteSEO'
+
+const Home = lazy(() => import('./pages/Home'))
+const Rooms = lazy(() => import('./pages/Rooms'))
+const RoomDetails = lazy(() => import('./pages/RoomDetails'))
+const BookingBill = lazy(() => import('./pages/BookingBill'))
+const Contact = lazy(() => import('./pages/Contact'))
+const Gallery = lazy(() => import('./pages/Gallery'))
+const Experience = lazy(() => import('./pages/Experience'))
+const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'))
+const TermsOfService = lazy(() => import('./pages/TermsOfService'))
+const NotFound = lazy(() => import('./pages/NotFound'))
 
 /**
  * Root application with route-based page transitions.
@@ -25,7 +27,8 @@ function App() {
       <ScrollToTop />
       <RouteSEO />
       <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
+        <Suspense fallback={<div className="min-h-screen bg-white" aria-label="Loading page" />}>
+          <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
           <Route path="/rooms" element={<Rooms />} />
           <Route path="/gallery" element={<Gallery />} />
@@ -36,7 +39,8 @@ function App() {
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
           <Route path="*" element={<NotFound />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </AnimatePresence>
     </Layout>
   )
