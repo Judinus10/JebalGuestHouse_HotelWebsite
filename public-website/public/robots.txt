@@ -4,5 +4,8 @@ Allow: /
 Disallow: /api/
 Disallow: /admin/
 Disallow: /dashboard/
+Disallow: /booking-bill
+Disallow: /*?*order_id=
+Disallow: /*?*token=
 
 Sitemap: https://jebalhomes.com/sitemap.xml

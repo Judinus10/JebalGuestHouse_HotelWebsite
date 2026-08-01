@@ -7,6 +7,7 @@ import ImageReveal from '../components/ui/ImageReveal'
 import Button from '../components/ui/Button'
 import RoomCard from '../components/ui/RoomCard'
 import { checkRoomAvailability, fetchRoom, fetchRooms } from '../services/roomsApi'
+import SEO from '../components/SEO'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
@@ -333,7 +334,15 @@ export default function RoomDetails() {
   }
 
   return (
-    <PageTransition>
+    <>
+      <SEO
+        title={`${room.name} in Jaffna | Jebal Guest House`}
+        description={`${room.description || `View ${room.name} at Jebal Guest House in Jaffna.`}`.slice(0, 160)}
+        path={`/rooms/${encodeURIComponent(room.id || id)}`}
+        image={room.main_image || room.images?.[0]}
+        type="product"
+      />
+      <PageTransition>
       {/* Hero image */}
       <section className="relative h-[50vh] min-h-[350px]">
         <img
@@ -663,6 +672,7 @@ export default function RoomDetails() {
           </div>
         </div>
       </section>
-    </PageTransition>
+      </PageTransition>
+    </>
   )
 }

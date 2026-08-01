@@ -12,6 +12,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy'
 import TermsOfService from './pages/TermsOfService'
 import NotFound from './pages/NotFound'
 import ScrollToTop from './components/layout/ScrollToTop'
+import RouteSEO from './components/RouteSEO'
 
 /**
  * Root application with route-based page transitions.
@@ -22,6 +23,7 @@ function App() {
   return (
     <Layout>
       <ScrollToTop />
+      <RouteSEO />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           <Route path="/" element={<Home />} />
