@@ -1,5 +1,7 @@
 import { API_BASE_URL, getCsrfToken } from '@/services/apiClient'
 
+const SESSION_CHECK_TIMEOUT_MS = 10000
+
 async function readJsonResponse(response) {
   const payload = await response.json().catch(() => null)
 
@@ -45,13 +47,33 @@ export async function verifyAdminSession() {
   // 401 request when the user opens a protected URL before signing in.
   if (!hasCsrfCookie) return null
 
-  const response = await fetch(`${API_BASE_URL}/auth/me.php`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-    credentials: 'include',
-  })
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(
+    () => controller.abort(),
+    SESSION_CHECK_TIMEOUT_MS
+  )
+
+  let response
+
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/me.php`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+      credentials: 'include',
+      cache: 'no-store',
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error('Session check timed out. Check Apache and MySQL, then retry.')
+    }
+
+    throw new Error('Unable to contact the server. Check Apache and your API configuration.')
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
 
   const payload = await response.json().catch(() => null)
 

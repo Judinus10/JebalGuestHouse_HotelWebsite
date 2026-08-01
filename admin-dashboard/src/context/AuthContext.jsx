@@ -8,26 +8,39 @@ const AuthContext = createContext(null)
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [initializing, setInitializing] = useState(true)
+  const [sessionError, setSessionError] = useState('')
+  const [sessionRetryKey, setSessionRetryKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
 
     async function restoreSession() {
       clearStoredSession()
-      const session = await verifyAdminSession()
+      setSessionError('')
 
-      if (cancelled) return
+      try {
+        const session = await verifyAdminSession()
 
-      if (session?.user) {
-        setCsrfToken(session.csrf_token)
-        setUser(session.user)
-      } else {
+        if (cancelled) return
+
+        if (session?.user) {
+          setCsrfToken(session.csrf_token)
+          setUser(session.user)
+        } else {
+          setCsrfToken('')
+          clearStoredSession()
+          setUser(null)
+        }
+      } catch (error) {
+        if (cancelled) return
+
         setCsrfToken('')
         clearStoredSession()
         setUser(null)
+        setSessionError(error?.message || 'Unable to verify the admin session.')
+      } finally {
+        if (!cancelled) setInitializing(false)
       }
-
-      setInitializing(false)
     }
 
     restoreSession()
@@ -35,7 +48,13 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [sessionRetryKey])
+
+  const retrySession = () => {
+    setInitializing(true)
+    setSessionError('')
+    setSessionRetryKey((value) => value + 1)
+  }
 
   const login = async ({ email, password }) => {
     const payload = await loginAdmin({ email, password })
@@ -59,11 +78,13 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       initializing,
+      sessionError,
       isAuthenticated: Boolean(user),
+      retrySession,
       login,
       logout,
     }),
-    [user, initializing]
+    [user, initializing, sessionError]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
