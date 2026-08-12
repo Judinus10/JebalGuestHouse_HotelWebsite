@@ -12,7 +12,6 @@ import { breadcrumbSchema, SITE_URL } from '../data/business'
 
 import { API_BASE_URL } from '@/services/config'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
-const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
 
 function readBookingParams(searchParams) {
   return {
@@ -75,11 +74,13 @@ export default function RoomDetails() {
     check_out_date: '',
     guests: '2',
     message: '',
+    payment_method: 'Cash',
   })
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [availabilityWarning, setAvailabilityWarning] = useState('')
+  const [paymentToast, setPaymentToast] = useState('')
   const [checkingAvailability, setCheckingAvailability] = useState(false)
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const submittingRef = useRef(false)
@@ -128,6 +129,13 @@ export default function RoomDetails() {
       guests: bookingParams.guests || current.guests,
     }))
   }, [searchParams])
+
+  useEffect(() => {
+    if (!paymentToast) return undefined
+
+    const timeoutId = window.setTimeout(() => setPaymentToast(''), 3500)
+    return () => window.clearTimeout(timeoutId)
+  }, [paymentToast])
 
   useEffect(() => {
     let active = true
@@ -243,6 +251,17 @@ export default function RoomDetails() {
     })
   }
 
+  const handlePaymentMethodChange = (e) => {
+    if (e.target.value === 'PayHere') {
+      setPaymentToast('Online payment is temporarily unavailable. Please select Pay on Arrival.')
+      setFormData((current) => ({ ...current, payment_method: 'Cash' }))
+      return
+    }
+
+    setPaymentToast('')
+    setFormData((current) => ({ ...current, payment_method: 'Cash' }))
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (loading || submittingRef.current || redirectingRef.current) return
@@ -289,26 +308,6 @@ export default function RoomDetails() {
         throw new Error(result.message || 'Unable to send booking inquiry.')
       }
 
-      const paymentResponse = await fetch(PAYMENT_INIT_API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ booking_id: result.inquiry_id }),
-      })
-
-      const paymentResult = await paymentResponse.json()
-
-      if (!paymentResponse.ok || !paymentResult.success) {
-        throw new Error(paymentResult.message || 'Booking saved, but payment could not be started.')
-      }
-
-      if (paymentResult.checkout_url) {
-        redirectingRef.current = true
-        window.location.assign(paymentResult.checkout_url)
-        return
-      }
-
       setSubmitted(true)
       setFormData({
         full_name: '',
@@ -323,6 +322,7 @@ export default function RoomDetails() {
         check_out_date: '',
         guests: '2',
         message: '',
+        payment_method: 'Cash',
       })
     } catch (err) {
       setError(err.message || 'Unable to send booking inquiry. Please try again.')
@@ -561,6 +561,32 @@ export default function RoomDetails() {
                       <textarea name="message" rows={3} value={formData.message} onChange={handleChange} className="mt-1 w-full resize-none border-b border-ice-dark bg-transparent py-2 text-sm outline-none focus:border-gold" />
                     </div>
 
+                    <fieldset>
+                      <legend className="text-xs tracking-wider uppercase text-muted">Payment Method</legend>
+                      <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-charcoal">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="radio"
+                            name="payment_method"
+                            value="Cash"
+                            checked={formData.payment_method === 'Cash'}
+                            onChange={handlePaymentMethodChange}
+                          />
+                          <span>Pay on Arrival</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="radio"
+                            name="payment_method"
+                            value="PayHere"
+                            checked={false}
+                            onChange={handlePaymentMethodChange}
+                          />
+                          <span>Pay Online</span>
+                        </label>
+                      </div>
+                    </fieldset>
+
                     {checkingAvailability && (
                       <p className="text-xs text-muted">Checking room availability...</p>
                     )}
@@ -585,19 +611,25 @@ export default function RoomDetails() {
                     {error && <p className="text-xs text-red-600">{error}</p>}
 
                     <Button type="submit" className="w-full" disabled={loading || checkingAvailability || isRoomUnavailable}>
-                      {loading ? 'Processing...' : checkingAvailability ? 'Checking...' : 'Continue to Payment'}
+                      {loading ? 'Processing...' : checkingAvailability ? 'Checking...' : 'Book Now'}
                     </Button>
                   </form>
                 )}
 
                 <p className="mt-4 text-center text-xs text-muted">
-                  Your room hold starts only after you continue to payment
+                  Your booking request will be confirmed by the property. Payment can be made on arrival.
                 </p>
               </div>
             </ImageReveal>
           </div>
         </div>
       </section>
+
+      {paymentToast && (
+        <div className="fixed right-4 top-24 z-[60] max-w-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-lg" role="status" aria-live="polite">
+          {paymentToast}
+        </div>
+      )}
 
 
       {bookingTotal.hasValidDates && !submitted && (
