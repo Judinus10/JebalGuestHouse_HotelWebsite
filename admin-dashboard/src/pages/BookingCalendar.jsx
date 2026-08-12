@@ -265,6 +265,8 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
   const paymentStatusKey = getBookingStatusKey(booking.payment_status)
   const bookingStatusKey = getBookingStatusKey(booking.booking_status)
   const isPaid = paymentStatusKey === 'paid'
+  const isCash = String(booking.payment_method || '').trim().toLowerCase() === 'cash'
+  const canConfirm = isPaid || isCash
   const noShowDateReached = Boolean(booking.check_in) && booking.check_in <= new Date().toISOString().slice(0, 10)
   const actionDisabled = (allowed) => updatingStatus || !allowed
 
@@ -334,7 +336,7 @@ function BookingDetailsModal({ booking, onClose, onStatusChange, updatingStatus 
               <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 md:col-span-2">
                 <h3 className="text-sm font-bold text-blue-950">Quick Actions</h3>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Button title={!isPaid ? 'Payment must be Paid first.' : ''} size="sm" variant="outline" disabled={actionDisabled(bookingStatusKey === 'pending' && isPaid)} onClick={() => onStatusChange(booking, 'confirmed')}>Confirm booking</Button>
+                  <Button title={!canConfirm ? 'Payment must be Paid first.' : ''} size="sm" variant="outline" disabled={actionDisabled(bookingStatusKey === 'pending' && canConfirm)} onClick={() => onStatusChange(booking, 'confirmed')}>Confirm booking</Button>
                   <Button size="sm" variant="outline" disabled={actionDisabled(['pending', 'confirmed'].includes(bookingStatusKey))} onClick={() => onStatusChange(booking, 'cancelled')}>Cancel booking</Button>
                   <Button size="sm" variant="outline" disabled={actionDisabled(bookingStatusKey === 'confirmed')} onClick={() => onStatusChange(booking, 'checked_in')}>Mark checked in</Button>
                   <Button size="sm" variant="outline" disabled={actionDisabled(bookingStatusKey === 'checked_in')} onClick={() => onStatusChange(booking, 'checked_out')}>Mark checked out</Button>
@@ -416,7 +418,7 @@ export default function BookingCalendar() {
     if (status === 'no_show' && paymentKey === 'paid') {
       confirmation = String(booking.payment_method || '').toLowerCase() === 'payhere'
         ? 'Mark this booking as No Show? The PayHere payment will remain Paid until a real refund is completed.'
-        : 'Mark this booking as No Show and record the paid Cash/Bank Transfer amount as Refunded?'
+        : 'Mark this booking as No Show? The recorded Cash/Bank Transfer payment status will not be changed automatically.'
     }
     if (!window.confirm(confirmation)) return
 

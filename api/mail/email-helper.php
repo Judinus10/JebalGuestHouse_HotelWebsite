@@ -1249,9 +1249,14 @@ function queue_staying_guest_booking_email(PDO $pdo, array $booking, string $sta
 function send_booking_received_emails(PDO $pdo, array $booking): void
 {
     $bookingId = (int) ($booking['id'] ?? 0);
-    $subjectCustomer = 'Booking inquiry received - Jebal Guest House #' . $bookingId;
+    $payment = [
+        'amount' => $booking['amount'] ?? 0,
+        'status' => $booking['payment_status'] ?? 'Payment Pending',
+        'method' => $booking['payment_method'] ?? 'Cash',
+    ];
+    $subjectCustomer = 'Booking request received - Jebal Guest House #' . $bookingId;
 
-    $bodyCustomer = booking_email_html('received', $booking);
+    $bodyCustomer = booking_email_html('received', $booking, $payment);
 
     $sentCustomer = send_tracked_email(
         $pdo,
@@ -1263,9 +1268,12 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
         'booking_inquiry_received'
     );
 
-    $subjectAdmin = 'New booking received - Jebal Guest House #' . $bookingId;
+    $subjectAdmin = 'New Pay on Arrival booking - Jebal Guest House #' . $bookingId;
 
-    $bodyAdmin = booking_email_html('received', $booking, [], true);
+    $bodyAdmin = admin_booking_email_html('pending', $booking, $payment, [
+        'Payment Method' => 'Cash - Pay on Arrival',
+        'Payment Status' => 'Payment Pending',
+    ]);
 
     send_tracked_email(
         $pdo,
@@ -1278,7 +1286,7 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
         $booking['email'] ?? null
     );
 
-    send_staying_guest_booking_email($pdo, $booking, 'received', [], 'staying_guest_booking_received', 'A room was booked for you');
+    send_staying_guest_booking_email($pdo, $booking, 'received', $payment, 'staying_guest_booking_received', 'A booking request was made for you');
 
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Queued' : 'Queue Failed');

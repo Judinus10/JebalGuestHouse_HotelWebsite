@@ -200,6 +200,16 @@ try {
 
     $pdo->commit();
 
+    $emailBooking = $bookingValues;
+    $emailBooking['id'] = $bookingId;
+    $emailBooking['booking_no'] = 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $emailBooking['payment_method'] = 'Cash';
+    try {
+        send_booking_received_emails($pdo, $emailBooking);
+    } catch (Throwable $emailError) {
+        error_log('Public Cash booking email error: ' . $emailError->getMessage());
+    }
+
     json_response(true, 'Booking inquiry submitted successfully.', 201, [
         'inquiry_id' => $bookingId,
         'booking_id' => $bookingId,

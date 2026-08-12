@@ -66,7 +66,8 @@ try {
         json_response(false, 'This action is not allowed for the current booking status.', 409);
     }
 
-    if ($status === 'confirmed' && $paymentKey !== 'paid') {
+    $isCashPayment = strcasecmp($paymentMethod, 'Cash') === 0;
+    if ($status === 'confirmed' && $paymentKey !== 'paid' && !$isCashPayment) {
         $pdo->rollBack();
         json_response(false, 'Payment must be Paid before confirming the booking.', 409);
     }
@@ -103,9 +104,6 @@ try {
     if ($status === 'no_show' && $paymentKey === 'paid') {
         if (strcasecmp($paymentMethod, 'PayHere') === 0) {
             $refundRequired = true;
-        } else {
-            $paymentStatus = 'Refunded';
-            $paymentKey = 'refunded';
         }
     } elseif ($status === 'cancelled' && !in_array($paymentKey, ['paid', 'refunded'], true)) {
         $paymentStatus = 'Cancelled';

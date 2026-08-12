@@ -108,7 +108,8 @@ try {
     $oldBookingStatus = (string) ($booking['status'] ?? 'Pending');
     $oldPaymentStatus = (string) ($booking['payment_status'] ?? 'Payment Pending');
 
-    if (in_array($bookingStatus, ['Confirmed', 'Checked In'], true) && $paymentStatus !== 'Paid' && $paymentStatus !== 'No Pay') {
+    $cashConfirmationAllowed = $bookingStatus === 'Confirmed' && $paymentMethod === 'Cash';
+    if (in_array($bookingStatus, ['Confirmed', 'Checked In'], true) && $paymentStatus !== 'Paid' && $paymentStatus !== 'No Pay' && !$cashConfirmationAllowed) {
         $pdo->rollBack();
         json_response(false, 'Payment must be Paid or No Pay before confirming or checking in.', 409);
     }
