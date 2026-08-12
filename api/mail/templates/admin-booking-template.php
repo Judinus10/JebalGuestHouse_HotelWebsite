@@ -15,9 +15,9 @@ function admin_booking_status_config(string $state): array
             'icon' => 'check',
         ],
         'pending' => [
-            'title' => 'New Booking Received',
-            'message' => 'You have received a new booking. Please find the details below.',
-            'information' => 'Please review the booking and monitor the pending payment status.',
+            'title' => 'New Pay on Arrival Booking',
+            'message' => 'A new Pay on Arrival booking request has been received. Please review and confirm availability.',
+            'information' => 'Payment is due when the guest arrives. This Cash booking can be confirmed while payment remains pending.',
             'icon' => 'calendar',
         ],
         'failed' => [

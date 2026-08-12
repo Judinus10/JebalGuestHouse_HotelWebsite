@@ -27,10 +27,10 @@ function booking_email_status_config(string $status): array
     $key = strtolower(trim($status));
 
     $map = [
-        'confirmed' => ['Booking Confirmed!', 'Your booking and payment were successful. We look forward to welcoming you.', 'Payment Status: Paid', 'check', '#0f7a24', '#e9f9ea'],
+        'confirmed' => ['Booking Confirmed!', 'Your booking has been confirmed. Payment can be made when you arrive.', 'Payment: Pay on Arrival', 'check', '#0f7a24', '#e9f9ea'],
         'paid' => ['Booking Confirmed!', 'Your booking and payment were successful. We look forward to welcoming you.', 'Payment Status: Paid', 'check', '#0f7a24', '#e9f9ea'],
         'pending' => ['Booking Received', 'We received your booking details. Your booking is waiting for payment confirmation.', 'Payment Status: Pending', 'calendar', '#987b58', '#ffffff'],
-        'received' => ['Booking Received', 'We received your booking inquiry. Our team will contact you if any detail needs confirmation.', 'Booking Status: Received', 'calendar', '#987b58', '#ffffff'],
+        'received' => ['Booking Request Received', 'Your booking request is awaiting confirmation from the property. Payment can be made when you arrive.', 'Payment: Pay on Arrival', 'calendar', '#987b58', '#ffffff'],
         'failed' => ['Payment Failed', 'Your payment could not be completed. You can retry payment if the room is still available.', 'Payment Status: Failed', 'close', '#b42318', '#fff1f1'],
         'expired' => ['Booking Hold Expired', 'Your booking hold expired because payment was not completed within the allowed time.', 'Booking Status: Expired', 'alert', '#b42318', '#fff1f1'],
         'cancelled' => ['Booking Cancelled', 'Your booking has been cancelled. Contact us if this was unexpected.', 'Booking Status: Cancelled', 'close', '#b42318', '#fff1f1'],
@@ -199,12 +199,12 @@ function customer_booking_email_html(array $booking, string $state = 'confirmed'
             'info2' => 'If you have already paid or need help, please contact us.',
         ],
         'received' => [
-            'subject' => 'Booking Received',
-            'preheader' => 'We received your booking details.',
+            'subject' => 'Booking Request Received',
+            'preheader' => 'Your booking request is awaiting property confirmation.',
             'line1' => 'Thank you for choosing Jebal Guest House.',
-            'line2' => 'We received your booking details. Our team will contact you if anything else is required.',
-            'info1' => 'Please keep your booking ID for future reference.',
-            'info2' => 'If you have any questions, feel free to contact us.',
+            'line2' => 'Your booking request has been received and is awaiting confirmation from the property.',
+            'info1' => 'Payment can be made when you arrive. No online payment is required for this request.',
+            'info2' => 'Please keep your booking ID for future reference.',
         ],
         'failed' => [
             'subject' => 'Payment Failed',
