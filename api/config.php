@@ -103,6 +103,13 @@ function jebal_env_json_array(string $key, array $default = []): array
     return is_array($decoded) && $decoded !== [] ? $decoded : $default;
 }
 
+function jebal_env_bool(string $key, bool $default = false): bool
+{
+    $value = jebal_env_value($key, $default ? 'true' : 'false');
+    $parsed = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    return $parsed ?? $default;
+}
+
 $defaultRoomRates = [
     'Ground Floor Room 1' => 8500.00,
     'Ground Floor Room 2' => 8500.00,
@@ -131,6 +138,7 @@ jebal_define('PUBLIC_APP_URL', $publicAppUrl);
 jebal_define('ADMIN_APP_URL', $adminAppUrl);
 jebal_define('API_BASE_URL', $apiBaseUrl);
 jebal_define('ASSET_BASE_URL', $assetBaseUrl !== '' ? $assetBaseUrl : $apiBaseUrl);
+jebal_define('ONLINE_PAYMENT_ENABLED', jebal_env_bool('ONLINE_PAYMENT_ENABLED', false));
 
 jebal_define('DB_HOST', (string) jebal_env_value('DB_HOST', ''));
 jebal_define('DB_NAME', (string) jebal_env_value('DB_NAME', ''));

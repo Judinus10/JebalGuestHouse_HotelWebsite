@@ -20,6 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(false, 'Only POST requests are allowed.', 405);
 }
 
+if (!ONLINE_PAYMENT_ENABLED) {
+    json_response(false, 'Online payment is temporarily unavailable. Please select Pay on Arrival.', 503);
+}
+
 rate_limit_or_fail('create_checkout_session', 10, 15);
 
 function payhere_format_amount(float $amount): string

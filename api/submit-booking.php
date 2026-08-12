@@ -29,6 +29,11 @@ $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
 $guests = (int) ($data['guests'] ?? 0);
 $message = clean_string($data['message'] ?? '', 3000);
+$paymentMethod = strtolower(clean_string($data['payment_method'] ?? 'Cash', 30));
+
+if (!in_array($paymentMethod, ['cash', 'pay on arrival'], true)) {
+    json_response(false, 'Online payment is temporarily unavailable. Please select Pay on Arrival.', 422);
+}
 
 if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
     json_response(false, 'Please fill in all required fields.', 422);
@@ -88,15 +93,19 @@ try {
     $pdo = get_db_connection();
     expire_pending_bookings($pdo, null, true);
 
+    $pdo->beginTransaction();
+
     $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1");
     $roomStmt->execute([':room_name' => $roomName]);
     $room = $roomStmt->fetch();
 
     if (!$room || ($room['status'] ?? '') !== 'Available') {
+        $pdo->rollBack();
         json_response(false, 'Please select a valid available room.', 422);
     }
 
     if ($guests > (int) ($room['max_guests'] ?? 0)) {
+        $pdo->rollBack();
         json_response(false, 'Selected room cannot hold this number of guests.', 422);
     }
 
@@ -117,6 +126,7 @@ try {
     ]);
 
     if ($conflict->fetch() || ics_room_conflict($pdo, (int) $room['id'], $checkInDate, $checkOutDate)) {
+        $pdo->rollBack();
         json_response(false, 'Sorry, this room is not available for the selected dates.', 409, ['available' => false]);
     }
 
@@ -169,14 +179,26 @@ try {
 
     $bookingId = (int) $pdo->lastInsertId();
 
+    $paymentStmt = $pdo->prepare(
+        "INSERT INTO payments
+            (booking_id, order_id, amount, currency, status, method, gateway_response, created_at, updated_at)
+         VALUES
+            (:booking_id, :order_id, :amount, :currency, 'Payment Pending', 'Cash', NULL, NOW(), NOW())"
+    );
+    $paymentStmt->execute([
+        ':booking_id' => $bookingId,
+        ':order_id' => 'CASH-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT),
+        ':amount' => $amount,
+        ':currency' => PAYMENT_CURRENCY,
+    ]);
+
     booking_audit_log($pdo, $bookingId, 'booking_created', 'Booking Created', 'Customer submitted booking details and a pending booking was created.', [
         'room_name' => $roomName,
         'amount' => $amount,
         'currency' => PAYMENT_CURRENCY,
     ]);
 
-    // Do not send user/admin confirmation emails here.
-    // Payment is not verified yet. Success/failed emails are sent only from payments/payhere-notify.php.
+    $pdo->commit();
 
     json_response(true, 'Booking inquiry submitted successfully.', 201, [
         'inquiry_id' => $bookingId,
@@ -192,6 +214,9 @@ try {
         ],
     ]);
 } catch (Throwable $e) {
+    if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     error_log('Booking submit error: ' . $e->getMessage());
     json_response(false, 'Unable to submit booking inquiry.', 500);
 }

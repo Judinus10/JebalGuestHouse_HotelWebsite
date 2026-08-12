@@ -10,6 +10,12 @@ declare(strict_types=1);
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
 
+if (!ONLINE_PAYMENT_ENABLED) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Online payment is temporarily unavailable.');
+}
+
 function redirect_error(string $message, int $statusCode = 400): void
 {
     http_response_code($statusCode);

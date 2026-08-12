@@ -17,6 +17,12 @@ require_once __DIR__ . '/../bookings/booking-audit-helper.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 
+if (!ONLINE_PAYMENT_ENABLED) {
+    http_response_code(503);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit('Online payment is temporarily unavailable');
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     header('Content-Type: text/plain; charset=utf-8');
