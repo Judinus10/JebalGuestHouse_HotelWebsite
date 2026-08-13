@@ -18,9 +18,14 @@ $roomId = (int) ($data['room_id'] ?? 0);
 $roomName = clean_string($data['room_name'] ?? '', 150);
 $checkInDate = clean_string($data['check_in_date'] ?? '', 20);
 $checkOutDate = clean_string($data['check_out_date'] ?? '', 20);
+$guests = (int) ($data['guests'] ?? 0);
 
 if (($roomId < 1 && $roomName === '') || $checkInDate === '' || $checkOutDate === '') {
     json_response(false, 'Room, check-in date, and check-out date are required.', 422);
+}
+
+if ($guests < 1 || $guests > 20) {
+    json_response(false, 'Enter a valid number of guests.', 422);
 }
 
 if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate) || strtotime($checkOutDate) < strtotime($checkInDate)) {
@@ -37,7 +42,7 @@ try {
     expire_pending_bookings($pdo, null, false);
 
     if ($roomId > 0) {
-        $roomStmt = $pdo->prepare('SELECT room_name FROM rooms WHERE id = :id LIMIT 1');
+        $roomStmt = $pdo->prepare('SELECT id, room_name, max_guests, status FROM rooms WHERE id = :id LIMIT 1');
         $roomStmt->execute([':id' => $roomId]);
         $room = $roomStmt->fetch();
 
@@ -47,6 +52,28 @@ try {
 
         $roomName = (string) $room['room_name'];
         $roomId = (int) $roomId;
+    } else {
+        $roomStmt = $pdo->prepare('SELECT id, room_name, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1');
+        $roomStmt->execute([':room_name' => $roomName]);
+        $room = $roomStmt->fetch();
+
+        if (!$room) {
+            json_response(false, 'Room not found.', 404);
+        }
+
+        $roomId = (int) $room['id'];
+    }
+
+    if (($room['status'] ?? '') !== 'Available') {
+        json_response(false, 'This room is not currently available for booking.', 409, ['available' => false]);
+    }
+
+    $capacity = (int) ($room['max_guests'] ?? 0);
+    if ($capacity < 1 || $guests > $capacity) {
+        json_response(false, 'Selected room cannot hold this number of guests.', 422, [
+            'available' => false,
+            'max_guests' => max(0, $capacity),
+        ]);
     }
 
     $stmt = $pdo->prepare(

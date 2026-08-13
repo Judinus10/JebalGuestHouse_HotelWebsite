@@ -60,19 +60,21 @@ export default function BookingBar() {
     e.preventDefault()
     setError('')
 
-    if (!checkIn || !checkOut) {
-      setError('Please select both check-in and check-out dates.')
+    if ((checkIn && !checkOut) || (!checkIn && checkOut)) {
+      setError('Please select both check-in and check-out dates, or leave both empty.')
       return
     }
 
-    if (checkOut <= checkIn) {
+    if (checkIn && checkOut && checkOut <= checkIn) {
       setError('Check-out date must be after check-in date.')
       return
     }
 
     const params = new URLSearchParams()
-    params.set('check_in_date', checkIn)
-    params.set('check_out_date', checkOut)
+    if (checkIn && checkOut) {
+      params.set('check_in_date', checkIn)
+      params.set('check_out_date', checkOut)
+    }
     params.set('guests', guests)
     if (roomType !== 'All Rooms') params.set('room_type', roomType)
     navigate(`/rooms?${params.toString()}`)

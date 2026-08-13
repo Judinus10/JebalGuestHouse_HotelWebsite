@@ -110,13 +110,24 @@ export default function Rooms() {
     setFilter(bookingFilters.room_type || 'All')
   }, [bookingFilters.room_type])
 
-  const availableTypes = useMemo(() => {
-    const types = rooms.map((room) => room.type).filter(Boolean)
-    return ['All', ...new Set(types)]
-  }, [rooms])
+  const capacityFilteredRooms = useMemo(() => {
+    const requestedGuests = Number(bookingFilters.guests || 0)
+    if (!requestedGuests) return rooms
 
-  const filtered =
-    filter === 'All' ? rooms : rooms.filter((room) => room.type === filter)
+    return rooms.filter((room) => {
+      const capacity = Number(room.max_guests ?? room.guests ?? 0)
+      return Number.isFinite(capacity) && capacity > 0 && capacity >= requestedGuests
+    })
+  }, [rooms, bookingFilters.guests])
+
+  const availableTypes = useMemo(() => {
+    const types = capacityFilteredRooms.map((room) => room.type).filter(Boolean)
+    return ['All', ...new Set(types)]
+  }, [capacityFilteredRooms])
+
+  const filtered = filter === 'All'
+    ? capacityFilteredRooms
+    : capacityFilteredRooms.filter((room) => room.type === filter)
 
   const selectedStayText = bookingFilters.check_in_date && bookingFilters.check_out_date
     ? `${bookingFilters.check_in_date} to ${bookingFilters.check_out_date}`

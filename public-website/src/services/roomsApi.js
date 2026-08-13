@@ -42,7 +42,7 @@ export async function fetchRoom(idOrSlug) {
   return payload.data || payload.room
 }
 
-export async function checkRoomAvailability({ roomId, roomName, checkInDate, checkOutDate }) {
+export async function checkRoomAvailability({ roomId, roomName, checkInDate, checkOutDate, guests }) {
   const response = await fetch(`${API_BASE_URL}/check-availability.php`, {
     method: 'POST',
     headers: {
@@ -54,6 +54,7 @@ export async function checkRoomAvailability({ roomId, roomName, checkInDate, che
       room_name: roomName,
       check_in_date: checkInDate,
       check_out_date: checkOutDate,
+      guests,
     }),
   })
 

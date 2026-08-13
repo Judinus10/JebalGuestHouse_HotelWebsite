@@ -157,6 +157,7 @@ export default function RoomDetails() {
           roomName: room.name,
           checkInDate: formData.check_in_date,
           checkOutDate: formData.check_out_date,
+          guests: formData.guests,
         })
 
         if (!active) return
@@ -165,7 +166,7 @@ export default function RoomDetails() {
           setAvailabilityWarning('This room is not available for the selected dates.')
         }
       } catch (err) {
-        if (active) setAvailabilityWarning('Unable to confirm availability right now. Please try again.')
+        if (active) setAvailabilityWarning(err.message || 'Unable to confirm availability right now. Please try again.')
       } finally {
         if (active) setCheckingAvailability(false)
       }
@@ -176,7 +177,7 @@ export default function RoomDetails() {
     return () => {
       active = false
     }
-  }, [room, formData.check_in_date, formData.check_out_date])
+  }, [room, formData.check_in_date, formData.check_out_date, formData.guests])
 
   const relatedRooms = useMemo(() => {
     if (!room) return []
@@ -283,6 +284,7 @@ export default function RoomDetails() {
         roomName: room.name,
         checkInDate: formData.check_in_date,
         checkOutDate: formData.check_out_date,
+        guests: formData.guests,
       })
 
       if (!availability.available) {
