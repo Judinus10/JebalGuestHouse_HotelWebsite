@@ -77,6 +77,11 @@ function cleanContactValue(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : ''
 }
 
+function isOnlinePaymentMethod(value) {
+  const method = cleanContactValue(value).toLowerCase()
+  return method.includes('payhere') || method.includes('online')
+}
+
 function getBookingNumber(bill, orderId) {
   if (bill?.id) return `BK-${String(bill.id).padStart(6, '0')}`
   return orderId || 'booking-bill'
@@ -245,12 +250,15 @@ export default function BookingBill() {
 
   useEffect(() => {
     if (!bill || bill.payment_status !== 'Payment Pending') return
-    const timer = window.setInterval(loadBill, 5000)
+    const refreshInterval = isOnlinePaymentMethod(bill.payment_method)
+      ? 15 * 1000
+      : 7 * 60 * 1000
+    const timer = window.setInterval(loadBill, refreshInterval)
     return () => window.clearInterval(timer)
   }, [bill, loadBill])
 
   useEffect(() => {
-    if (!bill || bill.payment_status !== 'Payment Pending') return undefined
+    if (!bill || bill.payment_status !== 'Payment Pending' || !isOnlinePaymentMethod(bill.payment_method)) return undefined
     const timer = window.setInterval(() => {
       setSecondsRemaining((current) => Math.max(0, current - 1))
     }, 1000)
@@ -511,7 +519,7 @@ export default function BookingBill() {
     pdf.setTextColor(51, 65, 85)
     const notes = [
       'Please keep this bill for your records.',
-      'The room is booked from check-in day morning 11:30 AM to check-out day morning 11:00 AM.',
+      'The room is booked from 12:00 PM on the check-in date until 11:00 AM on the check-out date.',
       `For billing queries, contact the front desk at ${hotelPhone}.`,
     ]
     let noteY = panelY + 68
@@ -731,7 +739,7 @@ export default function BookingBill() {
                   </div>
                 </div>
 
-                {bill.payment_status === 'Payment Pending' && (
+                {bill.payment_status === 'Payment Pending' && isOnlinePaymentMethod(bill.payment_method) && (
                   <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                     Payment is still pending. Complete it within {formatCountdown(secondsRemaining)} to keep this room reserved.
                   </div>

@@ -94,7 +94,9 @@ $token = clean_string($_GET['token'] ?? '', 1024);
 if ($bookingId < 1 || $orderId === '' || $token === '') {
     json_response(false, 'Booking ID, order ID, and token are required.', 422);
 }
-rate_limit_or_fail('payment_status_lookup', 30, 15);
+// PayHere bills poll every 15 seconds and Cash bills every 7 minutes.
+// Allow normal bill monitoring without letting the endpoint run unrestricted.
+rate_limit_or_fail('payment_status_lookup', 120, 15);
 
 try {
     $pdo = get_db_connection();

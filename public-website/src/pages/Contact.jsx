@@ -18,7 +18,7 @@ const fallbackContactDetails = {
   reception_contact_number: '',
   whatsapp_reservation_number: business.displayTelephone,
   email: business.email,
-  business_hours: 'Check-in 2:00 PM · Check-out 12:00 PM',
+  business_hours: 'Check-in 12:00 PM · Check-out 11:00 AM',
   business_name: 'Jebal Guest House',
   map_embed_url: '',
 }

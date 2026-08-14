@@ -72,6 +72,8 @@ export default function Rooms() {
   )
 
   const roomSearchQuery = useMemo(() => buildRoomSearch(bookingFilters), [bookingFilters])
+  const requestedGuests = Number(bookingFilters.guests || 0)
+  const capacityExceeded = requestedGuests > 3
 
   useEffect(() => {
     setSearchForm({
@@ -135,6 +137,7 @@ export default function Rooms() {
 
   const handleSearchFormChange = (e) => {
     const { name, value } = e.target
+    setFormError('')
     setSearchForm((current) => ({ ...current, [name]: value }))
   }
 
@@ -149,6 +152,11 @@ export default function Rooms() {
 
     if (searchForm.check_in_date && searchForm.check_out_date && searchForm.check_out_date <= searchForm.check_in_date) {
       setFormError('Check-out date must be after check-in date.')
+      return
+    }
+
+    if (Number(searchForm.guests) > 3) {
+      setFormError('A single room can accommodate a maximum of 3 guests. Please reduce the guest count or contact the property for multiple-room arrangements.')
       return
     }
 
@@ -189,12 +197,11 @@ export default function Rooms() {
             description="Choose ground-floor or first-floor rooms in Anaiccoddai, Jaffna. Each room has a king-size bed, accommodates up to 3 guests, and includes air conditioning, free Wi-Fi, a kitchen, refrigerator, attached bathroom, and free parking. Full-day packages are available."
           />
 
-          {!hasBookingFilter && (
-            <FadeUp>
-              <form
-                onSubmit={handleRoomSearch}
-                className="mx-auto mb-12 max-w-6xl border border-ice-dark bg-white p-6 shadow-sm md:p-8"
-              >
+          <FadeUp>
+            <form
+              onSubmit={handleRoomSearch}
+              className="mx-auto mb-12 max-w-6xl border border-ice-dark bg-white p-6 shadow-sm md:p-8"
+            >
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-5 lg:gap-4">
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 text-xs font-medium tracking-wider uppercase text-muted">
@@ -276,9 +283,8 @@ export default function Rooms() {
                 </div>
 
                 {formError && <p className="mt-4 text-xs text-red-600">{formError}</p>}
-              </form>
-            </FadeUp>
-          )}
+            </form>
+          </FadeUp>
 
           {hasBookingFilter && (
             <FadeUp>
@@ -333,8 +339,10 @@ export default function Rooms() {
 
               {filtered.length === 0 && (
                 <p className="py-16 text-center text-muted">
-                  {hasBookingFilter
-                    ? 'No rooms are available for the selected dates. Try different dates from the home search bar or open Rooms again without filters.'
+                  {capacityExceeded
+                    ? `No single room can accommodate ${requestedGuests} guests. Each room supports up to 3 guests. Please reduce the guest count above or contact the property for multiple-room arrangements.`
+                    : hasBookingFilter
+                    ? 'No rooms are available for the selected dates. Change the search details above and select Search again.'
                     : 'No rooms found for this category.'}
                 </p>
               )}

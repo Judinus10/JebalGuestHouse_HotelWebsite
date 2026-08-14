@@ -17,8 +17,8 @@ export const business = {
   mapUrl: 'https://maps.app.goo.gl/GnrBaQgFcBbVvpbb6',
   latitude: 9.700297,
   longitude: 80.003293,
-  checkinTime: '14:00',
-  checkoutTime: '12:00',
+  checkinTime: '12:00',
+  checkoutTime: '11:00',
   priceRange: 'USD 20-30',
   amenities: ['Air conditioning', 'Kitchen', 'Refrigerator', 'Free Wi-Fi', 'Attached bathroom', 'Free parking'],
 }
