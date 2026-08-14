@@ -12,6 +12,8 @@ import { breadcrumbSchema, SITE_URL } from '../data/business'
 
 import { API_BASE_URL } from '@/services/config'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
+const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
+const ONLINE_PAYMENT_ENABLED = import.meta.env.VITE_ONLINE_PAYMENT_ENABLED === 'true'
 
 function readBookingParams(searchParams) {
   return {
@@ -253,14 +255,16 @@ export default function RoomDetails() {
   }
 
   const handlePaymentMethodChange = (e) => {
-    if (e.target.value === 'PayHere') {
-      setPaymentToast('Online payment is temporarily unavailable. Please select Pay on Arrival.')
+    const selectedMethod = e.target.value
+
+    if (selectedMethod === 'PayHere' && !ONLINE_PAYMENT_ENABLED) {
+      setPaymentToast('Online payment is not available right now. Please book the room using Pay on Arrival, or contact the management for bank-transfer details.')
       setFormData((current) => ({ ...current, payment_method: 'Cash' }))
       return
     }
 
     setPaymentToast('')
-    setFormData((current) => ({ ...current, payment_method: 'Cash' }))
+    setFormData((current) => ({ ...current, payment_method: selectedMethod }))
   }
 
   const handleSubmit = async (e) => {
@@ -304,28 +308,61 @@ export default function RoomDetails() {
         }),
       })
 
-      const result = await response.json()
+      const responseText = await response.text()
+      let result
 
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Unable to send booking inquiry.')
+      try {
+        result = responseText ? JSON.parse(responseText) : null
+      } catch (parseError) {
+        console.error('Booking API returned invalid JSON:', responseText)
+        throw new Error('The server returned an invalid booking response. Please contact the property before trying again.')
       }
 
-      setSubmitted(true)
-      setFormData({
-        full_name: '',
-        email: '',
-        phone: '',
-        is_booking_for_other: false,
-        staying_guest_name: '',
-        staying_guest_email: '',
-        staying_guest_phone: '',
-        staying_guest_note: '',
-        check_in_date: '',
-        check_out_date: '',
-        guests: '2',
-        message: '',
-        payment_method: 'Cash',
-      })
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.message || 'Unable to send booking inquiry.')
+      }
+
+      if (formData.payment_method === 'PayHere') {
+        const paymentResponse = await fetch(PAYMENT_INIT_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ booking_id: result.booking_id || result.inquiry_id }),
+        })
+
+        const paymentResponseText = await paymentResponse.text()
+        let paymentResult
+
+        try {
+          paymentResult = paymentResponseText ? JSON.parse(paymentResponseText) : null
+        } catch (parseError) {
+          console.error('Payment API returned invalid JSON:', paymentResponseText)
+          throw new Error('Booking was saved, but the payment server returned an invalid response. Please contact the property before trying again.')
+        }
+
+        if (!paymentResponse.ok || !paymentResult?.success) {
+          throw new Error(paymentResult?.message || 'Booking saved, but online payment could not be started.')
+        }
+
+        if (paymentResult.checkout_url) {
+          redirectingRef.current = true
+          window.location.assign(paymentResult.checkout_url)
+          return
+        }
+
+        throw new Error('Booking saved, but the online payment redirect was not returned.')
+      }
+
+      const billUrl = result.bill_url || result.data?.bill_url
+
+      if (billUrl) {
+        redirectingRef.current = true
+        window.location.assign(billUrl)
+        return
+      }
+
+      throw new Error('Booking was saved, but the booking bill link was not returned. Please contact the property before trying again.')
     } catch (err) {
       setError(err.message || 'Unable to send booking inquiry. Please try again.')
     } finally {
@@ -581,7 +618,7 @@ export default function RoomDetails() {
                             type="radio"
                             name="payment_method"
                             value="PayHere"
-                            checked={false}
+                            checked={formData.payment_method === 'PayHere'}
                             onChange={handlePaymentMethodChange}
                           />
                           <span>Pay Online</span>

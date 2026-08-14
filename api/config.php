@@ -249,8 +249,11 @@ if (defined('APP_ENV') && APP_ENV === 'production') {
     ini_set('log_errors', '1');
     error_reporting(E_ALL);
 } else {
-    ini_set('display_errors', '1');
-    ini_set('display_startup_errors', '1');
+    // API responses must stay machine-readable in local/development too.
+    // Warnings/notices are written to the PHP error log instead of being
+    // injected before JSON and breaking response.json() in the frontend.
+    ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
     ini_set('log_errors', '1');
     error_reporting(E_ALL);
 }

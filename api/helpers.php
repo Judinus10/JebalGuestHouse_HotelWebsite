@@ -53,11 +53,30 @@ function apply_cors_headers(): void
 
 function json_response(bool $success, string $message, int $statusCode = 200, array $extra = []): void
 {
+    // Some API endpoints (notably booking submission) deliberately start an
+    // output buffer. Clear anything accidentally written before the JSON body
+    // so the client always receives valid JSON and never PHP warning markup.
+    if (ob_get_level() > 0 && ob_get_length() !== false && ob_get_length() > 0) {
+        ob_clean();
+    }
+
+    if (!headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+    }
+
     http_response_code($statusCode);
-    echo json_encode(array_merge([
+
+    $payload = json_encode(array_merge([
         'success' => $success,
         'message' => $message,
     ], $extra), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    if ($payload === false) {
+        http_response_code(500);
+        $payload = '{"success":false,"message":"Unable to encode server response."}';
+    }
+
+    echo $payload;
     exit;
 }
 

@@ -172,7 +172,10 @@ try {
 
     $expiresAt = booking_expires_at($record);
     $secondsRemaining = $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
-    $canRetryPayment = in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
+    $paymentMethod = strtolower((string) ($record['payment_method'] ?? ''));
+    $isOnlinePayment = str_contains($paymentMethod, 'payhere');
+    $canRetryPayment = $isOnlinePayment
+        && in_array($paymentStatus, ['Payment Pending', 'Failed', 'Cancelled'], true)
         && (string) ($record['status'] ?? '') !== 'Confirmed';
 
     $invoiceDownloadUrl = null;
