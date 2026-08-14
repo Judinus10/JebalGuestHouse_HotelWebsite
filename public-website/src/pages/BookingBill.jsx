@@ -83,6 +83,7 @@ function isOnlinePaymentMethod(value) {
 }
 
 function getBookingNumber(bill, orderId) {
+  if (bill?.booking_no) return bill.booking_no
   if (bill?.id) return `BK-${String(bill.id).padStart(6, '0')}`
   return orderId || 'booking-bill'
 }
@@ -296,6 +297,7 @@ export default function BookingBill() {
   const bookingNumber = getBookingNumber(bill, orderId)
   const generatedAt = formatDateTime(new Date().toISOString())
   const paymentHistory = Array.isArray(bill?.payment_history) ? bill.payment_history : []
+  const bookedRooms = Array.isArray(bill?.rooms) ? bill.rooms : []
   const displayPaymentStatus = normalizePaymentStatus(bill?.payment_status)
   const displayBookingStatus = normalizeBookingStatus(bill?.booking_status, bill?.payment_status)
 
@@ -773,7 +775,9 @@ export default function BookingBill() {
                       <DetailBlock label="Check-out" value={bill.check_out_date} />
                       <DetailBlock label="Nights" value={`${nights} Night${nights === 1 ? '' : 's'}`} />
                       <DetailBlock label="Guests" value={`${bill.guests || 1} Guest${Number(bill.guests || 1) === 1 ? '' : 's'}`} />
-                      <DetailBlock label="Room Type" value={bill.room_name} />
+                      {bookedRooms.length > 0
+                        ? bookedRooms.map((room) => <DetailBlock key={room.booking_id} label={room.room_name} value={`${room.guests} Guest${Number(room.guests) === 1 ? '' : 's'}`} />)
+                        : <DetailBlock label="Room Type" value={bill.room_name} />}
                     </div>
                   </section>
 
@@ -785,13 +789,15 @@ export default function BookingBill() {
                     <div className="grid grid-cols-[1fr_auto] border-b border-slate-200 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                       <span>Description</span><span>Amount ({bill.currency || 'USD'})</span>
                     </div>
-                    <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-200 py-5 text-sm">
-                      <div>
-                        <p className="font-semibold text-slate-900">{bill.room_name} ({nights} Night{nights === 1 ? '' : 's'})</p>
-                        <p className="mt-1 text-xs text-slate-500">{stayDateRange(bill.check_in_date, bill.check_out_date)}</p>
+                    {(bookedRooms.length > 0 ? bookedRooms : [{ booking_id: 'single', room_name: bill.room_name, amount: roomTotal }]).map((room) => (
+                      <div key={room.booking_id} className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-200 py-5 text-sm">
+                        <div>
+                          <p className="font-semibold text-slate-900">{room.room_name} ({nights} Night{nights === 1 ? '' : 's'})</p>
+                          <p className="mt-1 text-xs text-slate-500">{stayDateRange(bill.check_in_date, bill.check_out_date)}{room.guests ? ` · ${room.guests} guests` : ''}</p>
+                        </div>
+                        <p className="font-semibold text-slate-950">{Number(room.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
-                      <p className="font-semibold text-slate-950">{Number(roomTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
+                    ))}
                     <div className="mt-5 flex items-center justify-between rounded-md border border-amber-100 bg-amber-50 px-4 py-4">
                       <span className="font-bold text-slate-900">TOTAL AMOUNT</span>
                       <span className="font-bold text-amber-800">{formatMoney(roomTotal, bill.currency)}</span>
@@ -814,7 +820,9 @@ export default function BookingBill() {
                       <DetailBlock label="Check-out" value={bill.check_out_date} />
                       <DetailBlock label="Nights" value={`${nights} Night${nights === 1 ? '' : 's'}`} />
                       <DetailBlock label="Guests" value={`${bill.guests || 1} Guest${Number(bill.guests || 1) === 1 ? '' : 's'}`} />
-                      <DetailBlock label="Room Type" value={bill.room_name} />
+                      {bookedRooms.length > 0
+                        ? bookedRooms.map((room) => <DetailBlock key={room.booking_id} label={room.room_name} value={`${room.guests} Guest${Number(room.guests) === 1 ? '' : 's'}`} />)
+                        : <DetailBlock label="Room Type" value={bill.room_name} />}
                     </div>
                   </MobileAccordion>
 
@@ -822,13 +830,12 @@ export default function BookingBill() {
                     <div className="grid grid-cols-[1fr_auto] border-b border-slate-200 pb-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                       <span>Description</span><span>Amount ({bill.currency || 'USD'})</span>
                     </div>
-                    <div className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-200 py-5 text-sm">
-                      <div>
-                        <p className="font-semibold text-slate-900">{bill.room_name} ({nights} Night{nights === 1 ? '' : 's'})</p>
-                        <p className="mt-1 text-xs text-slate-500">{stayDateRange(bill.check_in_date, bill.check_out_date)}</p>
+                    {(bookedRooms.length > 0 ? bookedRooms : [{ booking_id: 'single', room_name: bill.room_name, amount: roomTotal }]).map((room) => (
+                      <div key={room.booking_id} className="grid grid-cols-[1fr_auto] gap-4 border-b border-slate-200 py-5 text-sm">
+                        <div><p className="font-semibold text-slate-900">{room.room_name} ({nights} Night{nights === 1 ? '' : 's'})</p><p className="mt-1 text-xs text-slate-500">{stayDateRange(bill.check_in_date, bill.check_out_date)}{room.guests ? ` · ${room.guests} guests` : ''}</p></div>
+                        <p className="font-semibold text-slate-950">{Number(room.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                       </div>
-                      <p className="font-semibold text-slate-950">{Number(roomTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
+                    ))}
                     <div className="mt-5 flex items-center justify-between rounded-md border border-amber-100 bg-amber-50 px-4 py-4">
                       <span className="font-bold text-slate-900">TOTAL AMOUNT</span>
                       <span className="font-bold text-amber-800">{formatMoney(roomTotal, bill.currency)}</span>

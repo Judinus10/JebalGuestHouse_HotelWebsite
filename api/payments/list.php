@@ -27,7 +27,10 @@ try {
         "SELECT
             p.id,
             p.booking_id,
-            CONCAT('BK-', LPAD(COALESCE(p.booking_id, 0), 5, '0')) AS booking_no,
+            CASE WHEN b.booking_group_id IS NOT NULL
+                THEN CONCAT('MB-', LPAD(b.booking_group_id, 6, '0'))
+                ELSE CONCAT('BK-', LPAD(COALESCE(p.booking_id, 0), 5, '0'))
+            END AS booking_no,
             COALESCE(CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_name, ''), '') <> '' THEN b.staying_guest_name ELSE b.full_name END, 'Unknown Guest') AS guest_name,
             COALESCE(CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_email, ''), '') <> '' THEN b.staying_guest_email ELSE b.email END, '') AS guest_email,
             COALESCE(CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_phone, ''), '') <> '' THEN b.staying_guest_phone ELSE b.phone END, '') AS guest_phone,
@@ -42,10 +45,15 @@ try {
             COALESCE(b.status, '') AS booking_status,
             COALESCE(b.check_in_date, '') AS check_in,
             COALESCE(b.check_out_date, '') AS check_out,
-            COALESCE(b.guests, 0) AS guests,
+            CASE WHEN b.booking_group_id IS NOT NULL THEN (
+                SELECT SUM(group_booking.guests) FROM bookings group_booking WHERE group_booking.booking_group_id = b.booking_group_id
+            ) ELSE COALESCE(b.guests, 0) END AS guests,
             GREATEST(1, DATEDIFF(COALESCE(b.check_out_date, CURDATE()), COALESCE(b.check_in_date, CURDATE()))) AS total_nights,
             COALESCE(b.message, '') AS special_request,
-            COALESCE(b.room_name, '-') AS room_name,
+            CASE WHEN b.booking_group_id IS NOT NULL THEN (
+                SELECT GROUP_CONCAT(group_booking.room_name ORDER BY group_booking.id SEPARATOR ', ')
+                FROM bookings group_booking WHERE group_booking.booking_group_id = b.booking_group_id
+            ) ELSE COALESCE(b.room_name, '-') END AS room_name,
             p.order_id,
             p.payment_id,
             p.amount,

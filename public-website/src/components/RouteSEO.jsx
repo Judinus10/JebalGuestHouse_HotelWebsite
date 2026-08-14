@@ -36,6 +36,11 @@ const pages = {
     description: 'Private booking information for a Jebal Guest House reservation.',
     robots: 'noindex, nofollow, noarchive',
   },
+  '/multi-room-booking': {
+    title: 'Multi-Room Booking | Jebal Guest House',
+    description: 'Choose and reserve multiple available rooms for your group at Jebal Guest House.',
+    robots: 'noindex, nofollow, noarchive',
+  },
 }
 
 export default function RouteSEO() {

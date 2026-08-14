@@ -643,3 +643,27 @@ AFTER status;
 
 UPDATE gallery_folders
 SET sort_order = id;
+
+-- Run once before deploying the multi-room booking files.
+
+CREATE TABLE IF NOT EXISTS booking_groups (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    booking_no VARCHAR(40) NULL,
+    primary_booking_id INT UNSIGNED NULL,
+    total_guests INT UNSIGNED NOT NULL,
+    total_rooms INT UNSIGNED NOT NULL,
+    total_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_booking_groups_booking_no (booking_no),
+    KEY idx_booking_groups_primary_booking (primary_booking_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE bookings
+    ADD COLUMN IF NOT EXISTS booking_group_id BIGINT UNSIGNED NULL AFTER id,
+    ADD COLUMN IF NOT EXISTS is_group_primary TINYINT(1) NOT NULL DEFAULT 0 AFTER booking_group_id;
+
+ALTER TABLE bookings
+    ADD INDEX IF NOT EXISTS idx_bookings_group_id (booking_group_id);

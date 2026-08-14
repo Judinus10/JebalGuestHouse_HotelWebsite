@@ -95,6 +95,7 @@ function build_monthly_booking_trend(PDO $pdo): array
         "SELECT YEAR(created_at) AS year_number, MONTH(created_at) AS month_number, COUNT(*) AS total
          FROM bookings
          WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 5 MONTH)
+           AND (booking_group_id IS NULL OR is_group_primary = 1)
          GROUP BY YEAR(created_at), MONTH(created_at)
          ORDER BY YEAR(created_at), MONTH(created_at)"
     );
@@ -177,6 +178,7 @@ function build_booking_status_distribution(PDO $pdo): array
         $pdo,
         "SELECT status, COUNT(*) AS total
          FROM bookings
+         WHERE booking_group_id IS NULL OR is_group_primary = 1
          GROUP BY status"
     );
 
@@ -211,6 +213,7 @@ function build_payment_status_distribution(PDO $pdo): array
         $pdo,
         "SELECT payment_status, COUNT(*) AS total
          FROM bookings
+         WHERE booking_group_id IS NULL OR is_group_primary = 1
          GROUP BY payment_status"
     );
 
@@ -239,6 +242,7 @@ function build_recent_bookings(PDO $pdo): array
         $pdo,
         "SELECT
             id,
+            booking_group_id,
             full_name,
             room_name,
             check_in_date,
@@ -247,6 +251,7 @@ function build_recent_bookings(PDO $pdo): array
             payment_status,
             created_at
          FROM bookings
+         WHERE booking_group_id IS NULL OR is_group_primary = 1
          ORDER BY created_at DESC
          LIMIT 5"
     );
@@ -263,7 +268,9 @@ function build_recent_bookings(PDO $pdo): array
         );
 
         $data[] = [
-            'bookingNo' => 'BK-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
+            'bookingNo' => !empty($row['booking_group_id'])
+                ? 'MB-' . str_pad((string) $row['booking_group_id'], 6, '0', STR_PAD_LEFT)
+                : 'BK-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
             'guest' => $row['full_name'],
             'room' => $row['room_name'],
             'checkIn' => $row['check_in_date'],
@@ -283,6 +290,7 @@ function build_upcoming_checkins(PDO $pdo): array
         $pdo,
         "SELECT
             id,
+            booking_group_id,
             full_name,
             room_name,
             check_in_date,
@@ -291,6 +299,7 @@ function build_upcoming_checkins(PDO $pdo): array
             created_at
          FROM bookings
          WHERE status = 'Confirmed'
+           AND (booking_group_id IS NULL OR is_group_primary = 1)
            AND check_in_date >= CURDATE()
          ORDER BY check_in_date ASC
          LIMIT 5"
@@ -299,7 +308,9 @@ function build_upcoming_checkins(PDO $pdo): array
     $data = [];
     foreach ($rows as $row) {
         $data[] = [
-            'bookingNo' => 'BK-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
+            'bookingNo' => !empty($row['booking_group_id'])
+                ? 'MB-' . str_pad((string) $row['booking_group_id'], 6, '0', STR_PAD_LEFT)
+                : 'BK-' . str_pad((string) $row['id'], 4, '0', STR_PAD_LEFT),
             'guest' => $row['full_name'],
             'room' => $row['room_name'],
             'checkIn' => $row['check_in_date'],
@@ -377,28 +388,29 @@ try {
     $pdo = get_db_connection();
     ensure_ics_schema($pdo);
 
-    $websiteTotalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings");
+    $websiteTotalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE booking_group_id IS NULL OR is_group_primary = 1");
     $bookingComTotalBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com'");
     $bookingComActiveBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND is_active = 1 AND UPPER(COALESCE(status, '')) NOT IN ('CANCELLED', 'CANCELED')");
     $bookingComCancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM external_calendar_events WHERE provider = 'booking.com' AND (is_active = 0 OR UPPER(COALESCE(status, '')) IN ('CANCELLED', 'CANCELED'))");
 
     $totalBookings = $websiteTotalBookings + $bookingComTotalBookings;
-    $pendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Pending'") + $bookingComActiveBookings;
-    $confirmedBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Confirmed'");
-    $checkedInBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Checked In'");
-    $checkedOutBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Checked Out'");
-    $cancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Cancelled'") + $bookingComCancelledBookings;
-    $noShowBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'No Show'");
+    $countableBooking = " AND (booking_group_id IS NULL OR is_group_primary = 1)";
+    $pendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Pending'" . $countableBooking) + $bookingComActiveBookings;
+    $confirmedBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Confirmed'" . $countableBooking);
+    $checkedInBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Checked In'" . $countableBooking);
+    $checkedOutBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Checked Out'" . $countableBooking);
+    $cancelledBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'Cancelled'" . $countableBooking) + $bookingComCancelledBookings;
+    $noShowBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE status = 'No Show'" . $countableBooking);
 
     $totalEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries");
     $newEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries WHERE status = 'New'");
     $readEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries WHERE status = 'Read'");
     $repliedEnquiries = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM enquiries WHERE status = 'Replied'");
 
-    $paidBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Paid'");
-    $paymentPendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Payment Pending'");
-    $failedPayments = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Failed'");
-    $refundedPayments = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Refunded'");
+    $paidBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Paid'" . $countableBooking);
+    $paymentPendingBookings = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Payment Pending'" . $countableBooking);
+    $failedPayments = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Failed'" . $countableBooking);
+    $refundedPayments = (int) fetch_single_value($pdo, "SELECT COUNT(*) FROM bookings WHERE payment_status = 'Refunded'" . $countableBooking);
 
     $todayRevenue = (float) fetch_single_value(
         $pdo,

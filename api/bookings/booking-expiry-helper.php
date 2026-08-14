@@ -87,8 +87,16 @@ function expire_pending_bookings(PDO $pdo, ?int $bookingId = null, bool $sendEma
            AND payment_status = 'Payment Pending'
            AND created_at < :cutoff
            AND NOT EXISTS (
-               SELECT 1 FROM payments p
-               WHERE p.booking_id = bookings.id
+               SELECT 1
+               FROM payments p
+               LEFT JOIN bookings payment_booking ON payment_booking.id = p.booking_id
+               WHERE (
+                   p.booking_id = bookings.id
+                   OR (
+                       bookings.booking_group_id IS NOT NULL
+                       AND payment_booking.booking_group_id = bookings.booking_group_id
+                   )
+               )
                  AND LOWER(COALESCE(p.method, '')) = 'cash'
            )
            {$whereId}"
@@ -153,8 +161,16 @@ function active_booking_conflict_sql(): string
                     AND (
                         created_at >= :hold_cutoff
                         OR EXISTS (
-                            SELECT 1 FROM payments p
-                            WHERE p.booking_id = bookings.id
+                            SELECT 1
+                            FROM payments p
+                            LEFT JOIN bookings payment_booking ON payment_booking.id = p.booking_id
+                            WHERE (
+                                p.booking_id = bookings.id
+                                OR (
+                                    bookings.booking_group_id IS NOT NULL
+                                    AND payment_booking.booking_group_id = bookings.booking_group_id
+                                )
+                            )
                               AND LOWER(COALESCE(p.method, '')) = 'cash'
                         )
                     )

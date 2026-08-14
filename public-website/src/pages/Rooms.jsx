@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { Calendar, Users, BedDouble, Search } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import SectionHeading from '../components/ui/SectionHeading'
@@ -73,7 +73,7 @@ export default function Rooms() {
 
   const roomSearchQuery = useMemo(() => buildRoomSearch(bookingFilters), [bookingFilters])
   const requestedGuests = Number(bookingFilters.guests || 0)
-  const capacityExceeded = requestedGuests > 3
+  const isMultiRoomSearch = requestedGuests > 3
 
   useEffect(() => {
     setSearchForm({
@@ -92,7 +92,7 @@ export default function Rooms() {
       setError('')
 
       try {
-        const data = await fetchRooms(bookingFilters)
+        const data = await fetchRooms(isMultiRoomSearch ? { ...bookingFilters, guests: '' } : bookingFilters)
         if (active) setRooms(data)
       } catch (err) {
         if (active) setError(err.message || 'Unable to load rooms.')
@@ -106,7 +106,7 @@ export default function Rooms() {
     return () => {
       active = false
     }
-  }, [bookingFilters])
+  }, [bookingFilters, isMultiRoomSearch])
 
   useEffect(() => {
     setFilter(bookingFilters.room_type || 'All')
@@ -114,7 +114,7 @@ export default function Rooms() {
 
   const capacityFilteredRooms = useMemo(() => {
     const requestedGuests = Number(bookingFilters.guests || 0)
-    if (!requestedGuests) return rooms
+    if (!requestedGuests || requestedGuests > 3) return rooms
 
     return rooms.filter((room) => {
       const capacity = Number(room.max_guests ?? room.guests ?? 0)
@@ -130,6 +130,8 @@ export default function Rooms() {
   const filtered = filter === 'All'
     ? capacityFilteredRooms
     : capacityFilteredRooms.filter((room) => room.type === filter)
+  const combinedCapacity = filtered.reduce((total, room) => total + Number(room.max_guests ?? room.guests ?? 0), 0)
+  const canBuildMultiRoomBooking = isMultiRoomSearch && combinedCapacity >= requestedGuests
 
   const selectedStayText = bookingFilters.check_in_date && bookingFilters.check_out_date
     ? `${bookingFilters.check_in_date} to ${bookingFilters.check_out_date}`
@@ -155,8 +157,8 @@ export default function Rooms() {
       return
     }
 
-    if (Number(searchForm.guests) > 3) {
-      setFormError('A single room can accommodate a maximum of 3 guests. Please reduce the guest count or contact the property for multiple-room arrangements.')
+    if (Number(searchForm.guests) > 20) {
+      setFormError('A booking can include a maximum of 20 guests.')
       return
     }
 
@@ -320,6 +322,22 @@ export default function Rooms() {
             </div>
           </FadeUp>
 
+          {!loading && !error && canBuildMultiRoomBooking && (
+            <FadeUp>
+              <div className="mx-auto mb-12 max-w-3xl border border-gold/30 bg-gold/5 px-6 py-6 text-center">
+                <p className="text-sm text-charcoal">
+                  Multiple rooms are required for {requestedGuests} guests. The system will assign available rooms and let you adjust the guest allocation before booking.
+                </p>
+                <Link
+                  to={`/multi-room-booking?${roomSearchQuery}`}
+                  className="mt-5 inline-flex bg-charcoal px-7 py-3 text-xs font-medium tracking-[0.18em] uppercase text-white transition-colors hover:bg-charcoal-light"
+                >
+                  Continue Multi-Room Booking
+                </Link>
+              </div>
+            </FadeUp>
+          )}
+
           {loading && (
             <p className="py-16 text-center text-muted">Loading rooms...</p>
           )}
@@ -339,8 +357,8 @@ export default function Rooms() {
 
               {filtered.length === 0 && (
                 <p className="py-16 text-center text-muted">
-                  {capacityExceeded
-                    ? `No single room can accommodate ${requestedGuests} guests. Each room supports up to 3 guests. Please reduce the guest count above or contact the property for multiple-room arrangements.`
+                  {isMultiRoomSearch && combinedCapacity < requestedGuests
+                    ? `There are not enough rooms available for ${requestedGuests} guests on the selected dates. Change the dates, room type, or guest count and search again.`
                     : hasBookingFilter
                     ? 'No rooms are available for the selected dates. Change the search details above and select Search again.'
                     : 'No rooms found for this category.'}

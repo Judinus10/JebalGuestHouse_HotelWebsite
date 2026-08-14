@@ -10,6 +10,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../invoices/invoice-helper.php';
 require_once __DIR__ . '/../bookings/booking-expiry-helper.php';
 require_once __DIR__ . '/../bookings/booking-audit-helper.php';
+require_once __DIR__ . '/../bookings/multi-room-helper.php';
 require_once __DIR__ . '/../mail/email-helper.php';
 require_once __DIR__ . '/../security/public-token-helper.php';
 
@@ -171,6 +172,17 @@ try {
     }
 
     $paymentHistory = load_payment_history($pdo, $bookingId);
+    $bookingGroupId = (int) ($record['booking_group_id'] ?? 0);
+    $groupRooms = $bookingGroupId > 0 ? multi_room_group_rows($pdo, $bookingGroupId) : [];
+    $groupBookingNo = $bookingGroupId > 0
+        ? 'MB-' . str_pad((string) $bookingGroupId, 6, '0', STR_PAD_LEFT)
+        : 'BK-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
+    $displayRoomName = $groupRooms
+        ? implode(', ', array_map(static fn(array $room): string => (string) $room['room_name'], $groupRooms))
+        : (string) ($record['room_name'] ?? '');
+    $displayGuests = $groupRooms
+        ? array_sum(array_map(static fn(array $room): int => (int) $room['guests'], $groupRooms))
+        : (int) ($record['guests'] ?? 0);
 
     $expiresAt = booking_expires_at($record);
     $secondsRemaining = $paymentStatus === 'Payment Pending' ? booking_seconds_remaining($record) : 0;
@@ -185,6 +197,8 @@ try {
         $baseApiUrl = API_BASE_URL !== '' ? API_BASE_URL : rtrim(dirname(dirname($_SERVER['SCRIPT_NAME'] ?? '/api/payments')), '/');
         $invoiceDownloadUrl = $baseApiUrl . '/invoices/download.php?' . http_build_query([
             'id' => $bookingId,
+            'booking_no' => $groupBookingNo,
+            'booking_group_id' => $bookingGroupId ?: null,
             'token' => public_invoice_download_token($bookingId),
         ]);
     }
@@ -195,10 +209,10 @@ try {
             'full_name' => (string) ($record['full_name'] ?? ''),
             'email' => (string) ($record['email'] ?? ''),
             'phone' => (string) ($record['phone'] ?? ''),
-            'room_name' => (string) ($record['room_name'] ?? ''),
+            'room_name' => $displayRoomName,
             'check_in_date' => (string) ($record['check_in_date'] ?? ''),
             'check_out_date' => (string) ($record['check_out_date'] ?? ''),
-            'guests' => (int) ($record['guests'] ?? 0),
+            'guests' => $displayGuests,
             'booking_status' => (string) ($record['status'] ?? 'Pending'),
             'payment_status' => $paymentStatus,
             'amount' => (float) ($record['paid_amount'] ?? $record['amount'] ?? 0),
@@ -214,6 +228,14 @@ try {
             'seconds_remaining' => $secondsRemaining,
             'can_retry_payment' => $canRetryPayment,
             'payment_history' => $paymentHistory,
+            'rooms' => array_map(static fn(array $room): array => [
+                'booking_id' => (int) $room['id'],
+                'room_id' => (int) ($room['room_id'] ?? 0),
+                'room_name' => (string) $room['room_name'],
+                'guests' => (int) $room['guests'],
+                'amount' => (float) $room['amount'],
+                'currency' => (string) $room['currency'],
+            ], $groupRooms),
         ],
     ]);
 } catch (Throwable $exception) {

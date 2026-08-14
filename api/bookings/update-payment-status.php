@@ -55,18 +55,29 @@ try {
         json_response(false, 'Booking was not found.', 404);
     }
 
-    $updateBooking = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
-    $updateBooking->execute([
-        ':payment_status' => $paymentStatus,
-        ':id' => $id,
-    ]);
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($groupId > 0) {
+        $updateBooking = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE booking_group_id = :group_id');
+        $updateBooking->execute([':payment_status' => $paymentStatus, ':group_id' => $groupId]);
+    } else {
+        $updateBooking = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
+        $updateBooking->execute([':payment_status' => $paymentStatus, ':id' => $id]);
+    }
 
-    $amount = (float) ($booking['amount'] ?? 0);
+    $amount = $groupId > 0
+        ? (float) $pdo->query('SELECT total_amount FROM booking_groups WHERE id = ' . $groupId)->fetchColumn()
+        : (float) ($booking['amount'] ?? 0);
     $currency = (string) ($booking['currency'] ?? PAYMENT_CURRENCY);
     $orderId = 'MANUAL-' . date('YmdHis') . '-' . str_pad((string) $id, 5, '0', STR_PAD_LEFT);
 
     $paymentStmt = $pdo->prepare('SELECT id FROM payments WHERE booking_id = :booking_id ORDER BY id DESC LIMIT 1 FOR UPDATE');
-    $paymentStmt->execute([':booking_id' => $id]);
+    $paymentBookingId = $id;
+    if ($groupId > 0) {
+        $primaryStmt = $pdo->prepare('SELECT primary_booking_id FROM booking_groups WHERE id = :group_id LIMIT 1');
+        $primaryStmt->execute([':group_id' => $groupId]);
+        $paymentBookingId = (int) ($primaryStmt->fetchColumn() ?: $id);
+    }
+    $paymentStmt->execute([':booking_id' => $paymentBookingId]);
     $existingPayment = $paymentStmt->fetch();
 
     $gatewayResponse = json_encode([
@@ -101,7 +112,7 @@ try {
              VALUES (:booking_id, :order_id, :amount, :currency, :status, :method, :gateway_response, NOW(), NOW())'
         );
         $insertPayment->execute([
-            ':booking_id' => $id,
+            ':booking_id' => $paymentBookingId,
             ':order_id' => $orderId,
             ':amount' => $amount,
             ':currency' => $currency,

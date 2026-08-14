@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/multi-room-helper.php';
 
 apply_cors_headers();
 
@@ -151,20 +152,25 @@ try {
         }
     }
 
-    $updateBooking = $pdo->prepare(
-        'UPDATE bookings
-         SET status = :status,
-             payment_status = :payment_status,
-             updated_at = NOW()
-         WHERE id = :id'
-    );
-    $updateBooking->execute([
-        ':status' => $bookingStatus,
-        ':payment_status' => $paymentStatus,
-        ':id' => $bookingId,
-    ]);
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    if ($groupId > 0) {
+        $updateBooking = $pdo->prepare(
+            'UPDATE bookings SET status = :status, payment_status = :payment_status, updated_at = NOW()
+             WHERE booking_group_id = :group_id'
+        );
+        $updateBooking->execute([':status' => $bookingStatus, ':payment_status' => $paymentStatus, ':group_id' => $groupId]);
+    } else {
+        $updateBooking = $pdo->prepare(
+            'UPDATE bookings SET status = :status, payment_status = :payment_status, updated_at = NOW()
+             WHERE id = :id'
+        );
+        $updateBooking->execute([':status' => $bookingStatus, ':payment_status' => $paymentStatus, ':id' => $bookingId]);
+    }
 
-    $amount = (float) ($booking['amount'] ?? 0);
+    $groupRows = $groupId > 0 ? multi_room_group_rows($pdo, $groupId) : [];
+    $amount = $groupRows
+        ? array_sum(array_map(static fn(array $row): float => (float) $row['amount'], $groupRows))
+        : (float) ($booking['amount'] ?? 0);
     $currency = (string) ($booking['currency'] ?? PAYMENT_CURRENCY);
     $orderId = 'MANUAL-' . date('YmdHis') . '-' . str_pad((string) $bookingId, 5, '0', STR_PAD_LEFT);
     $gatewayResponse = json_encode([
@@ -176,8 +182,9 @@ try {
         'remarks' => $remarks,
     ], JSON_UNESCAPED_SLASHES);
 
+    $paymentBookingId = $groupId > 0 ? multi_room_primary_booking_id($pdo, $groupId) : $bookingId;
     $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :booking_id ORDER BY id DESC LIMIT 1 FOR UPDATE');
-    $paymentStmt->execute([':booking_id' => $bookingId]);
+    $paymentStmt->execute([':booking_id' => $paymentBookingId]);
     $payment = $paymentStmt->fetch();
 
     if ($payment) {
@@ -210,7 +217,7 @@ try {
              VALUES (:booking_id, :order_id, :payment_id, :amount, :currency, :status, :method, :gateway_response, NOW(), NOW())'
         );
         $insertPayment->execute([
-            ':booking_id' => $bookingId,
+            ':booking_id' => $paymentBookingId,
             ':order_id' => $orderId,
             ':payment_id' => $reference,
             ':amount' => $amount,
@@ -225,6 +232,12 @@ try {
     $freshBookingStmt = $pdo->prepare('SELECT * FROM bookings WHERE id = :id LIMIT 1');
     $freshBookingStmt->execute([':id' => $bookingId]);
     $freshBooking = $freshBookingStmt->fetch() ?: $booking;
+    if ($groupRows) {
+        $freshBooking['booking_no'] = multi_room_booking_number($freshBooking);
+        $freshBooking['room_name'] = implode(', ', array_column($groupRows, 'room_name'));
+        $freshBooking['guests'] = array_sum(array_map(static fn(array $row): int => (int) $row['guests'], $groupRows));
+        $freshBooking['amount'] = $amount;
+    }
 
     $freshPaymentStmt = $pdo->prepare('SELECT * FROM payments WHERE id = :id LIMIT 1');
     $freshPaymentStmt->execute([':id' => $paymentId]);

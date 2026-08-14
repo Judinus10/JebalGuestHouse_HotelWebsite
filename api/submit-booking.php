@@ -110,6 +110,11 @@ try {
     $pdo = get_db_connection();
     expire_pending_bookings($pdo, null, true);
 
+    // Initialize the ICS tables before starting the booking transaction.
+    // Running CREATE TABLE IF NOT EXISTS inside a MySQL transaction causes an
+    // implicit commit and later produces "There is no active transaction".
+    ensure_ics_schema($pdo);
+
     $pdo->beginTransaction();
 
     $roomStmt = $pdo->prepare("SELECT id, max_guests, status FROM rooms WHERE room_name = :room_name LIMIT 1");

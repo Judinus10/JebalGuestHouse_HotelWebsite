@@ -105,23 +105,26 @@ try {
     $updateStmt->execute($updateParams);
 
     if (!empty($currentPayment['booking_id'])) {
-        $bookingStmt = $pdo->prepare(
-            'UPDATE bookings
-             SET payment_status = :payment_status,
-                 updated_at = NOW()
-             WHERE id = :booking_id'
-        );
-        $bookingStmt->execute([
-            ':payment_status' => $paymentStatus,
-            ':booking_id' => (int) $currentPayment['booking_id'],
-        ]);
+        $groupStmt = $pdo->prepare('SELECT booking_group_id FROM bookings WHERE id = :booking_id LIMIT 1');
+        $groupStmt->execute([':booking_id' => (int) $currentPayment['booking_id']]);
+        $groupId = (int) ($groupStmt->fetchColumn() ?: 0);
+        if ($groupId > 0) {
+            $bookingStmt = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE booking_group_id = :group_id');
+            $bookingStmt->execute([':payment_status' => $paymentStatus, ':group_id' => $groupId]);
+        } else {
+            $bookingStmt = $pdo->prepare('UPDATE bookings SET payment_status = :payment_status, updated_at = NOW() WHERE id = :booking_id');
+            $bookingStmt->execute([':payment_status' => $paymentStatus, ':booking_id' => (int) $currentPayment['booking_id']]);
+        }
     }
 
     $selectStmt = $pdo->prepare(
         "SELECT
             p.id,
             p.booking_id,
-            CONCAT('BK-', LPAD(COALESCE(p.booking_id, 0), 5, '0')) AS booking_no,
+            CASE WHEN b.booking_group_id IS NOT NULL
+                THEN CONCAT('MB-', LPAD(b.booking_group_id, 6, '0'))
+                ELSE CONCAT('BK-', LPAD(COALESCE(p.booking_id, 0), 5, '0'))
+            END AS booking_no,
             COALESCE(b.full_name, 'Unknown Guest') AS guest_name,
             COALESCE(b.email, '') AS guest_email,
             COALESCE(b.room_name, '-') AS room_name,

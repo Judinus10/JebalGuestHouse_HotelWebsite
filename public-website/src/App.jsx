@@ -9,6 +9,7 @@ const Home = lazy(() => import('./pages/Home'))
 const Rooms = lazy(() => import('./pages/Rooms'))
 const RoomDetails = lazy(() => import('./pages/RoomDetails'))
 const BookingBill = lazy(() => import('./pages/BookingBill'))
+const MultiRoomBooking = lazy(() => import('./pages/MultiRoomBooking'))
 const Contact = lazy(() => import('./pages/Contact'))
 const Gallery = lazy(() => import('./pages/Gallery'))
 const Experience = lazy(() => import('./pages/Experience'))
@@ -34,6 +35,7 @@ function App() {
           <Route path="/gallery" element={<Gallery />} />
           <Route path="/rooms/:id" element={<RoomDetails />} />
           <Route path="/booking-bill" element={<BookingBill />} />
+          <Route path="/multi-room-booking" element={<MultiRoomBooking />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/experience" element={<Experience />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />

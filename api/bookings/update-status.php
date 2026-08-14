@@ -7,6 +7,7 @@ ob_start();
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../mail/email-helper.php';
+require_once __DIR__ . '/multi-room-helper.php';
 
 apply_cors_headers();
 require_admin_auth();
@@ -43,8 +44,10 @@ try {
         json_response(false, 'Booking was not found.', 404);
     }
 
+    $groupId = (int) ($booking['booking_group_id'] ?? 0);
+    $primaryBookingId = $groupId > 0 ? multi_room_primary_booking_id($pdo, $groupId) : $id;
     $paymentStmt = $pdo->prepare('SELECT * FROM payments WHERE booking_id = :id ORDER BY id DESC LIMIT 1 FOR UPDATE');
-    $paymentStmt->execute([':id' => $id]);
+    $paymentStmt->execute([':id' => $primaryBookingId]);
     $payment = $paymentStmt->fetch() ?: [];
 
     $oldStatus = calendar_status_key($booking['status'] ?? 'Pending');
@@ -110,8 +113,13 @@ try {
         $paymentKey = 'cancelled';
     }
 
-    $update = $pdo->prepare('UPDATE bookings SET status = :status, payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
-    $update->execute([':status' => $displayStatus, ':payment_status' => $paymentStatus, ':id' => $id]);
+    if ($groupId > 0) {
+        $update = $pdo->prepare('UPDATE bookings SET status = :status, payment_status = :payment_status, updated_at = NOW() WHERE booking_group_id = :group_id');
+        $update->execute([':status' => $displayStatus, ':payment_status' => $paymentStatus, ':group_id' => $groupId]);
+    } else {
+        $update = $pdo->prepare('UPDATE bookings SET status = :status, payment_status = :payment_status, updated_at = NOW() WHERE id = :id');
+        $update->execute([':status' => $displayStatus, ':payment_status' => $paymentStatus, ':id' => $id]);
+    }
 
     if ($payment) {
         $paymentUpdate = $pdo->prepare('UPDATE payments SET status = :status, updated_at = NOW() WHERE id = :id');
@@ -121,6 +129,13 @@ try {
     $pdo->commit();
     $booking['status'] = $displayStatus;
     $booking['payment_status'] = $paymentStatus;
+    if ($groupId > 0) {
+        $groupRows = multi_room_group_rows($pdo, $groupId);
+        $booking['booking_no'] = multi_room_booking_number($booking);
+        $booking['room_name'] = implode(', ', array_column($groupRows, 'room_name'));
+        $booking['guests'] = array_sum(array_map(static fn(array $row): int => (int) $row['guests'], $groupRows));
+        $booking['amount'] = array_sum(array_map(static fn(array $row): float => (float) $row['amount'], $groupRows));
+    }
 
     try {
         if ($status === 'confirmed') send_booking_confirmed_email($pdo, $booking);

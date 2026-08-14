@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../calendar/ics-helper.php';
+require_once __DIR__ . '/multi-room-helper.php';
 
 apply_cors_headers();
 
@@ -18,7 +19,12 @@ try {
     $stmt = $pdo->query(
         "SELECT
             b.id,
-            CONCAT('BK-', LPAD(b.id, 5, '0')) AS booking_no,
+            CASE
+                WHEN b.booking_group_id IS NOT NULL THEN CONCAT('MB-', LPAD(b.booking_group_id, 6, '0'))
+                ELSE CONCAT('BK-', LPAD(b.id, 5, '0'))
+            END AS booking_no,
+            b.booking_group_id,
+            b.is_group_primary,
             CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_name, ''), '') <> '' THEN b.staying_guest_name ELSE b.full_name END AS guest_name,
             CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_email, ''), '') <> '' THEN b.staying_guest_email ELSE b.email END AS guest_email,
             CASE WHEN b.is_booking_for_other = 1 AND COALESCE(NULLIF(b.staying_guest_phone, ''), '') <> '' THEN b.staying_guest_phone ELSE b.phone END AS guest_phone,
@@ -59,7 +65,9 @@ try {
             COALESCE((
                 SELECT p.method
                 FROM payments p
+                LEFT JOIN bookings payment_booking ON payment_booking.id = p.booking_id
                 WHERE p.booking_id = b.id
+                   OR (b.booking_group_id IS NOT NULL AND payment_booking.booking_group_id = b.booking_group_id)
                 ORDER BY p.id DESC
                 LIMIT 1
             ), '') AS payment_method,
