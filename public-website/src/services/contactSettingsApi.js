@@ -2,15 +2,16 @@ import { API_BASE_URL } from '@/services/config'
 
 const fallbackContactSettings = {
   business_name: 'Jebal Guest House',
-  address: 'Jebal Guest House, Sri Lanka',
-  phone: '+94 77 123 4567',
-  reception_contact_number: '+94 21 222 4567',
-  whatsapp_reservation_number: '+94 77 123 4567',
-  email: 'reservations@jebalguesthouse.com',
+  address: 'Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka',
+  phone: '+31 6 28324956',
+  reception_contact_number: '+94 77 951 8657',
+  whatsapp_reservation_number: '+94 77 951 8657',
+  email: 'info@jebalguesthouse.com',
   business_hours: 'Daily · 7:00 AM – 10:00 PM',
   facebook_link: '',
   instagram_link: '',
   map_embed_url: '',
+  google_maps_url: '',
 }
 
 export async function fetchContactSettings() {

@@ -16,9 +16,11 @@ const footerLinks = [
 
 const fallbackSettings = {
   business_name: 'Jebal Guest House',
-  address: 'Jebal Guest House, Sri Lanka',
-  phone: '+94 77 000 0000',
-  email: 'info@jebalhomes.com',
+  address: 'Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka',
+  phone: '+31 6 28324956',
+  reception_contact_number: '+94 77 951 8657',
+  email: 'info@jebalguesthouse.com',
+  google_maps_url: '',
   facebook_link: '',
   instagram_link: '',
 }
@@ -128,10 +130,13 @@ export default function Footer() {
 
           {/* Contact Info - Unchanged */}
           <div className="text-sm text-white/60">
-            <p>{settings.address}</p>
+            {settings.google_maps_url ? (
+              <a href={settings.google_maps_url} target="_blank" rel="noreferrer" className="whitespace-pre-line transition-colors hover:text-gold-light">{settings.address}</a>
+            ) : <p className="whitespace-pre-line">{settings.address}</p>}
             <p className="mt-1">
-              {settings.phone} · {settings.email}
+              {settings.phone}{settings.reception_contact_number ? ` · ${settings.reception_contact_number}` : ''}
             </p>
+            <p className="mt-1">{settings.email}</p>
           </div>
 
           {/* Copyright + CompylX */}

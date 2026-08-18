@@ -19,15 +19,16 @@ import { fetchContactSettings, saveContactSettings } from '@/services/settingsAp
 
 const defaultSettings = {
   business_name: 'Jebal Guest House',
-  address: 'Jebal Guest House, Sri Lanka',
-  phone: '+94 77 123 4567',
-  reception_contact_number: '+94 21 222 4567',
-  whatsapp_reservation_number: '+94 77 123 4567',
-  email: 'reservations@jebalguesthouse.com',
+  address: 'Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka',
+  phone: '+31 6 28324956',
+  reception_contact_number: '+94 77 951 8657',
+  whatsapp_reservation_number: '+94 77 951 8657',
+  email: 'info@jebalguesthouse.com',
   business_hours: 'Daily · 7:00 AM – 10:00 PM',
   facebook_link: '',
   instagram_link: '',
   map_embed_url: '',
+  google_maps_url: '',
 }
 
 function normalizeSettings(data = {}) {
@@ -163,7 +164,7 @@ export default function WebsiteSettings() {
 
       <PageHeader
         title="Website Contact Settings"
-        description="Update the contact details shown on the public home page and contact page. These values are saved in the database."
+        description="Update the contact and location details used throughout the website, bills, PDFs and emails. These values are saved in the database."
       />
 
       {loadError && (
@@ -222,20 +223,20 @@ export default function WebsiteSettings() {
                       value={settings.phone}
                       onChange={(event) => updateSetting('phone', event.target.value)}
                       className="pl-9"
-                      placeholder="+94 77 123 4567"
+                      placeholder="+31 6 28324956"
                     />
                   </FieldWithIcon>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="reception_contact_number">Reception Number</Label>
+                  <Label htmlFor="reception_contact_number">Secondary Phone</Label>
                   <FieldWithIcon icon={Phone}>
                     <Input
                       id="reception_contact_number"
                       value={settings.reception_contact_number}
                       onChange={(event) => updateSetting('reception_contact_number', event.target.value)}
                       className="pl-9"
-                      placeholder="+94 21 222 4567"
+                      placeholder="+94 77 951 8657"
                     />
                   </FieldWithIcon>
                 </div>
@@ -250,7 +251,7 @@ export default function WebsiteSettings() {
                       value={settings.whatsapp_reservation_number}
                       onChange={(event) => updateSetting('whatsapp_reservation_number', event.target.value)}
                       className="pl-9"
-                      placeholder="+94 77 123 4567"
+                    placeholder="+94 77 951 8657"
                     />
                   </FieldWithIcon>
                 </div>
@@ -264,11 +265,26 @@ export default function WebsiteSettings() {
                       value={settings.email}
                       onChange={(event) => updateSetting('email', event.target.value)}
                       className="pl-9"
-                      placeholder="reservations@jebalguesthouse.com"
+                    placeholder="info@jebalguesthouse.com"
                       required
                     />
                   </FieldWithIcon>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="google_maps_url">Google Maps Directions URL</Label>
+                <FieldWithIcon icon={MapPin}>
+                  <Input
+                    id="google_maps_url"
+                    type="url"
+                    value={settings.google_maps_url}
+                    onChange={(event) => updateSetting('google_maps_url', event.target.value)}
+                    className="pl-9"
+                    placeholder="https://maps.app.goo.gl/..."
+                  />
+                </FieldWithIcon>
+                <p className="text-xs text-text-secondary">Used by address and directions links across the website.</p>
               </div>
 
               <div className="space-y-2">

@@ -112,7 +112,7 @@ export default function Experience() {
 
       <section className="bg-ice-light py-20">
         <div className="mx-auto mb-20 max-w-6xl px-6">
-          <SectionHeading subtitle="Nearby Jaffna Attractions" title="Places Near Jebal Guest House" description="Approximate travel distances from Jebal Guest House in Uyarappulam, Anaiccoddai. Travel time depends on the route and transport conditions." />
+          <SectionHeading subtitle="Nearby Jaffna Attractions" title="Places Near Jebal Guest House" description="Approximate travel distances from Jebal Guest House in Uyarappulam, Annaicoddai. Travel time depends on the route and transport conditions." />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {nearbyPlaces.map(([place, distance]) => (
               <div key={place} className="flex items-center justify-between gap-4 bg-white px-5 py-4">

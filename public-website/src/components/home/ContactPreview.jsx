@@ -7,8 +7,9 @@ export default function ContactPreview() {
   const { settings } = useContactSettings()
 
   const items = [
-    { icon: MapPin, text: settings.address },
-    { icon: Phone, text: settings.phone },
+    { icon: MapPin, text: settings.address, href: settings.google_maps_url },
+    { icon: Phone, text: settings.phone, href: `tel:${String(settings.phone || '').replace(/[^\d+]/g, '')}` },
+    { icon: Phone, text: settings.reception_contact_number, href: `tel:${String(settings.reception_contact_number || '').replace(/[^\d+]/g, '')}` },
     { icon: Mail, text: settings.email },
     { icon: Clock, text: settings.business_hours },
   ].filter((item) => item.text)
@@ -32,12 +33,12 @@ export default function ContactPreview() {
             </p>
 
             <ul className="mt-8 space-y-5">
-              {items.map(({ icon: Icon, text }) => (
+              {items.map(({ icon: Icon, text, href }) => (
                 <li key={text} className="flex items-center gap-4 text-sm text-charcoal">
                   <span className="flex h-10 w-10 items-center justify-center bg-ice text-gold">
                     <Icon size={18} />
                   </span>
-                  {text}
+                  {href ? <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel={href.startsWith('http') ? 'noreferrer' : undefined} className="whitespace-pre-line hover:text-gold">{text}</a> : <span className="whitespace-pre-line">{text}</span>}
                 </li>
               ))}
             </ul>
@@ -71,9 +72,11 @@ export default function ContactPreview() {
                       {settings.address || 'Location details will be updated soon.'}
                     </p>
 
-                    <Button to="/contact" variant="outline" className="mt-6">
-                      View Contact Details
-                    </Button>
+                    {settings.google_maps_url ? (
+                      <a href={settings.google_maps_url} target="_blank" rel="noreferrer" className="mt-6 inline-flex min-h-11 items-center justify-center border border-charcoal px-6 text-xs font-medium uppercase tracking-[0.18em] text-charcoal transition hover:bg-charcoal hover:text-white">Open in Google Maps</a>
+                    ) : (
+                      <Button to="/contact" variant="outline" className="mt-6">View Contact Details</Button>
+                    )}
                   </div>
                 </div>
               )}

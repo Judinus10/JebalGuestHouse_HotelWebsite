@@ -18,7 +18,7 @@ export default function ContactInfo({ settings, compact = false }) {
     },
     {
       icon: Phone,
-      label: 'Reception',
+      label: 'Secondary Phone',
       value: settings.reception_contact_number,
       href: phoneHref(settings.reception_contact_number),
     },
@@ -39,7 +39,8 @@ export default function ContactInfo({ settings, compact = false }) {
       icon: MapPin,
       label: 'Address',
       value: settings.address,
-      href: null,
+      href: settings.google_maps_url || null,
+      external: Boolean(settings.google_maps_url),
     },
   ].filter((item) => item.value)
 

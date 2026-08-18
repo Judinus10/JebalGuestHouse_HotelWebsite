@@ -13,8 +13,10 @@ const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.p
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 
 const FALLBACK_HOTEL_NAME = 'Jebal Guest House'
-const FALLBACK_HOTEL_PHONE = '0707894862'
-const FALLBACK_HOTEL_EMAIL = 'jebalguesthouse@gmail.com'
+const FALLBACK_HOTEL_PHONE = '+31 6 28324956'
+const FALLBACK_HOTEL_SECONDARY_PHONE = '+94 77 951 8657'
+const FALLBACK_HOTEL_EMAIL = 'info@jebalguesthouse.com'
+const FALLBACK_HOTEL_ADDRESS = 'Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka'
 
 function formatMoney(amount, currency = 'USD') {
   const value = Number(amount || 0)
@@ -290,6 +292,12 @@ export default function BookingBill() {
     || cleanContactValue(bill?.contact_email)
     || FALLBACK_HOTEL_EMAIL
 
+  const hotelSecondaryPhone = cleanContactValue(contactSettings?.reception_contact_number)
+    || FALLBACK_HOTEL_SECONDARY_PHONE
+  const hotelAddress = cleanContactValue(contactSettings?.address) || FALLBACK_HOTEL_ADDRESS
+  const hotelMapsUrl = cleanContactValue(contactSettings?.google_maps_url)
+  const hotelPhoneLine = [hotelPhone, hotelSecondaryPhone].filter((value, index, values) => value && values.indexOf(value) === index).join(' | ')
+
   const roomTotal = Number(bill?.amount || 0)
   const roomPaid = bill?.payment_status === 'Paid' ? roomTotal : 0
   const roomBalance = Math.max(roomTotal - roomPaid, 0)
@@ -326,13 +334,15 @@ export default function BookingBill() {
 
     const addFooter = () => {
       pdf.setFillColor(61, 31, 13)
-      pdf.rect(0, pageHeight - 16, pageWidth, 16, 'F')
+      pdf.rect(0, pageHeight - 22, pageWidth, 22, 'F')
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(7.5)
       pdf.setTextColor(255, 255, 255)
-      pdf.text('Thank you for choosing Jebal Guest House.', pageWidth / 2, pageHeight - 9.5, { align: 'center' })
+      pdf.text('Thank you for choosing Jebal Guest House.', pageWidth / 2, pageHeight - 15.5, { align: 'center' })
       pdf.setTextColor(242, 200, 173)
-      pdf.text(pdfText(`${hotelPhone} | ${hotelEmail}`), pageWidth / 2, pageHeight - 4.5, { align: 'center' })
+      pdf.text(pdfText(`${hotelPhoneLine} | ${hotelEmail}`), pageWidth / 2, pageHeight - 10.5, { align: 'center' })
+      pdf.setFontSize(6.8)
+      pdf.text(pdfText(hotelAddress.replace(/\s*\n\s*/g, ', ')), pageWidth / 2, pageHeight - 5, { align: 'center', maxWidth: contentWidth })
     }
 
     const sectionTitle = (title, x, y) => {
@@ -522,7 +532,7 @@ export default function BookingBill() {
     const notes = [
       'Please keep this bill for your records.',
       'The room is booked from 12:00 PM on the check-in date until 11:00 AM on the check-out date.',
-      `For billing queries, contact the front desk at ${hotelPhone}.`,
+      `For billing queries, contact us at ${hotelPhoneLine}.`,
     ]
     let noteY = panelY + 68
     notes.forEach((note) => {
@@ -538,7 +548,7 @@ export default function BookingBill() {
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(7)
     pdf.setTextColor(100, 116, 139)
-    pdf.text('Page 1 of 1', pageWidth - margin, pageHeight - 20, { align: 'right' })
+    pdf.text('Page 1 of 1', pageWidth - margin, pageHeight - 26, { align: 'right' })
 
     return pdf.output('blob')
   }
@@ -852,7 +862,7 @@ export default function BookingBill() {
                         <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-slate-600">
                           <li>Check-in date: {bill.check_in_date || '-'}</li>
                           <li>Check-out date: {bill.check_out_date || '-'}</li>
-                          <li>For assistance, contact {hotelPhone}.</li>
+                          <li>For assistance, contact {hotelPhoneLine}.</li>
                         </ul>
                       </div>
                     </div>
@@ -884,9 +894,9 @@ export default function BookingBill() {
 
                 <div className="mt-10 border-t border-slate-200 py-7 print:hidden">
                   <div className="grid gap-5 text-sm text-slate-600 sm:grid-cols-3 justify-items-center items-center">
-                    <div className="flex items-center gap-3"><Phone size={16} className="text-amber-700" /><span>{hotelPhone}</span></div>
+                    <div className="flex items-center gap-3"><Phone size={16} className="text-amber-700" /><span>{hotelPhoneLine}</span></div>
                     <div className="flex items-center gap-3"><Mail size={16} className="text-amber-700" /><span className="break-all">{hotelEmail}</span></div>
-                    <div className="flex items-center gap-3"><MapPin size={16} className="text-amber-700" /><span>Jaffna, Sri Lanka</span></div>
+                    <div className="flex items-start gap-3"><MapPin size={16} className="mt-0.5 shrink-0 text-amber-700" />{hotelMapsUrl ? <a href={hotelMapsUrl} target="_blank" rel="noreferrer" className="whitespace-pre-line hover:text-amber-800">{hotelAddress}</a> : <span className="whitespace-pre-line">{hotelAddress}</span>}</div>
                   </div>
                 </div>
               </div>

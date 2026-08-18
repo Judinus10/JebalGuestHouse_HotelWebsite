@@ -7,9 +7,11 @@ export const business = {
   url: SITE_URL,
   telephone: '+31628324956',
   displayTelephone: '+31 6 28324956',
+  secondaryTelephone: '+94779518657',
+  displaySecondaryTelephone: '+94 77 951 8657',
   email: 'info@jebalguesthouse.com',
   address: {
-    streetAddress: 'Jebal Guest House, Uyarappulam, Anaiccoddai',
+    streetAddress: 'Old Church Road (near the RC School), Uyarappulam, Annaicoddai',
     addressLocality: 'Jaffna',
     addressRegion: 'Northern Province',
     addressCountry: 'LK',
@@ -32,14 +34,20 @@ export const nearbyPlaces = [
   ['Delft Island', '52 km'],
 ]
 
-export function lodgingSchema() {
+export function lodgingSchema(settings = {}) {
+  const primaryPhone = settings.phone || business.telephone
+  const secondaryPhone = settings.reception_contact_number || business.secondaryTelephone
+  const address = settings.address || `${business.address.streetAddress}, ${business.address.addressLocality}, Sri Lanka`
+  const mapUrl = settings.google_maps_url || business.mapUrl
+
   return {
     '@context': 'https://schema.org', '@type': ['LodgingBusiness', 'LocalBusiness'],
     '@id': `${SITE_URL}/#lodging`, name: business.name, url: business.url,
     image: [new URL(propertyImage, window.location.origin).href],
-    telephone: business.telephone, email: business.email, priceRange: business.priceRange,
+    telephone: primaryPhone, email: settings.email || business.email, priceRange: business.priceRange,
     currenciesAccepted: 'USD', checkinTime: business.checkinTime, checkoutTime: business.checkoutTime,
-    hasMap: business.mapUrl, address: { '@type': 'PostalAddress', ...business.address },
+    hasMap: mapUrl, address: { '@type': 'PostalAddress', ...business.address, streetAddress: address },
+    contactPoint: [primaryPhone, secondaryPhone].filter(Boolean).map((telephone) => ({ '@type': 'ContactPoint', telephone, contactType: 'reservations' })),
     geo: { '@type': 'GeoCoordinates', latitude: business.latitude, longitude: business.longitude },
     amenityFeature: business.amenities.map((name) => ({ '@type': 'LocationFeatureSpecification', name, value: true })),
   }

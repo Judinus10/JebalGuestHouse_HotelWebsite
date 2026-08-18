@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom'
-import { Users, Maximize2, BedDouble, Check, ArrowLeft, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Users, Maximize2, BedDouble, Check, ArrowLeft, AlertTriangle, ChevronLeft, ChevronRight, MapPin, Phone } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import ImageReveal from '../components/ui/ImageReveal'
@@ -9,6 +9,7 @@ import RoomCard from '../components/ui/RoomCard'
 import { checkRoomAvailability, fetchRoom, fetchRooms } from '../services/roomsApi'
 import SEO from '../components/SEO'
 import { breadcrumbSchema, SITE_URL } from '../data/business'
+import { useContactSettings } from '../hooks/useContactSettings'
 
 import { API_BASE_URL } from '@/services/config'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
@@ -58,6 +59,7 @@ function formatRoomPrice(currency, amount) {
 export default function RoomDetails() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
+  const { settings: contactSettings } = useContactSettings()
   const [room, setRoom] = useState(null)
   const [rooms, setRooms] = useState([])
   const [pageLoading, setPageLoading] = useState(true)
@@ -477,6 +479,27 @@ export default function RoomDetails() {
                     </li>
                   ))}
                 </ul>
+              </FadeUp>
+
+              <FadeUp delay={0.25}>
+                <div className="mt-12 border-t border-ice-dark pt-8">
+                  <h2 className="font-serif text-2xl text-charcoal md:text-3xl">Contact & Location</h2>
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                    <div className="flex gap-3 text-sm text-charcoal">
+                      <Phone size={18} className="mt-0.5 shrink-0 text-gold" />
+                      <div className="space-y-1">
+                        {contactSettings.phone && <a href={`tel:${contactSettings.phone.replace(/[^\d+]/g, '')}`} className="block hover:text-gold">{contactSettings.phone}</a>}
+                        {contactSettings.reception_contact_number && <a href={`tel:${contactSettings.reception_contact_number.replace(/[^\d+]/g, '')}`} className="block hover:text-gold">{contactSettings.reception_contact_number}</a>}
+                      </div>
+                    </div>
+                    <div className="flex gap-3 text-sm text-charcoal">
+                      <MapPin size={18} className="mt-0.5 shrink-0 text-gold" />
+                      {contactSettings.google_maps_url ? (
+                        <a href={contactSettings.google_maps_url} target="_blank" rel="noreferrer" className="whitespace-pre-line hover:text-gold">{contactSettings.address}</a>
+                      ) : <span className="whitespace-pre-line">{contactSettings.address}</span>}
+                    </div>
+                  </div>
+                </div>
               </FadeUp>
             </div>
 

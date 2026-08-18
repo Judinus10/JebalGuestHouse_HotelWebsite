@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom'
 import SEO from './SEO'
 import { breadcrumbSchema, lodgingSchema } from '../data/business'
+import { useContactSettings } from '../hooks/useContactSettings'
 
 const pages = {
   '/': {
@@ -45,6 +46,7 @@ const pages = {
 
 export default function RouteSEO() {
   const { pathname } = useLocation()
+  const { settings } = useContactSettings()
   if (pathname.startsWith('/rooms/')) return null
 
   const page = pages[pathname] || {
@@ -54,7 +56,7 @@ export default function RouteSEO() {
   }
 
   const structuredData = pathname === '/'
-    ? [lodgingSchema()]
+    ? [lodgingSchema(settings)]
     : page.robots?.startsWith('noindex')
       ? []
       : [breadcrumbSchema([{ name: 'Home', path: '/' }, { name: page.title.split('|')[0].trim(), path: pathname }])]

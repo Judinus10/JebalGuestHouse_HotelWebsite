@@ -5,7 +5,6 @@ import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
 import Button from '../components/ui/Button'
 import contactBanner from '../assets/images/banners/contact-banner.webp'
-import { business } from '../data/business'
 
 import { API_BASE_URL } from '@/services/config'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
@@ -13,14 +12,15 @@ const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
 const CONTACT_SUBMIT_TIMEOUT_MS = 8000
 
 const fallbackContactDetails = {
-  address: 'Jebal Guest House, Uyarappulam, Anaiccoddai, Jaffna',
-  phone: business.displayTelephone,
-  reception_contact_number: '',
-  whatsapp_reservation_number: business.displayTelephone,
-  email: business.email,
+  address: 'Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka',
+  phone: '+31 6 28324956',
+  reception_contact_number: '+94 77 951 8657',
+  whatsapp_reservation_number: '+94 77 951 8657',
+  email: 'info@jebalguesthouse.com',
   business_hours: 'Check-in 12:00 PM · Check-out 11:00 AM',
   business_name: 'Jebal Guest House',
   map_embed_url: '',
+  google_maps_url: '',
 }
 
 function whatsappHref(number) {
@@ -313,7 +313,7 @@ export default function Contact() {
                       { icon: Phone, title: 'Main Phone', text: contactDetails.phone },
                       {
                         icon: Phone,
-                        title: 'Reception Contact',
+                        title: 'Secondary Phone',
                         text: contactDetails.reception_contact_number,
                       },
                       { icon: Mail, title: 'Email', text: contactDetails.email },
@@ -329,7 +329,7 @@ export default function Contact() {
                             <p className="text-xs tracking-wider uppercase text-muted">
                               {title}
                             </p>
-                            <p className="mt-1 break-words text-sm text-charcoal">
+                            <p className="mt-1 whitespace-pre-line break-words text-sm text-charcoal">
                               {text}
                             </p>
                           </div>
@@ -364,14 +364,15 @@ export default function Contact() {
                             <p className="mt-2 font-serif text-charcoal">
                               {contactDetails.business_name}
                             </p>
-                            <a href={business.mapUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-medium text-gold underline">
-                              Open in Google Maps
-                            </a>
+                            {contactDetails.google_maps_url && <a href={contactDetails.google_maps_url} target="_blank" rel="noreferrer" className="mt-3 inline-block text-sm font-medium text-gold underline">Open in Google Maps</a>}
                           </div>
                         </div>
                       </>
                     )}
                   </div>
+                  {contactDetails.google_maps_url && contactDetails.map_embed_url && (
+                    <a href={contactDetails.google_maps_url} target="_blank" rel="noreferrer" className="inline-flex text-sm font-medium text-gold underline">Open in Google Maps</a>
+                  )}
                 </div>
               </FadeUp>
             </div>

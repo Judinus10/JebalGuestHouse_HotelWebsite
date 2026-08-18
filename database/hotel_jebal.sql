@@ -667,3 +667,21 @@ ALTER TABLE bookings
 
 ALTER TABLE bookings
     ADD INDEX IF NOT EXISTS idx_bookings_group_id (booking_group_id);
+
+-- Step 1: central hotel contact and location details.
+-- Import once in phpMyAdmin after replacing the application files.
+
+INSERT INTO website_settings (setting_key, setting_value, updated_at) VALUES
+('business_name', 'Jebal Guest House', NOW()),
+('address', 'Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka', NOW()),
+('phone', '+31 6 28324956', NOW()),
+('reception_contact_number', '+94 77 951 8657', NOW()),
+('whatsapp_reservation_number', '+94 77 951 8657', NOW())
+ON DUPLICATE KEY UPDATE
+  setting_value = VALUES(setting_value),
+  updated_at = NOW();
+
+INSERT IGNORE INTO website_settings (setting_key, setting_value, updated_at) VALUES
+('email', 'info@jebalguesthouse.com', NOW()),
+('map_embed_url', '', NOW()),
+('google_maps_url', '', NOW());

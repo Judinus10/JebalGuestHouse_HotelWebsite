@@ -156,7 +156,7 @@ jebal_define('ADMIN_EMAIL', (string) jebal_env_value('ADMIN_EMAIL', 'admin@jebal
 jebal_define('BOOKING_ADMIN_EMAIL', (string) jebal_env_value('BOOKING_ADMIN_EMAIL', 'bookings@jebalguesthouse.com'));
 jebal_define('CONTACT_ADMIN_EMAIL', (string) jebal_env_value('CONTACT_ADMIN_EMAIL', 'info@jebalguesthouse.com'));
 
-jebal_define('FROM_EMAIL', (string) jebal_env_value('FROM_EMAIL', 'info@jebalhomes.com'));
+jebal_define('FROM_EMAIL', (string) jebal_env_value('FROM_EMAIL', 'info@jebalguesthouse.com'));
 jebal_define('BOOKING_FROM_EMAIL', (string) jebal_env_value('BOOKING_FROM_EMAIL', 'bookings@jebalguesthouse.com'));
 jebal_define('CONTACT_FROM_EMAIL', (string) jebal_env_value('CONTACT_FROM_EMAIL', 'info@jebalguesthouse.com'));
 jebal_define('ADMIN_FROM_EMAIL', (string) jebal_env_value('ADMIN_FROM_EMAIL', jebal_env_value('ADMIN_EMAIL', 'admin@jebalguesthouse.com')));

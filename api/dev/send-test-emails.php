@@ -49,7 +49,7 @@ function test_email_dummy_booking(string $recipient): array
         'full_name' => 'Test Guest',
         'guest_name' => 'Test Guest',
         'email' => $recipient,
-        'phone' => '+94 77 123 4567',
+        'phone' => '+31 6 28324956 / +94 77 951 8657',
         'is_booking_for_other' => 0,
         'staying_guest_name' => '',
         'staying_guest_email' => '',
@@ -214,7 +214,7 @@ function test_email_catalog(string $recipient): array
         'contact_admin' => [
             'label' => 'Contact notification - admin',
             'subject' => 'TEST: New contact enquiry - Jebal Guest House ' . $contactRef,
-            'body' => contact_admin_email_html('Test Guest', $recipient, '+94 77 123 4567', 'Room availability question', 'This is a dummy contact message for email UI testing.', $contactRef),
+            'body' => contact_admin_email_html('Test Guest', $recipient, '+31 6 28324956', 'Room availability question', 'This is a dummy contact message for email UI testing.', $contactRef),
             'from_email' => contact_from_email(),
             'from_name' => contact_from_name(),
             'reply_to' => $recipient,

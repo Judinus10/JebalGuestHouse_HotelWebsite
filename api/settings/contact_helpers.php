@@ -14,15 +14,16 @@ function default_contact_settings(): array
 {
     return [
         'business_name' => 'Jebal Guest House',
-        'address' => 'Jebal Guest House, Sri Lanka',
-        'phone' => '+94 77 123 4567',
-        'reception_contact_number' => '+94 21 222 4567',
-        'whatsapp_reservation_number' => '+94 77 123 4567',
-        'email' => 'reservations@jebalguesthouse.com',
+        'address' => "Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka",
+        'phone' => '+31 6 28324956',
+        'reception_contact_number' => '+94 77 951 8657',
+        'whatsapp_reservation_number' => '+94 77 951 8657',
+        'email' => 'info@jebalguesthouse.com',
         'business_hours' => 'Daily · 7:00 AM – 10:00 PM',
         'facebook_link' => '',
         'instagram_link' => '',
         'map_embed_url' => '',
+        'google_maps_url' => '',
     ];
 }
 
@@ -51,7 +52,7 @@ function save_contact_settings(PDO $pdo, array $settings): array
     $cleaned = [];
 
     foreach ($allowed as $key => $defaultValue) {
-        $maxLength = in_array($key, ['map_embed_url', 'facebook_link', 'instagram_link'], true) ? 1000 : 255;
+        $maxLength = in_array($key, ['map_embed_url', 'google_maps_url', 'facebook_link', 'instagram_link'], true) ? 1000 : 255;
         $cleaned[$key] = clean_string($settings[$key] ?? $defaultValue, $maxLength);
     }
 
@@ -71,7 +72,7 @@ function save_contact_settings(PDO $pdo, array $settings): array
         json_response(false, 'A valid reservation email is required.', 422);
     }
 
-    foreach (['facebook_link', 'instagram_link', 'map_embed_url'] as $urlKey) {
+    foreach (['facebook_link', 'instagram_link', 'map_embed_url', 'google_maps_url'] as $urlKey) {
         if ($cleaned[$urlKey] !== '' && !filter_var($cleaned[$urlKey], FILTER_VALIDATE_URL)) {
             json_response(false, ucfirst(str_replace('_', ' ', $urlKey)) . ' must be a valid URL.', 422);
         }

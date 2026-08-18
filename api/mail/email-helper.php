@@ -508,15 +508,16 @@ function email_contact_settings(): array
 
     $defaults = function_exists('default_contact_settings') ? default_contact_settings() : [
         'business_name' => 'Jebal Guest House',
-        'address' => 'Jebal Guest House, Sri Lanka',
-        'phone' => '+94 77 123 4567',
-        'reception_contact_number' => '+94 21 222 4567',
-        'whatsapp_reservation_number' => '+94 77 123 4567',
-        'email' => 'reservations@jebalguesthouse.com',
+        'address' => "Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka",
+        'phone' => '+31 6 28324956',
+        'reception_contact_number' => '+94 77 951 8657',
+        'whatsapp_reservation_number' => '+94 77 951 8657',
+        'email' => 'info@jebalguesthouse.com',
         'business_hours' => 'Daily · 7:00 AM – 10:00 PM',
         'facebook_link' => '',
         'instagram_link' => '',
         'map_embed_url' => '',
+        'google_maps_url' => '',
     ];
 
     $settings = $defaults;
@@ -541,18 +542,24 @@ function email_contact_phone(): string
 {
     $phone = email_contact_value('phone');
     if ($phone === '') { $phone = email_contact_value('reception_contact_number'); }
-    if ($phone === '') { $phone = email_contact_value('whatsapp_reservation_number', '+94 77 123 4567'); }
+    if ($phone === '') { $phone = email_contact_value('whatsapp_reservation_number', '+31 6 28324956'); }
+
+    $secondary = email_contact_value('reception_contact_number');
+    if ($secondary !== '' && $secondary !== $phone) {
+        return $phone . ' / ' . $secondary;
+    }
+
     return $phone;
 }
 
 function email_contact_email(): string
 {
-    return email_contact_value('email', 'reservations@jebalguesthouse.com');
+    return email_contact_value('email', 'info@jebalguesthouse.com');
 }
 
 function email_contact_address(): string
 {
-    return email_contact_value('address', 'Jebal Guest House, Sri Lanka');
+    return email_contact_value('address', "Old Church Road (near the RC School)\nUyarappulam\nAnnaicoddai\nJaffna\nSri Lanka");
 }
 
 function email_contact_website(): string
@@ -635,7 +642,7 @@ function email_shell(string $title, string $content, string $preheader = ''): st
 </td>
 <td style="padding-left:14px;vertical-align:middle;">
 <div style="font-size:24px;line-height:1.15;color:#ffffff;font-weight:800;letter-spacing:.01em;">' . email_safe($brand) . '</div>
-<div style="margin-top:8px;font-size:12px;color:#f7f4ef;line-height:1.4;">' . email_safe(email_contact_address()) . ' &nbsp;&bull;&nbsp; Comfortable Guest House</div>
+<div style="margin-top:8px;font-size:12px;color:#f7f4ef;line-height:1.4;">' . nl2br(email_safe(email_contact_address())) . '<br>Comfortable Guest House</div>
 </td>
 </tr>
 </table>
