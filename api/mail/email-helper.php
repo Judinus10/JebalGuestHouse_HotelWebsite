@@ -1286,7 +1286,7 @@ function send_booking_received_emails(PDO $pdo, array $booking): void
         $pdo,
         'booking',
         $bookingId,
-        ADMIN_EMAIL,
+        booking_admin_email(),
         $subjectAdmin,
         $bodyAdmin,
         'admin_new_booking',
@@ -1397,7 +1397,7 @@ function send_booking_payment_pending_emails_once(PDO $pdo, array $booking, arra
             $pdo,
             'booking',
             $bookingId,
-            ADMIN_EMAIL,
+            booking_admin_email(),
             'New booking received - payment pending - Jebal Guest House #' . $bookingId,
             $bodyAdmin,
             $adminType,
@@ -1444,7 +1444,7 @@ function send_booking_expired_emails_once(PDO $pdo, array $booking): void
             $pdo,
             'booking',
             $bookingId,
-            ADMIN_EMAIL,
+            booking_admin_email(),
             'Pending booking expired - Jebal Guest House #' . $bookingId,
             $bodyAdmin,
             $adminType,
@@ -1468,7 +1468,7 @@ function send_booking_cancelled_emails(PDO $pdo, array $booking): void
 
     $bodyAdmin = admin_booking_email_html('cancelled', $booking);
 
-    send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Booking cancelled - Jebal Guest House #' . $bookingId, $bodyAdmin, 'admin_booking_cancelled');
+    send_tracked_email($pdo, 'booking', $bookingId, booking_admin_email(), 'Booking cancelled - Jebal Guest House #' . $bookingId, $bodyAdmin, 'admin_booking_cancelled');
 
     if ($bookingId > 0) {
         update_booking_email_status($pdo, $bookingId, $sentCustomer ? 'Queued' : 'Queue Failed');
@@ -1497,7 +1497,7 @@ function send_payment_success_emails(PDO $pdo, array $booking, array $payment): 
     if (!booking_email_sent($pdo, $bookingId, [$adminType])) {
         $bodyAdmin = admin_booking_email_html('paid', $booking, $payment);
 
-        send_tracked_email($pdo, 'booking', $bookingId, ADMIN_EMAIL, 'Payment received - Jebal Guest House #' . $bookingId, $bodyAdmin, $adminType, $booking['email'] ?? null);
+        send_tracked_email($pdo, 'booking', $bookingId, booking_admin_email(), 'Payment received - Jebal Guest House #' . $bookingId, $bodyAdmin, $adminType, $booking['email'] ?? null);
     }
 
     send_staying_guest_booking_email($pdo, $booking, 'paid', $payment, 'staying_guest_payment_successful', 'Booking confirmed for you');
@@ -1526,7 +1526,7 @@ function send_payment_failed_email(PDO $pdo, array $booking): void
             $pdo,
             'booking',
             $bookingId,
-            ADMIN_EMAIL,
+            booking_admin_email(),
             'Payment failed - Jebal Guest House #' . $bookingId,
             $adminBody,
             'admin_payment_failed',

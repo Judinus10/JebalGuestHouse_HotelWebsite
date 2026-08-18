@@ -1,33 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Bath,
   BedDouble,
-  BriefcaseBusiness,
-  Building2,
   Check,
   ChevronLeft,
   ChevronRight,
-  Coffee,
   Eye,
-  GlassWater,
   ImagePlus,
   MoreHorizontal,
   Pencil,
   Plus,
   Search,
+  Settings2,
   Trash2,
-  Waves,
-  Wifi,
-  Wind,
   X,
 } from 'lucide-react'
-import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input, Label, Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { initialAmenities } from '@/data/roomData'
-import { createRoom, deleteRoomById, deleteRoomImage, listRooms, updateRoom } from '@/services/roomsApi'
+import { createAmenity, createRoom, deleteAmenity, deleteRoomById, deleteRoomImage, listAmenities, listRooms, updateAmenity, updateRoom } from '@/services/roomsApi'
 
 const emptyForm = {
   room_name: '',
@@ -40,6 +31,7 @@ const emptyForm = {
   status: 'Available',
   images: [],
   amenity_ids: [],
+  show_unavailable_amenities: false,
 }
 
 const roomTypes = ['Ground Floor', 'First Floor', 'Family Room', 'Private Cottage']
@@ -49,17 +41,6 @@ const statusVariant = {
   Available: 'success',
   Unavailable: 'secondary',
   Maintenance: 'warning',
-}
-
-const amenityIcons = {
-  Wifi,
-  Wind,
-  Coffee,
-  Waves,
-  Building2,
-  GlassWater,
-  BriefcaseBusiness,
-  Bath,
 }
 
 function formatCurrency(value) {
@@ -284,6 +265,103 @@ function AmenitiesPreview({ amenities }) {
       )}
 
       {amenities.length === 0 && <span className="text-xs font-medium text-text-secondary">No amenities</span>}
+    </div>
+  )
+}
+
+function ManageAmenitiesModal({ amenities, onChange, onClose }) {
+  const [newName, setNewName] = useState('')
+  const [editingId, setEditingId] = useState(null)
+  const [editingName, setEditingName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+
+  async function addItem() {
+    const name = newName.trim()
+    if (!name || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      onChange(await createAmenity(name))
+      setNewName('')
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to add amenity.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function saveItem(id) {
+    const name = editingName.trim()
+    if (!name || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      onChange(await updateAmenity(id, name))
+      setEditingId(null)
+      setEditingName('')
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to update amenity.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function removeItem(amenity) {
+    const usage = Number(amenity.assigned_room_count || 0)
+    const warning = usage > 0
+      ? `${amenity.amenity_name} is assigned to ${usage} room${usage === 1 ? '' : 's'}. Delete it and remove those assignments?`
+      : `Delete ${amenity.amenity_name}?`
+    if (!window.confirm(warning) || busy) return
+    setBusy(true)
+    setError('')
+    try {
+      onChange(await deleteAmenity(amenity.id))
+    } catch (requestError) {
+      setError(requestError.message || 'Unable to delete amenity.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <div>
+            <h2 className="text-lg font-bold text-text-primary">Manage Amenities</h2>
+            <p className="text-sm text-text-secondary">Add, rename or delete amenities used by rooms.</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="max-h-[calc(90vh-80px)] overflow-y-auto p-6">
+          <div className="flex gap-3">
+            <Input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addItem() } }} placeholder="New amenity name" />
+            <Button type="button" onClick={addItem} disabled={!newName.trim() || busy}><Plus className="h-4 w-4" /> Add</Button>
+          </div>
+          {error && <p className="mt-3 text-sm font-medium text-red-600">{error}</p>}
+          <div className="mt-5 space-y-3">
+            {amenities.length === 0 && <p className="rounded-xl bg-slate-50 p-5 text-center text-sm text-text-secondary">No amenities created.</p>}
+            {amenities.map((amenity) => (
+              <div key={amenity.id} className="flex flex-col gap-3 rounded-xl border border-border p-3 sm:flex-row sm:items-center">
+                {editingId === amenity.id ? (
+                  <Input value={editingName} onChange={(event) => setEditingName(event.target.value)} className="flex-1" />
+                ) : (
+                  <div className="flex-1"><p className="font-semibold text-text-primary">{amenity.amenity_name}</p><p className="text-xs text-text-secondary">Used by {amenity.assigned_room_count || 0} rooms</p></div>
+                )}
+                <div className="flex gap-2">
+                  {editingId === amenity.id ? (
+                    <><Button type="button" size="sm" onClick={() => saveItem(amenity.id)} disabled={!editingName.trim() || busy}>Save</Button><Button type="button" size="sm" variant="outline" onClick={() => setEditingId(null)}>Cancel</Button></>
+                  ) : (
+                    <Button type="button" size="sm" variant="outline" onClick={() => { setEditingId(amenity.id); setEditingName(amenity.amenity_name) }}><Pencil className="h-4 w-4" /> Edit</Button>
+                  )}
+                  <Button type="button" size="sm" variant="outline" onClick={() => removeItem(amenity)} disabled={busy}><Trash2 className="h-4 w-4 text-red-600" /> Delete</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -538,7 +616,6 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
               <Label>Amenities</Label>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {amenities.map((amenity) => {
-                  const Icon = amenityIcons[amenity.icon] || Check
                   const selected = form.amenity_ids.includes(amenity.id)
 
                   return (
@@ -553,12 +630,22 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                           : 'border-border bg-white text-text-secondary hover:border-blue-200 hover:bg-slate-50'
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" />
+                      <Check className="h-4 w-4 shrink-0" />
                       <span className="truncate font-medium">{amenity.amenity_name}</span>
                     </button>
                   )
                 })}
               </div>
+              {amenities.length === 0 && <p className="text-sm text-text-secondary">No amenities exist yet. Close this form and use Manage Amenities.</p>}
+              <label className="mt-4 flex items-start gap-3 rounded-xl border border-border bg-slate-50 p-4 text-sm text-text-primary">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.show_unavailable_amenities)}
+                  onChange={(event) => updateField('show_unavailable_amenities', event.target.checked)}
+                  className="mt-0.5 h-4 w-4"
+                />
+                <span><span className="block font-semibold">Show amenities this room does not include</span><span className="mt-1 block text-xs text-text-secondary">Unselected amenities will appear with a red X on the public room page.</span></span>
+              </label>
             </div>
           </div>
 
@@ -705,6 +792,7 @@ function DeleteDialog({ room, onCancel, onConfirm }) {
 
 export default function Rooms() {
   const [rooms, setRooms] = useState([])
+  const [amenities, setAmenities] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
@@ -716,6 +804,7 @@ export default function Rooms() {
   const [deleteRoom, setDeleteRoom] = useState(null)
   const [toast, setToast] = useState(null)
   const [openActionsId, setOpenActionsId] = useState(null)
+  const [manageAmenitiesOpen, setManageAmenitiesOpen] = useState(false)
 
   function showToast(title, message) {
     setToast({ title, message })
@@ -727,8 +816,9 @@ export default function Rooms() {
     setLoadError('')
 
     try {
-      const data = await listRooms()
-      setRooms(data)
+      const [roomData, amenityData] = await Promise.all([listRooms(), listAmenities()])
+      setRooms(roomData)
+      setAmenities(amenityData)
     } catch (error) {
       setLoadError(error.message || 'Unable to load rooms.')
     } finally {
@@ -745,11 +835,8 @@ export default function Rooms() {
 
   const enrichedRooms = useMemo(() => {
     return rooms.map((room) => {
-      const amenityNames = Array.isArray(room.amenities) ? room.amenities : []
-      const amenityIds = initialAmenities
-        .filter((amenity) => amenityNames.includes(amenity.amenity_name))
-        .map((amenity) => amenity.id)
-      const amenities = initialAmenities.filter((amenity) => amenityIds.includes(amenity.id))
+      const amenityRecords = Array.isArray(room.amenity_records) ? room.amenity_records : []
+      const amenityIds = Array.isArray(room.amenity_ids) ? room.amenity_ids.map(Number) : []
       const imageRecords = Array.isArray(room.image_records) ? room.image_records : []
       const imageUrls = Array.isArray(room.images) ? room.images : []
       const image = imageRecords[0] || room.image || (room.main_image ? { image_url: room.main_image } : null)
@@ -762,7 +849,7 @@ export default function Rooms() {
         price_per_night: room.price_per_night ?? room.base_price ?? room.price,
         capacity: room.capacity ?? room.max_guests ?? room.guests,
         image,
-        amenities,
+        amenities: amenityRecords,
         amenity_ids: amenityIds,
       }
     })
@@ -795,6 +882,7 @@ export default function Rooms() {
       bed_type: room.bed_type || room.beds || '',
       currency: room.currency || 'USD',
       amenity_ids: room.amenity_ids || [],
+      show_unavailable_amenities: Boolean(room.show_unavailable_amenities),
     })
     setFormMode('edit')
   }
@@ -805,10 +893,6 @@ export default function Rooms() {
   }
 
   async function handleSubmitRoom(form) {
-    const amenityNames = initialAmenities
-      .filter((amenity) => form.amenity_ids.includes(amenity.id))
-      .map((amenity) => amenity.amenity_name)
-
     const payload = new FormData()
     if (formMode === 'edit') payload.append('id', selectedRoom.id)
     payload.append('room_name', form.room_name)
@@ -819,7 +903,8 @@ export default function Rooms() {
     payload.append('base_price', form.price_per_night)
     payload.append('price_per_night', form.price_per_night)
     payload.append('currency', form.currency || 'USD')
-    payload.append('amenities', JSON.stringify(amenityNames))
+    payload.append('amenity_ids', JSON.stringify(form.amenity_ids))
+    payload.append('show_unavailable_amenities', form.show_unavailable_amenities ? '1' : '0')
     payload.append('status', form.status)
     payload.append('sort_order', form.sort_order || 0)
 
@@ -866,10 +951,10 @@ export default function Rooms() {
           <h1 className="text-2xl font-bold text-text-primary md:text-3xl">Rooms</h1>
           <p className="mt-1 text-sm text-text-secondary">Manage room inventory, pricing, amenities, images, and availability.</p>
         </div>
-        <Button onClick={openAddModal} className="shrink-0">
-          <Plus className="h-4 w-4" />
-          Add Room
-        </Button>
+        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+          <Button variant="outline" onClick={() => setManageAmenitiesOpen(true)}><Settings2 className="h-4 w-4" /> Manage Amenities</Button>
+          <Button onClick={openAddModal}><Plus className="h-4 w-4" /> Add Room</Button>
+        </div>
       </div>
 
       <div className="grid min-w-0 max-w-full gap-4 rounded-2xl border border-border bg-white p-4 shadow-sm shadow-slate-200/60 md:grid-cols-[minmax(0,1fr)_180px_180px]">
@@ -981,7 +1066,7 @@ export default function Rooms() {
         <RoomFormModal
           mode={formMode}
           room={selectedRoom}
-          amenities={initialAmenities}
+          amenities={amenities}
           onClose={closeFormModal}
           onSubmit={handleSubmitRoom}
           onDeleteExistingImage={handleDeleteRoomImage}
@@ -1002,6 +1087,14 @@ export default function Rooms() {
         onCancel={() => setDeleteRoom(null)}
         onConfirm={confirmDeleteRoom}
       />
+
+      {manageAmenitiesOpen && (
+        <ManageAmenitiesModal
+          amenities={amenities}
+          onChange={(nextAmenities) => { setAmenities(nextAmenities); loadRooms() }}
+          onClose={() => setManageAmenitiesOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -7,6 +7,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../settings/contact_helpers.php';
 
 function generate_invoice_number(int $bookingId): string
 {
@@ -20,8 +21,14 @@ function pdf_escape_text(string $text): string
 
 function create_simple_invoice_pdf(string $filePath, array $invoice): void
 {
+    $businessName = trim((string) ($invoice['business_name'] ?? 'Jebal Guest House')) ?: 'Jebal Guest House';
+    $mainPhone = trim((string) ($invoice['main_phone'] ?? ''));
+    $secondaryPhone = trim((string) ($invoice['secondary_phone'] ?? ''));
+    $phones = array_values(array_unique(array_filter([$mainPhone, $secondaryPhone])));
+    $addressLines = preg_split('/\R+/', trim((string) ($invoice['business_address'] ?? ''))) ?: [];
+
     $lines = [
-        'JEBAL HOMES',
+        strtoupper($businessName),
         'Booking Payment Invoice',
         '',
         'Invoice Number: ' . $invoice['invoice_number'],
@@ -34,8 +41,15 @@ function create_simple_invoice_pdf(string $filePath, array $invoice): void
         'Payment Method: ' . $invoice['payment_method'],
         'Payment Date: ' . ($invoice['payment_date'] ?: date('Y-m-d H:i:s')),
         '',
-        'Thank you for choosing Jebal Homes.',
+        'Property Contact',
+        ...array_map(static fn(string $line): string => trim($line), $addressLines),
+        $phones !== [] ? 'Telephone: ' . implode(' / ', $phones) : '',
+        !empty($invoice['business_email']) ? 'Email: ' . $invoice['business_email'] : '',
+        '',
+        'Thank you for choosing ' . $businessName . '.',
     ];
+
+    $lines = array_values(array_filter($lines, static fn(string $line, int $index): bool => $line !== '' || $index < 3, ARRAY_FILTER_USE_BOTH));
 
     $content = "BT\n/F1 18 Tf\n50 790 Td\n(" . pdf_escape_text($lines[0]) . ") Tj\n";
     $content .= "/F1 12 Tf\n0 -28 Td\n(" . pdf_escape_text($lines[1]) . ") Tj\n";
@@ -107,6 +121,7 @@ function generate_invoice_for_booking(PDO $pdo, int $bookingId, array $payment =
     $currency = (string) ($payment['currency'] ?? $booking['currency'] ?? $booking['payment_currency'] ?? PAYMENT_CURRENCY);
     $paymentMethod = (string) ($payment['method'] ?? $payment['payment_method'] ?? 'PayHere');
     $paymentDate = (string) ($payment['paid_at'] ?? date('Y-m-d H:i:s'));
+    $contact = get_contact_settings($pdo);
 
     $invoice = [
         'booking_id' => $bookingId,
@@ -121,6 +136,11 @@ function generate_invoice_for_booking(PDO $pdo, int $bookingId, array $payment =
         'payment_method' => $paymentMethod,
         'payment_date' => $paymentDate,
         'file_path' => $relativePath,
+        'business_name' => (string) ($contact['business_name'] ?? 'Jebal Guest House'),
+        'business_address' => (string) ($contact['address'] ?? ''),
+        'main_phone' => (string) ($contact['phone'] ?? ''),
+        'secondary_phone' => (string) ($contact['reception_contact_number'] ?? ''),
+        'business_email' => (string) ($contact['email'] ?? ''),
     ];
 
     create_simple_invoice_pdf($absolutePath, $invoice);

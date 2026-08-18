@@ -98,9 +98,9 @@ function stay_reminder_bookings_html(array $bookings, string $emptyText): string
 
 function queue_stay_reminder_email(PDO $pdo, string $date, array $checkIns, array $checkOuts): int
 {
-    $adminEmail = defined('ADMIN_EMAIL') ? trim((string) ADMIN_EMAIL) : '';
+    $adminEmail = booking_admin_email();
     if ($adminEmail === '' || !filter_var($adminEmail, FILTER_VALIDATE_EMAIL)) {
-        error_log('Stay reminder skipped: ADMIN_EMAIL is missing or invalid.');
+        error_log('Stay reminder skipped: BOOKING_ADMIN_EMAIL is missing or invalid.');
         return 0;
     }
 

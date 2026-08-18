@@ -668,6 +668,21 @@ ALTER TABLE bookings
 ALTER TABLE bookings
     ADD INDEX IF NOT EXISTS idx_bookings_group_id (booking_group_id);
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- Step 1: central hotel contact and location details.
 -- Import once in phpMyAdmin after replacing the application files.
 
@@ -685,3 +700,123 @@ INSERT IGNORE INTO website_settings (setting_key, setting_value, updated_at) VAL
 ('email', 'info@jebalguesthouse.com', NOW()),
 ('map_embed_url', '', NOW()),
 ('google_maps_url', '', NOW());
+
+-- Step 2: database-managed property amenities and nearby places.
+-- Import this file once through phpMyAdmin.
+
+CREATE TABLE IF NOT EXISTS property_amenities (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    is_available TINYINT(1) NOT NULL DEFAULT 0,
+    is_visible TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS nearby_places (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    distance DECIMAL(8,2) NOT NULL,
+    distance_unit ENUM('m', 'km') NOT NULL DEFAULT 'km',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO property_amenities (name, is_available, is_visible)
+SELECT seed.name, seed.is_available, seed.is_visible
+FROM (
+    SELECT 'Air Conditioning' AS name, 1 AS is_available, 0 AS is_visible
+    UNION ALL SELECT 'Television', 1, 0
+    UNION ALL SELECT 'Free Wi-Fi', 1, 0
+    UNION ALL SELECT 'Attached Bathroom', 1, 0
+    UNION ALL SELECT 'Swimming Pool', 0, 1
+    UNION ALL SELECT 'Breakfast', 0, 1
+    UNION ALL SELECT 'Lunch', 0, 1
+    UNION ALL SELECT 'Dinner', 0, 1
+) AS seed
+WHERE NOT EXISTS (SELECT 1 FROM property_amenities LIMIT 1);
+
+INSERT INTO nearby_places (name, distance, distance_unit)
+SELECT seed.name, seed.distance, seed.distance_unit
+FROM (
+    SELECT 'Nearby Beach' AS name, 0.00 AS distance, 'km' AS distance_unit
+    UNION ALL SELECT 'Nearby Shop', 0.00, 'km'
+) AS seed
+WHERE NOT EXISTS (SELECT 1 FROM nearby_places LIMIT 1);
+
+-- Revised Step 2: database amenity catalogue and per-room assignments.
+-- Import once in phpMyAdmin after replacing the application files.
+
+CREATE TABLE IF NOT EXISTS property_amenities (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    is_available TINYINT(1) NOT NULL DEFAULT 1,
+    is_visible TINYINT(1) NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS nearby_places (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(120) NOT NULL,
+    distance DECIMAL(8,2) NOT NULL,
+    distance_unit ENUM('m', 'km') NOT NULL DEFAULT 'km',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE rooms
+    ADD COLUMN IF NOT EXISTS show_unavailable_amenities TINYINT(1) NOT NULL DEFAULT 0 AFTER amenities;
+
+CREATE TABLE IF NOT EXISTS room_amenities (
+    room_id INT UNSIGNED NOT NULL,
+    amenity_id INT UNSIGNED NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (room_id, amenity_id),
+    KEY idx_room_amenities_amenity (amenity_id),
+    CONSTRAINT fk_room_amenities_room FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE,
+    CONSTRAINT fk_room_amenities_amenity FOREIGN KEY (amenity_id) REFERENCES property_amenities(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO property_amenities (name, is_available, is_visible)
+SELECT seed.name, 1, 0
+FROM (
+    SELECT 'Balcony' AS name
+    UNION ALL SELECT 'Air Conditioning'
+    UNION ALL SELECT 'Television'
+    UNION ALL SELECT 'Free WiFi'
+    UNION ALL SELECT 'Attached Bathroom'
+    UNION ALL SELECT 'Guest Bathroom'
+    UNION ALL SELECT 'Swimming Pool'
+    UNION ALL SELECT 'Breakfast'
+    UNION ALL SELECT 'Lunch'
+    UNION ALL SELECT 'Dinner'
+) seed
+WHERE NOT EXISTS (
+    SELECT 1 FROM property_amenities existing WHERE LOWER(existing.name) = LOWER(seed.name)
+);
+
+-- Preserve current JSON room amenities by converting matching names into relationships.
+INSERT IGNORE INTO room_amenities (room_id, amenity_id)
+SELECT r.id, a.id
+FROM rooms r
+INNER JOIN property_amenities a
+    ON JSON_CONTAINS(COALESCE(r.amenities, JSON_ARRAY()), JSON_QUOTE(a.name));
+
+-- Handle the earlier spelling used for Free Wi-Fi.
+INSERT IGNORE INTO room_amenities (room_id, amenity_id)
+SELECT r.id, a.id
+FROM rooms r
+INNER JOIN property_amenities a ON LOWER(REPLACE(a.name, '-', '')) = 'free wifi'
+WHERE JSON_CONTAINS(COALESCE(r.amenities, JSON_ARRAY()), JSON_QUOTE('Free WiFi'))
+   OR JSON_CONTAINS(COALESCE(r.amenities, JSON_ARRAY()), JSON_QUOTE('Free Wi-Fi'));
+
+UPDATE property_amenities SET is_available = 1, is_visible = 0;
+
+INSERT INTO nearby_places (name, distance, distance_unit)
+SELECT seed.name, seed.distance, seed.distance_unit
+FROM (
+    SELECT 'Nearby Beach' AS name, 0.00 AS distance, 'km' AS distance_unit
+    UNION ALL SELECT 'Nearby Shop', 0.00, 'km'
+) seed
+WHERE NOT EXISTS (SELECT 1 FROM nearby_places LIMIT 1);

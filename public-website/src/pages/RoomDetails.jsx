@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom'
-import { Users, Maximize2, BedDouble, Check, ArrowLeft, AlertTriangle, ChevronLeft, ChevronRight, MapPin, Phone } from 'lucide-react'
+import { Users, Maximize2, BedDouble, ArrowLeft, AlertTriangle, Check, ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import ImageReveal from '../components/ui/ImageReveal'
@@ -9,7 +9,7 @@ import RoomCard from '../components/ui/RoomCard'
 import { checkRoomAvailability, fetchRoom, fetchRooms } from '../services/roomsApi'
 import SEO from '../components/SEO'
 import { breadcrumbSchema, SITE_URL } from '../data/business'
-import { useContactSettings } from '../hooks/useContactSettings'
+import { fetchPropertyContent } from '../services/propertyContentApi'
 
 import { API_BASE_URL } from '@/services/config'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
@@ -59,9 +59,9 @@ function formatRoomPrice(currency, amount) {
 export default function RoomDetails() {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
-  const { settings: contactSettings } = useContactSettings()
   const [room, setRoom] = useState(null)
   const [rooms, setRooms] = useState([])
+  const [propertyContent, setPropertyContent] = useState({ amenities: [], nearby_places: [] })
   const [pageLoading, setPageLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [activeImage, setActiveImage] = useState(0)
@@ -99,14 +99,16 @@ export default function RoomDetails() {
       setActiveImage(0)
 
       try {
-        const [roomData, roomList] = await Promise.all([
+        const [roomData, roomList, contentData] = await Promise.all([
           fetchRoom(id),
           fetchRooms(),
+          fetchPropertyContent(),
         ])
 
         if (!active) return
         setRoom(roomData)
         setRooms(roomList)
+        setPropertyContent(contentData)
       } catch (err) {
         if (active) setNotFound(true)
       } finally {
@@ -463,44 +465,43 @@ export default function RoomDetails() {
                 </div>
               </FadeUp>
 
-              {/* Amenities */}
-              <FadeUp delay={0.2}>
-                <h2 className="mt-12 font-serif text-2xl text-charcoal md:text-3xl">
-                  Room Amenities
-                </h2>
-                <ul className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-3">
-                  {(room.amenities || []).map((amenity) => (
-                    <li
-                      key={amenity}
-                      className="flex items-center gap-3 text-sm text-charcoal"
-                    >
-                      <Check size={16} className="shrink-0 text-gold" />
-                      {amenity}
-                    </li>
-                  ))}
-                </ul>
-              </FadeUp>
-
-              <FadeUp delay={0.25}>
-                <div className="mt-12 border-t border-ice-dark pt-8">
-                  <h2 className="font-serif text-2xl text-charcoal md:text-3xl">Contact & Location</h2>
-                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                    <div className="flex gap-3 text-sm text-charcoal">
-                      <Phone size={18} className="mt-0.5 shrink-0 text-gold" />
-                      <div className="space-y-1">
-                        {contactSettings.phone && <a href={`tel:${contactSettings.phone.replace(/[^\d+]/g, '')}`} className="block hover:text-gold">{contactSettings.phone}</a>}
-                        {contactSettings.reception_contact_number && <a href={`tel:${contactSettings.reception_contact_number.replace(/[^\d+]/g, '')}`} className="block hover:text-gold">{contactSettings.reception_contact_number}</a>}
+              {(Array.isArray(room.amenities_catalog) && room.amenities_catalog.some((amenity) => amenity.selected || room.show_unavailable_amenities) || propertyContent.nearby_places.length > 0) && (
+                <FadeUp delay={0.2}>
+                  <div className="mt-12 border-t border-ice-dark pt-8">
+                    {Array.isArray(room.amenities_catalog) && room.amenities_catalog.some((amenity) => amenity.selected || room.show_unavailable_amenities) && (
+                      <div>
+                        <h2 className="font-serif text-2xl text-charcoal md:text-3xl">Room Amenities</h2>
+                        <ul className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+                          {room.amenities_catalog
+                            .filter((amenity) => amenity.selected || room.show_unavailable_amenities)
+                            .map((amenity) => (
+                            <li key={amenity.id || amenity.name} className="flex items-center gap-3 text-sm text-charcoal">
+                              <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${amenity.selected ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                                {amenity.selected ? <Check size={15} strokeWidth={2.5} /> : <X size={15} strokeWidth={2.5} />}
+                              </span>
+                              <span>{amenity.amenity_name}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                    </div>
-                    <div className="flex gap-3 text-sm text-charcoal">
-                      <MapPin size={18} className="mt-0.5 shrink-0 text-gold" />
-                      {contactSettings.google_maps_url ? (
-                        <a href={contactSettings.google_maps_url} target="_blank" rel="noreferrer" className="whitespace-pre-line hover:text-gold">{contactSettings.address}</a>
-                      ) : <span className="whitespace-pre-line">{contactSettings.address}</span>}
-                    </div>
+                    )}
+
+                    {propertyContent.nearby_places.length > 0 && (
+                      <div className={Array.isArray(room.amenities_catalog) && room.amenities_catalog.some((amenity) => amenity.selected || room.show_unavailable_amenities) ? 'mt-10 border-t border-ice-dark pt-8' : ''}>
+                        <h2 className="font-serif text-2xl text-charcoal md:text-3xl">Nearby Places</h2>
+                        <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+                          {propertyContent.nearby_places.map((place) => (
+                            <li key={place.id || place.name} className="flex items-center justify-between gap-4 border-b border-ice-dark pb-3 text-sm text-charcoal">
+                              <span className="flex items-center gap-3"><MapPin size={17} className="shrink-0 text-gold" />{place.name}</span>
+                              <span className="font-medium">{Number(place.distance).toLocaleString(undefined, { maximumFractionDigits: 2 })} {place.distance_unit}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </FadeUp>
+                </FadeUp>
+              )}
             </div>
 
             {/* Booking sidebar */}

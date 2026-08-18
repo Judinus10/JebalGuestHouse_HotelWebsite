@@ -9,13 +9,15 @@ import {
   MapPin,
   MessageCircle,
   Phone,
+  Plus,
   RotateCcw,
   Save,
+  Trash2,
 } from 'lucide-react'
 import { PageHeader, SectionCard } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input, Label, Textarea } from '@/components/ui/input'
-import { fetchContactSettings, saveContactSettings } from '@/services/settingsApi'
+import { fetchContactSettings, fetchPropertyContent, saveContactSettings, savePropertyContent } from '@/services/settingsApi'
 
 const defaultSettings = {
   business_name: 'Jebal Guest House',
@@ -92,14 +94,17 @@ function FieldWithIcon({ icon: Icon, children, align = 'center' }) {
 export default function WebsiteSettings() {
   const [settings, setSettings] = useState(defaultSettings)
   const [savedSettings, setSavedSettings] = useState(defaultSettings)
+  const [propertyContent, setPropertyContent] = useState({ nearby_places: [] })
+  const [savedPropertyContent, setSavedPropertyContent] = useState({ nearby_places: [] })
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [toast, setToast] = useState({ message: '', type: 'success' })
 
   const hasChanges = useMemo(
-    () => JSON.stringify(settings) !== JSON.stringify(savedSettings),
-    [settings, savedSettings]
+    () => JSON.stringify(settings) !== JSON.stringify(savedSettings)
+      || JSON.stringify(propertyContent) !== JSON.stringify(savedPropertyContent),
+    [settings, savedSettings, propertyContent, savedPropertyContent]
   )
 
   useEffect(() => {
@@ -109,10 +114,17 @@ export default function WebsiteSettings() {
       setIsLoading(true)
       setLoadError('')
       try {
-        const data = normalizeSettings(await fetchContactSettings())
+        const [contactData, contentData] = await Promise.all([
+          fetchContactSettings(),
+          fetchPropertyContent(),
+        ])
+        const data = normalizeSettings(contactData)
         if (!active) return
         setSettings(data)
         setSavedSettings(data)
+        const nearbyContent = { nearby_places: Array.isArray(contentData.nearby_places) ? contentData.nearby_places : [] }
+        setPropertyContent(nearbyContent)
+        setSavedPropertyContent(nearbyContent)
       } catch (error) {
         if (!active) return
         setLoadError(error.message || 'Could not load contact settings.')
@@ -137,15 +149,43 @@ export default function WebsiteSettings() {
     setSettings((current) => ({ ...current, [field]: value }))
   }
 
+  const updateNearbyPlace = (index, field, value) => {
+    setPropertyContent((current) => ({
+      ...current,
+      nearby_places: current.nearby_places.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
+    }))
+  }
+
+  const addNearbyPlace = () => {
+    setPropertyContent((current) => ({
+      ...current,
+      nearby_places: [...current.nearby_places, { name: '', distance: '', distance_unit: 'km' }],
+    }))
+  }
+
+  const removeNearbyPlace = (index) => {
+    setPropertyContent((current) => ({
+      ...current,
+      nearby_places: current.nearby_places.filter((_, itemIndex) => itemIndex !== index),
+    }))
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setIsSaving(true)
 
     try {
-      const saved = normalizeSettings(await saveContactSettings(settings))
+      const [savedContactData, savedContentData] = await Promise.all([
+        saveContactSettings(settings),
+        savePropertyContent({ nearby_places: propertyContent.nearby_places }),
+      ])
+      const saved = normalizeSettings(savedContactData)
       setSettings(saved)
       setSavedSettings(saved)
-      showToast('Contact settings saved to database.')
+      const nearbyContent = { nearby_places: Array.isArray(savedContentData.nearby_places) ? savedContentData.nearby_places : [] }
+      setPropertyContent(nearbyContent)
+      setSavedPropertyContent(nearbyContent)
+      showToast('Website settings saved to database.')
     } catch (error) {
       showToast(error.message || 'Could not save contact settings.', 'error')
     } finally {
@@ -155,6 +195,7 @@ export default function WebsiteSettings() {
 
   const handleReset = () => {
     setSettings(savedSettings)
+    setPropertyContent(savedPropertyContent)
     showToast('Changes reset.')
   }
 
@@ -163,7 +204,7 @@ export default function WebsiteSettings() {
       <Toast message={toast.message} type={toast.type} onClose={() => setToast({ message: '', type: 'success' })} />
 
       <PageHeader
-        title="Website Contact Settings"
+        title="Website Settings"
         description="Update the contact and location details used throughout the website, bills, PDFs and emails. These values are saved in the database."
       />
 
@@ -273,21 +314,6 @@ export default function WebsiteSettings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="google_maps_url">Google Maps Directions URL</Label>
-                <FieldWithIcon icon={MapPin}>
-                  <Input
-                    id="google_maps_url"
-                    type="url"
-                    value={settings.google_maps_url}
-                    onChange={(event) => updateSetting('google_maps_url', event.target.value)}
-                    className="pl-9"
-                    placeholder="https://maps.app.goo.gl/..."
-                  />
-                </FieldWithIcon>
-                <p className="text-xs text-text-secondary">Used by address and directions links across the website.</p>
-              </div>
-
-              <div className="space-y-2">
                 <Label htmlFor="business_hours">Business Hours</Label>
                 <Input
                   id="business_hours"
@@ -345,12 +371,41 @@ export default function WebsiteSettings() {
                   />
                 </FieldWithIcon>
               </div>
+
+              <div className="border-t border-border pt-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-semibold text-text-primary">Nearby Places</h3>
+                    <p className="mt-1 text-xs text-text-secondary">These appear below the not-provided amenities on room details.</p>
+                  </div>
+                  <Button type="button" variant="outline" onClick={addNearbyPlace}>
+                    <Plus className="h-4 w-4" /> Add Place
+                  </Button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  {propertyContent.nearby_places.length === 0 && <p className="rounded-xl bg-slate-50 p-4 text-sm text-text-secondary">No nearby places added.</p>}
+                  {propertyContent.nearby_places.map((place, index) => (
+                    <div key={place.id || `nearby-${index}`} className="grid gap-3 rounded-xl border border-border p-3 sm:grid-cols-[1fr_120px_90px_auto]">
+                      <Input value={place.name} onChange={(event) => updateNearbyPlace(index, 'name', event.target.value)} placeholder="Nearby beach" />
+                      <Input type="number" min="0" step="0.01" value={place.distance} onChange={(event) => updateNearbyPlace(index, 'distance', event.target.value)} placeholder="Distance" />
+                      <select value={place.distance_unit || 'km'} onChange={(event) => updateNearbyPlace(index, 'distance_unit', event.target.value)} className="h-10 rounded-lg border border-border bg-white px-3 text-sm text-text-primary">
+                        <option value="km">km</option>
+                        <option value="m">m</option>
+                      </select>
+                      <Button type="button" variant="outline" onClick={() => removeNearbyPlace(index)} aria-label={`Delete ${place.name || 'nearby place'}`}>
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </FormSection>
           </div>
 
           <div className="flex flex-col-reverse gap-3 rounded-2xl border border-border bg-white p-4 shadow-sm shadow-slate-200/60 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-text-secondary">
-              {hasChanges ? 'You have unsaved contact changes.' : 'Contact settings are synced with the database.'}
+              {hasChanges ? 'You have unsaved website changes.' : 'Website settings are synced with the database.'}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button type="button" variant="outline" onClick={handleReset} disabled={!hasChanges || isSaving}>
