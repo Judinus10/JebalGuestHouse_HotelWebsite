@@ -60,7 +60,10 @@ function parse_amenity_ids(mixed $value): array
 
 function replace_room_amenities(PDO $pdo, int $roomId, array $amenityIds): array
 {
-    ensure_amenity_tables($pdo);
+    // The caller must ensure the schema before opening its transaction.
+    // Running CREATE TABLE / ALTER TABLE here causes MySQL to implicitly
+    // commit the active transaction. A later PDO::commit() then throws
+    // "There is no active transaction" even though the room was saved.
     $validIds = [];
     if ($amenityIds !== []) {
         $placeholders = implode(',', array_fill(0, count($amenityIds), '?'));

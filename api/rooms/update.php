@@ -49,8 +49,16 @@ try {
         ':status' => $values['status'], ':sort_order' => $values['sort_order'],
     ]);
     replace_room_amenities($pdo, $id, $amenityIds);
-    $pdo->commit();
-    $committed = true;
+    if (!$pdo->inTransaction()) {
+        // This should never happen now that schema checks run before the
+        // transaction, but do not report a false failure if hosting-specific
+        // MySQL behaviour has already committed the write.
+        $committed = true;
+        error_log('Room '.$id.' transaction was committed implicitly before the explicit commit.');
+    } else {
+        $pdo->commit();
+        $committed = true;
+    }
 
     $warning = '';
     try {
