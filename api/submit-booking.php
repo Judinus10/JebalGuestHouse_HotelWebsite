@@ -40,7 +40,7 @@ $isOnlinePayment = in_array($paymentMethod, ['payhere', 'online', 'pay online'],
 $isCashPayment = in_array($paymentMethod, ['cash', 'pay on arrival'], true);
 
 if (!$isCashPayment && !$isOnlinePayment) {
-    json_response(false, 'Please select a valid payment method.', 422);
+    json_response(false, 'Please select a valid payment method.', 422, ['error_code' => 'INVALID_PAYMENT_METHOD']);
 }
 
 // Keep the PayHere flow intact for future use, but do not create a booking when
@@ -50,11 +50,11 @@ if ($isOnlinePayment && !ONLINE_PAYMENT_ENABLED) {
 }
 
 if ($fullName === '' || $email === '' || $phone === '' || $roomName === '' || $checkInDate === '' || $checkOutDate === '' || $guests < 1) {
-    json_response(false, 'Please fill in all required fields.', 422);
+    json_response(false, 'Please complete all required booking details.', 422, ['error_code' => 'MISSING_REQUIRED_FIELDS']);
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    json_response(false, 'Please enter a valid email address.', 422);
+    json_response(false, 'Please enter a valid email address, for example name@example.com.', 422, ['error_code' => 'INVALID_EMAIL']);
 }
 
 if ($stayingGuestEmail !== '' && !filter_var($stayingGuestEmail, FILTER_VALIDATE_EMAIL)) {
@@ -69,7 +69,7 @@ if (!$isBookingForOther) {
 }
 
 if (!is_valid_date($checkInDate) || !is_valid_date($checkOutDate)) {
-    json_response(false, 'Please enter valid check-in and check-out dates.', 422);
+    json_response(false, 'Please select valid check-in and check-out dates.', 422, ['error_code' => 'INVALID_DATES']);
 }
 
 $today = new DateTimeImmutable('today');
@@ -81,11 +81,11 @@ if (!$checkIn || !$checkOut) {
 }
 
 if ($checkIn < $today) {
-    json_response(false, 'Check-in date cannot be in the past.', 422);
+    json_response(false, 'Check-in cannot be earlier than today.', 422, ['error_code' => 'INVALID_DATES']);
 }
 
 if ($checkOut < $checkIn) {
-    json_response(false, 'Check-out date cannot be before check-in date.', 422);
+    json_response(false, 'Check-out must be after check-in.', 422, ['error_code' => 'INVALID_DATES']);
 }
 
 if ($checkOutDate === $checkInDate) {
@@ -128,7 +128,7 @@ try {
 
     if ($guests > (int) ($room['max_guests'] ?? 0)) {
         $pdo->rollBack();
-        json_response(false, 'Selected room cannot hold this number of guests.', 422);
+        json_response(false, 'This room cannot accommodate the selected number of guests. Please reduce the guest count or choose multiple rooms.', 422, ['error_code' => 'ROOM_CAPACITY_EXCEEDED']);
     }
 
     $conflict = $pdo->prepare(
@@ -149,7 +149,7 @@ try {
 
     if ($conflict->fetch() || ics_room_conflict($pdo, (int) $room['id'], $checkInDate, $checkOutDate)) {
         $pdo->rollBack();
-        json_response(false, 'Sorry, this room is not available for the selected dates.', 409, ['available' => false]);
+        json_response(false, 'This room was just booked for the selected dates. Please choose another room or change your dates.', 409, ['available' => false, 'error_code' => 'ROOM_UNAVAILABLE']);
     }
 
     $columnStmt = $pdo->query('SHOW COLUMNS FROM bookings');
@@ -296,6 +296,7 @@ try {
     // and Cash payment records already exist. This also covers a database
     // driver reporting an error after persistence has actually completed.
     $persistedBookingExists = $bookingCommitted;
+    $persistenceVerificationFailed = false;
     if (!$persistedBookingExists && $bookingId > 0) {
         try {
             $verifyPdo = get_db_connection();
@@ -308,6 +309,7 @@ try {
             $verifyStmt->execute([':booking_id' => $bookingId]);
             $persistedBookingExists = (bool) $verifyStmt->fetchColumn();
         } catch (Throwable $verificationError) {
+            $persistenceVerificationFailed = true;
             error_log('Booking persistence verification failed: ' . $verificationError->getMessage());
         }
     }
@@ -382,5 +384,13 @@ try {
         ]);
     }
 
-    json_response(false, 'Unable to submit booking inquiry.', 500);
+    if ($bookingId > 0 && $persistenceVerificationFailed) {
+        json_response(false, 'We could not confirm the final booking result. Your booking may already be saved. Please do not submit again. Contact the property with your name and booking dates.', 503, [
+            'error_code' => 'BOOKING_OUTCOME_UNKNOWN',
+        ]);
+    }
+
+    json_response(false, 'Your booking could not be completed. Please review your details and try again.', 500, [
+        'error_code' => 'BOOKING_NOT_SAVED',
+    ]);
 }

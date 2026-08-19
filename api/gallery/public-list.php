@@ -60,10 +60,12 @@ try {
         ],
     ]);
 } catch (Throwable $e) {
+    error_log('Public gallery load error: ' . $e->getMessage());
     http_response_code(500);
 
     echo json_encode([
         'success' => false,
-        'message' => $e->getMessage(),
+        'message' => 'The gallery is temporarily unavailable. Please try again later.',
+        'error_code' => 'GALLERY_UNAVAILABLE',
     ]);
 }

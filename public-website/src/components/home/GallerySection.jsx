@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import FadeUp from '../ui/FadeUp'
 import SectionHeading from '../ui/SectionHeading'
 import { fetchPublicGallery } from '../../services/galleryApi'
+import { publicErrorMessage } from '../../services/publicErrors'
+import { useToast } from '../ui/ToastProvider'
 
 const fallbackItems = []
 const maxPreviewItems = 5
@@ -18,6 +20,7 @@ function formatTitle(value) {
 }
 
 export default function GallerySection() {
+  const toast = useToast()
   const [items, setItems] = useState(fallbackItems)
 
   useEffect(() => {
@@ -71,6 +74,7 @@ export default function GallerySection() {
         if (!ignore) setItems(selected)
       } catch (error) {
         console.error('Gallery preview load failed:', error)
+        toast.error(publicErrorMessage(error, 'gallery'))
         if (!ignore) setItems([])
       }
     }
@@ -80,7 +84,7 @@ export default function GallerySection() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [toast])
 
   return (
     <section id="gallery" className="bg-white py-24 md:py-32">

@@ -4,8 +4,11 @@ import FadeUp from '../ui/FadeUp'
 import ImageReveal from '../ui/ImageReveal'
 import SectionHeading from '../ui/SectionHeading'
 import { fetchExperiences } from '../../services/experienceApi'
+import { publicErrorMessage } from '../../services/publicErrors'
+import { useToast } from '../ui/ToastProvider'
 
 export default function ExperienceSection() {
+  const toast = useToast()
   const [experiences, setExperiences] = useState([])
 
   useEffect(() => {
@@ -15,11 +18,12 @@ export default function ExperienceSection() {
         setExperiences(data.slice(0, 4))
       } catch (error) {
         console.error('Failed to load experiences:', error)
+        toast.error(publicErrorMessage(error, 'experiences'))
       }
     }
 
     loadExperiences()
-  }, [])
+  }, [toast])
 
   return (
     <section id="experience" className="bg-charcoal py-24 text-white md:py-32">

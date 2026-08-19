@@ -1,4 +1,5 @@
 import { clearStoredSession } from '@/utils/auth'
+import { AdminRequestError, responseError } from '@/services/adminErrors'
 
 const configuredApiBaseUrl = import.meta.env.VITE_API_BASE_URL
 
@@ -58,10 +59,10 @@ export async function apiFetch(url, options = {}) {
     })
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw new Error('The server took too long to respond. Check Apache and MySQL, then retry.')
+      throw new AdminRequestError('The server took too long to respond. Please try again.', { code: 'TIMEOUT' })
     }
 
-    throw new Error('Unable to contact the server. Check Apache and the API configuration.')
+    throw new AdminRequestError('Unable to connect to the server. Check your internet connection and try again.', { code: 'NETWORK_ERROR' })
   } finally {
     window.clearTimeout(timeoutId)
     externalSignal?.removeEventListener?.('abort', abortFromExternalSignal)
@@ -78,11 +79,11 @@ export async function apiFetch(url, options = {}) {
   return response
 }
 
-export async function readJsonResponse(response) {
+export async function readJsonResponse(response, context = '') {
   const payload = await response.json().catch(() => null)
 
   if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || 'Request failed. Please try again.')
+    throw responseError(payload, response, context)
   }
 
   return payload

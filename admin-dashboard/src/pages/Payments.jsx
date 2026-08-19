@@ -780,7 +780,7 @@ export default function Payments() {
           </div>
 
           {error ? (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800">{error}</div>
+            <div className="fixed right-5 top-5 z-[70] max-w-sm rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 shadow-xl">{error}</div>
           ) : null}
 
           <div className="overflow-x-auto">

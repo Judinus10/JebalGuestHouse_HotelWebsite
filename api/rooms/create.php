@@ -38,5 +38,6 @@ try {
     json_response(true, 'Room created.', 201, ['data' => $room, 'room' => $room]);
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
-    json_response(false, 'Unable to create room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
+    error_log('Room create error: ' . $e->getMessage());
+    json_response(false, 'The room could not be created. Check the details and try again.', 500, ['error_code' => 'ROOM_CREATE_FAILED']);
 }

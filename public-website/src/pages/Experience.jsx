@@ -6,10 +6,14 @@ import FadeUp from '../components/ui/FadeUp'
 import { fetchExperiences } from '../services/experienceApi'
 import experienceBanner from '../assets/images/banners/experience-banner.webp'
 import { nearbyPlaces } from '../data/business'
+import { publicErrorMessage } from '../services/publicErrors'
+import { useToast } from '../components/ui/ToastProvider'
 
 export default function Experience() {
+  const toast = useToast()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     async function loadData() {
@@ -17,14 +21,16 @@ export default function Experience() {
         const data = await fetchExperiences()
         setItems(data)
       } catch (error) {
-        console.error(error)
+        const text = publicErrorMessage(error, 'experiences')
+        setError(text)
+        toast.error(text)
       } finally {
         setLoading(false)
       }
     }
 
     loadData()
-  }, [])
+  }, [toast])
 
   return (
     <PageTransition>
@@ -57,6 +63,7 @@ export default function Experience() {
             title="Discover Local Experiences"
             description="Explore culture, food, islands, beaches and attractions around Jaffna during your stay at Jebal Guest House."
           />
+
 
           {loading ? (
             <p className="text-center text-charcoal/70">

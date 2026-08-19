@@ -668,21 +668,6 @@ ALTER TABLE bookings
 ALTER TABLE bookings
     ADD INDEX IF NOT EXISTS idx_bookings_group_id (booking_group_id);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 -- Step 1: central hotel contact and location details.
 -- Import once in phpMyAdmin after replacing the application files.
 

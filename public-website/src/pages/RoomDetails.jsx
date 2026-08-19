@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, Link, Navigate, useSearchParams } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { Users, Maximize2, BedDouble, ArrowLeft, AlertTriangle, Check, ChevronLeft, ChevronRight, MapPin, X } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
@@ -10,6 +10,8 @@ import { checkRoomAvailability, fetchRoom, fetchRooms } from '../services/roomsA
 import SEO from '../components/SEO'
 import { breadcrumbSchema, SITE_URL } from '../data/business'
 import { fetchPropertyContent } from '../services/propertyContentApi'
+import { bookingOutcomeUnknownMessage, publicErrorMessage, requestJson } from '../services/publicErrors'
+import { useToast } from '../components/ui/ToastProvider'
 
 import { API_BASE_URL } from '@/services/config'
 const BOOKING_API_URL = `${API_BASE_URL}/submit-booking.php`
@@ -57,6 +59,7 @@ function formatRoomPrice(currency, amount) {
  * UI and animation classes are intentionally kept from the finalized version.
  */
 export default function RoomDetails() {
+  const toast = useToast()
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const [room, setRoom] = useState(null)
@@ -64,6 +67,7 @@ export default function RoomDetails() {
   const [propertyContent, setPropertyContent] = useState({ amenities: [], nearby_places: [] })
   const [pageLoading, setPageLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [pageError, setPageError] = useState('')
   const [activeImage, setActiveImage] = useState(0)
   const [formData, setFormData] = useState({
     full_name: '',
@@ -83,6 +87,7 @@ export default function RoomDetails() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [bookingBlocked, setBookingBlocked] = useState(false)
   const [availabilityWarning, setAvailabilityWarning] = useState('')
   const [paymentToast, setPaymentToast] = useState('')
   const [checkingAvailability, setCheckingAvailability] = useState(false)
@@ -96,6 +101,7 @@ export default function RoomDetails() {
     async function loadData() {
       setPageLoading(true)
       setNotFound(false)
+      setPageError('')
       setActiveImage(0)
 
       try {
@@ -110,7 +116,9 @@ export default function RoomDetails() {
         setRooms(roomList)
         setPropertyContent(contentData)
       } catch (err) {
-        if (active) setNotFound(true)
+        if (!active) return
+        if (err?.code === 'ROOM_NOT_FOUND' || err?.status === 404) setNotFound(true)
+        else setPageError(publicErrorMessage(err, 'room'))
       } finally {
         if (active) setPageLoading(false)
       }
@@ -137,11 +145,25 @@ export default function RoomDetails() {
   }, [searchParams])
 
   useEffect(() => {
-    if (!paymentToast) return undefined
+    if (paymentToast) toast.warning(paymentToast)
+  }, [paymentToast, toast])
 
-    const timeoutId = window.setTimeout(() => setPaymentToast(''), 3500)
-    return () => window.clearTimeout(timeoutId)
-  }, [paymentToast])
+  useEffect(() => {
+    if (availabilityWarning) toast.warning(availabilityWarning)
+  }, [availabilityWarning, toast])
+
+  useEffect(() => {
+    if (error) toast[bookingBlocked ? 'warning' : 'error'](error, bookingBlocked ? { duration: 0, title: 'Booking status needs attention' } : undefined)
+  }, [bookingBlocked, error, toast])
+
+  useEffect(() => {
+    if (pageError) toast.error(pageError)
+  }, [pageError, toast])
+
+  useEffect(() => {
+    const state = (searchParams.get('payment') || '').toLowerCase()
+    if (state === 'failed' || state === 'cancelled') toast.warning('Payment was not completed. You can try booking again or contact the hotel for help.')
+  }, [searchParams, toast])
 
   useEffect(() => {
     let active = true
@@ -172,7 +194,7 @@ export default function RoomDetails() {
           setAvailabilityWarning('This room is not available for the selected dates.')
         }
       } catch (err) {
-        if (active) setAvailabilityWarning(err.message || 'Unable to confirm availability right now. Please try again.')
+        if (active) setAvailabilityWarning(publicErrorMessage(err, 'availability'))
       } finally {
         if (active) setCheckingAvailability(false)
       }
@@ -220,14 +242,15 @@ export default function RoomDetails() {
     )
   }
 
-  if (notFound || !room) return <Navigate to="/rooms" replace />
+  if (notFound) {
+    return <PageTransition><section className="flex min-h-[55vh] flex-col items-center justify-center bg-white px-6 text-center"><AlertTriangle className="mb-4 text-amber-700" size={34} /><h1 className="font-serif text-3xl text-charcoal">Room no longer available</h1><p className="mt-3 max-w-xl text-sm text-muted">This room is no longer available on our website. Please view the other rooms.</p><Link to="/rooms" className="mt-7 bg-charcoal px-6 py-3 text-xs tracking-wider uppercase text-white">View Other Rooms</Link></section></PageTransition>
+  }
+  if (pageError || !room) {
+    return <PageTransition><section className="flex min-h-[55vh] flex-col items-center justify-center bg-white px-6 text-center"><AlertTriangle className="mb-4 text-red-600" size={34} /><h1 className="font-serif text-3xl text-charcoal">Room temporarily unavailable</h1><p className="mt-3 max-w-xl text-sm text-muted">{pageError || 'This room could not be loaded right now.'}</p><Link to="/rooms" className="mt-7 bg-charcoal px-6 py-3 text-xs tracking-wider uppercase text-white">View Rooms</Link></section></PageTransition>
+  }
 
   const images = room.images?.length ? room.images : [room.main_image].filter(Boolean)
   const isRoomUnavailable = Boolean(availabilityWarning)
-  const paymentState = (searchParams.get('payment') || '').toLowerCase()
-  const paymentMessage = paymentState === 'failed' || paymentState === 'cancelled'
-    ? 'Payment was not completed. You can try booking again or contact the hotel for help.'
-    : ''
 
   const showPreviousImage = () => {
     if (!images.length) return
@@ -273,17 +296,34 @@ export default function RoomDetails() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (loading || submittingRef.current || redirectingRef.current) return
+    if (loading || submittingRef.current || redirectingRef.current || bookingBlocked) return
 
     submittingRef.current = true
     setLoading(true)
     setError('')
     setAvailabilityWarning('')
 
+    let bookingSaved = false
     try {
+      if (!formData.full_name.trim() || !formData.email.trim() || !formData.phone.trim() || !formData.check_in_date || !formData.check_out_date) {
+        setError('Please complete all required booking details.')
+        return
+      }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        setError('Please enter a valid email address, for example name@example.com.')
+        return
+      }
+      if (formData.phone.replace(/\D/g, '').length < 7) {
+        setError('Please enter a valid contact number including the country code.')
+        return
+      }
       if (formData.check_out_date <= formData.check_in_date) {
         setAvailabilityWarning('Check-out date must be after check-in date. Minimum stay is 1 night.')
         setLoading(false)
+        return
+      }
+      if (formData.check_in_date < new Date().toISOString().slice(0, 10)) {
+        setAvailabilityWarning('Check-in cannot be earlier than today.')
         return
       }
 
@@ -301,7 +341,7 @@ export default function RoomDetails() {
         return
       }
 
-      const response = await fetch(BOOKING_API_URL, {
+      const result = await requestJson(BOOKING_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -310,44 +350,17 @@ export default function RoomDetails() {
           ...formData,
           room_name: room.name,
         }),
-      })
-
-      const responseText = await response.text()
-      let result
-
-      try {
-        result = responseText ? JSON.parse(responseText) : null
-      } catch (parseError) {
-        console.error('Booking API returned invalid JSON:', responseText)
-        throw new Error('The server returned an invalid booking response. Please contact the property before trying again.')
-      }
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Unable to send booking inquiry.')
-      }
+      }, 'booking')
+      bookingSaved = true
 
       if (formData.payment_method === 'PayHere') {
-        const paymentResponse = await fetch(PAYMENT_INIT_API_URL, {
+        const paymentResult = await requestJson(PAYMENT_INIT_API_URL, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ booking_id: result.booking_id || result.inquiry_id }),
-        })
-
-        const paymentResponseText = await paymentResponse.text()
-        let paymentResult
-
-        try {
-          paymentResult = paymentResponseText ? JSON.parse(paymentResponseText) : null
-        } catch (parseError) {
-          console.error('Payment API returned invalid JSON:', paymentResponseText)
-          throw new Error('Booking was saved, but the payment server returned an invalid response. Please contact the property before trying again.')
-        }
-
-        if (!paymentResponse.ok || !paymentResult?.success) {
-          throw new Error(paymentResult?.message || 'Booking saved, but online payment could not be started.')
-        }
+        }, 'payment')
 
         if (paymentResult.checkout_url) {
           redirectingRef.current = true
@@ -355,7 +368,9 @@ export default function RoomDetails() {
           return
         }
 
-        throw new Error('Booking saved, but the online payment redirect was not returned.')
+        setBookingBlocked(true)
+        setError(bookingOutcomeUnknownMessage(true))
+        return
       }
 
       const billUrl = result.bill_url || result.data?.bill_url
@@ -366,9 +381,15 @@ export default function RoomDetails() {
         return
       }
 
-      throw new Error('Booking was saved, but the booking bill link was not returned. Please contact the property before trying again.')
+      setBookingBlocked(true)
+      setError(bookingOutcomeUnknownMessage(true))
     } catch (err) {
-      setError(err.message || 'Unable to send booking inquiry. Please try again.')
+      if (bookingSaved || err?.outcomeUnknown) {
+        setBookingBlocked(true)
+        setError(bookingOutcomeUnknownMessage(bookingSaved))
+      } else {
+        setError(publicErrorMessage(err, 'booking'))
+      }
     } finally {
       if (!redirectingRef.current) {
         submittingRef.current = false
@@ -546,14 +567,6 @@ export default function RoomDetails() {
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-                    {paymentMessage && (
-                      <div className="border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <div className="flex items-start gap-3">
-                          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-                          <p>{paymentMessage}</p>
-                        </div>
-                      </div>
-                    )}
 
                     <div>
                       <label className="text-xs tracking-wider uppercase text-muted">
@@ -654,27 +667,9 @@ export default function RoomDetails() {
                       <p className="text-xs text-muted">Checking room availability...</p>
                     )}
 
-                    {availabilityWarning && (
-                      <div className="border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                        <div className="flex items-start gap-3">
-                          <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-                          <div>
-                            <p>{availabilityWarning}</p>
-                            <Link
-                              to={roomsBackUrl}
-                              className="mt-2 inline-block text-xs font-medium tracking-wider uppercase underline"
-                            >
-                              View available rooms for these dates
-                            </Link>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
-                    {error && <p className="text-xs text-red-600">{error}</p>}
-
-                    <Button type="submit" className="w-full" disabled={loading || checkingAvailability || isRoomUnavailable}>
-                      {loading ? 'Processing...' : checkingAvailability ? 'Checking...' : 'Book Now'}
+                    <Button type="submit" className="w-full" disabled={loading || checkingAvailability || isRoomUnavailable || bookingBlocked}>
+                      {bookingBlocked ? 'Contact Property' : loading ? 'Processing...' : checkingAvailability ? 'Checking...' : 'Book Now'}
                     </Button>
                   </form>
                 )}
@@ -687,13 +682,6 @@ export default function RoomDetails() {
           </div>
         </div>
       </section>
-
-      {paymentToast && (
-        <div className="fixed right-4 top-24 z-[60] max-w-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-lg" role="status" aria-live="polite">
-          {paymentToast}
-        </div>
-      )}
-
 
       {bookingTotal.hasValidDates && !submitted && (
         <div className="fixed bottom-10 left-1/2 z-40 w-[min(90vw,380px)] -translate-x-1/2 px-4">

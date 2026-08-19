@@ -424,10 +424,15 @@ function RoomActionsDropdown({ room, isOpen, onToggle, onView, onEdit, onDelete 
 function Toast({ toast, onClose }) {
   if (!toast) return null
 
+  const isError = toast.type === 'error'
+  const isWarning = toast.type === 'warning'
+  const tone = isError ? 'border-red-200 bg-red-50' : isWarning ? 'border-amber-200 bg-amber-50' : 'border-emerald-200 bg-white'
+  const iconTone = isError ? 'bg-red-100 text-red-700' : isWarning ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
+
   return (
-    <div className="fixed right-6 top-6 z-50 flex w-[calc(100%-3rem)] max-w-sm items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 text-sm shadow-xl shadow-slate-900/10 sm:w-full">
-      <div className="mt-0.5 rounded-full bg-emerald-100 p-1 text-emerald-700">
-        <Check className="h-4 w-4" />
+    <div className={`fixed right-6 top-6 z-50 flex w-[calc(100%-3rem)] max-w-sm items-start gap-3 rounded-xl border p-4 text-sm shadow-xl shadow-slate-900/10 sm:w-full ${tone}`}>
+      <div className={`mt-0.5 rounded-full p-1 ${iconTone}`}>
+        {isError ? <X className="h-4 w-4" /> : <Check className="h-4 w-4" />}
       </div>
       <div className="flex-1">
         <p className="font-semibold text-text-primary">{toast.title}</p>
@@ -806,8 +811,8 @@ export default function Rooms() {
   const [openActionsId, setOpenActionsId] = useState(null)
   const [manageAmenitiesOpen, setManageAmenitiesOpen] = useState(false)
 
-  function showToast(title, message) {
-    setToast({ title, message })
+  function showToast(title, message, type = 'success') {
+    setToast({ title, message, type })
     window.setTimeout(() => setToast(null), 2800)
   }
 
@@ -910,19 +915,28 @@ export default function Rooms() {
 
     ;(form.images || []).forEach((file) => payload.append('images[]', file))
 
+    let saveResult
     try {
       if (formMode === 'edit') {
-        await updateRoom(payload)
-        showToast('Room updated', `${form.room_name} was updated successfully.`)
+        saveResult = await updateRoom(payload)
       } else {
-        await createRoom(payload)
-        showToast('Room added', `${form.room_name} was added successfully.`)
+        saveResult = await createRoom(payload)
       }
-      closeFormModal()
-      await loadRooms()
     } catch (error) {
-      showToast('Room save failed', error.message || 'Unable to save room.')
+      showToast('Room save failed', error.message || 'Unable to save room.', 'error')
+      return
     }
+
+    closeFormModal()
+    if (saveResult?.warning) {
+      showToast('Room saved with a warning', saveResult.warning, 'warning')
+    } else if (formMode === 'edit') {
+      showToast('Room updated', `${form.room_name} was updated successfully.`)
+    } else {
+      showToast('Room added', `${form.room_name} was added successfully.`)
+    }
+
+    await loadRooms()
   }
 
   async function handleDeleteRoomImage(imageId) {
@@ -938,7 +952,7 @@ export default function Rooms() {
       setDeleteRoom(null)
       await loadRooms()
     } catch (error) {
-      showToast('Delete failed', error.message || 'Unable to delete room.')
+      showToast('Delete failed', error.message || 'Unable to delete room.', 'error')
     }
   }
 
@@ -983,7 +997,7 @@ export default function Rooms() {
       )}
 
       {loadError && !loading && (
-        <div className="rounded-2xl border border-red-200 bg-white p-8 text-center text-sm font-medium text-red-600 shadow-sm shadow-slate-200/60">{loadError}</div>
+        <div className="fixed right-5 top-5 z-[70] max-w-sm rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 shadow-xl">{loadError}</div>
       )}
 
       {!loading && !loadError && (

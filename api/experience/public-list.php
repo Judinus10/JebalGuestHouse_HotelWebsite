@@ -20,8 +20,10 @@ try {
         'data' => $items,
     ]);
 } catch (Throwable $e) {
+    error_log('Public experience load error: ' . $e->getMessage());
     experience_json([
         'success' => false,
-        'message' => $e->getMessage(),
+        'message' => 'Experience information is temporarily unavailable. Please try again later.',
+        'error_code' => 'EXPERIENCES_UNAVAILABLE',
     ], 500);
 }

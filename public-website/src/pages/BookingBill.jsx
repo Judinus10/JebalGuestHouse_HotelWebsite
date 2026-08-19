@@ -7,6 +7,8 @@ import Button from '../components/ui/Button'
 import logo from '../assets/logo.png'
 import bookingBillBanner from '../assets/images/banners/booking-bill-banner.webp'
 import { API_BASE_URL } from '../services/config'
+import { publicErrorMessage, requestJson } from '../services/publicErrors'
+import { useToast } from '../components/ui/ToastProvider'
 
 const PAYMENT_STATUS_API_URL = `${API_BASE_URL}/payments/status.php`
 const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
@@ -187,6 +189,7 @@ function drawPdfLabelValue(pdf, label, value, x, y, width, options = {}) {
 }
 
 export default function BookingBill() {
+  const toast = useToast()
   const [searchParams] = useSearchParams()
   const bookingId = searchParams.get('booking_id') || ''
   const orderId = searchParams.get('order_id') || ''
@@ -201,6 +204,16 @@ export default function BookingBill() {
   const [secondsRemaining, setSecondsRemaining] = useState(0)
   const [openMobileSection, setOpenMobileSection] = useState('')
 
+  useEffect(() => {
+    if (error) toast.error(error)
+  }, [error, toast])
+
+  useEffect(() => {
+    if (bill?.payment_status === 'Failed' || bill?.payment_status === 'Cancelled') {
+      toast.warning('Payment was not completed. You may retry while the room remains available.')
+    }
+  }, [bill?.payment_status, toast])
+
   const statusUrl = useMemo(() => {
     const params = new URLSearchParams({ booking_id: bookingId, order_id: orderId, token })
     return `${PAYMENT_STATUS_API_URL}?${params.toString()}`
@@ -210,18 +223,13 @@ export default function BookingBill() {
     if (!bookingId || !orderId || !token) return
 
     try {
-      const response = await fetch(statusUrl, { headers: { Accept: 'application/json' } })
-      const result = await response.json()
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Unable to load booking bill.')
-      }
+      const result = await requestJson(statusUrl, { headers: { Accept: 'application/json' } }, 'bill')
 
       setBill(result.booking)
       setSecondsRemaining(Number(result.booking?.seconds_remaining || 0))
       setError('')
     } catch (err) {
-      setError(err.message || 'Unable to load booking bill.')
+      setError(publicErrorMessage(err, 'bill'))
     } finally {
       setLoading(false)
     }
@@ -569,8 +577,9 @@ export default function BookingBill() {
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
+      toast.success('Your booking bill was downloaded successfully.')
     } catch (err) {
-      alert(err.message || 'Unable to download bill PDF.')
+      toast.error(err.message || 'Unable to download bill PDF.')
     } finally {
       setPdfBusy(false)
     }
@@ -583,19 +592,14 @@ export default function BookingBill() {
       setRetryBusy(true)
       setError('')
 
-      const response = await fetch(PAYMENT_INIT_API_URL, {
+      const result = await requestJson(PAYMENT_INIT_API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Accept: 'application/json',
         },
         body: JSON.stringify({ booking_id: bill.id }),
-      })
-      const result = await response.json()
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || 'Unable to restart payment.')
-      }
+      }, 'payment')
 
       if (!result.checkout_url) {
         throw new Error('Payment checkout URL was not returned.')
@@ -603,7 +607,7 @@ export default function BookingBill() {
 
       window.location.href = result.checkout_url
     } catch (err) {
-      setError(err.message || 'Unable to restart payment.')
+      setError(publicErrorMessage(err, 'payment'))
     } finally {
       setRetryBusy(false)
     }
@@ -635,9 +639,9 @@ export default function BookingBill() {
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
-      alert('PDF file sharing is not supported in this browser. The bill PDF was downloaded instead.')
+      toast.info('PDF sharing is not supported in this browser, so the bill was downloaded instead.')
     } catch (err) {
-      alert(err.message || 'Unable to share bill PDF.')
+      toast.error(err.message || 'Unable to share bill PDF.')
     } finally {
       setPdfBusy(false)
     }
@@ -714,8 +718,8 @@ export default function BookingBill() {
             <div className="mx-auto max-w-6xl px-4 py-24 text-center">
               <AlertTriangle className="mx-auto mb-4 text-red-600" size={34} />
               <p className="font-serif text-3xl text-slate-900">Bill not available</p>
-              <p className="mt-3 text-sm text-slate-500">{error}</p>
-              <Button to="/rooms" className="mt-8">View Rooms</Button>
+              <div className="mt-8 flex flex-wrap justify-center gap-3"><button type="button" onClick={loadBill} className="bg-charcoal px-6 py-3 text-xs tracking-wider uppercase text-white">Try Again</button><Button to="/rooms">View Rooms</Button></div>
+              <p className="mt-5 text-xs text-slate-500">For help, contact {FALLBACK_HOTEL_PHONE} or {FALLBACK_HOTEL_SECONDARY_PHONE}.</p>
             </div>
           ) : (
             <div id="booking-bill-print-area" className="bg-white">
@@ -754,11 +758,6 @@ export default function BookingBill() {
                 {bill.payment_status === 'Payment Pending' && isOnlinePaymentMethod(bill.payment_method) && (
                   <div className="mt-6 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
                     Payment is still pending. Complete it within {formatCountdown(secondsRemaining)} to keep this room reserved.
-                  </div>
-                )}
-                {(bill.payment_status === 'Failed' || bill.payment_status === 'Cancelled') && (
-                  <div className="mt-6 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-                    Payment was not completed. You may retry while the room remains available.
                   </div>
                 )}
 

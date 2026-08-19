@@ -7,6 +7,8 @@ import Button from '../components/ui/Button'
 import { fetchRooms } from '../services/roomsApi'
 import { API_BASE_URL } from '../services/config'
 import roomsBanner from '../assets/images/banners/rooms-banner.webp'
+import { bookingOutcomeUnknownMessage, publicErrorMessage, requestJson } from '../services/publicErrors'
+import { useToast } from '../components/ui/ToastProvider'
 
 const SUBMIT_URL = `${API_BASE_URL}/submit-multi-room-booking.php`
 const ONLINE_PAYMENT_ENABLED = import.meta.env.VITE_ONLINE_PAYMENT_ENABLED === 'true'
@@ -37,6 +39,7 @@ function assignRooms(availableRooms, totalGuests) {
 }
 
 export default function MultiRoomBooking() {
+  const toast = useToast()
   const [searchParams] = useSearchParams()
   const filters = useMemo(() => readFilters(searchParams), [searchParams])
   const [availableRooms, setAvailableRooms] = useState([])
@@ -44,10 +47,12 @@ export default function MultiRoomBooking() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [bookingBlocked, setBookingBlocked] = useState(false)
   const [paymentToast, setPaymentToast] = useState('')
   const [gallery, setGallery] = useState(null)
   const [galleryIndex, setGalleryIndex] = useState(0)
   const redirectingRef = useRef(false)
+  const submittingRef = useRef(false)
   const [form, setForm] = useState({ full_name: '', email: '', phone: '', message: '', payment_method: 'Cash' })
 
   useEffect(() => {
@@ -66,7 +71,7 @@ export default function MultiRoomBooking() {
           setRooms(assignRooms(available, filters.guests))
         }
       } catch (err) {
-        if (active) setError(err.message || 'Unable to assign rooms.')
+        if (active) setError(publicErrorMessage(err, 'rooms'))
       } finally {
         if (active) setLoading(false)
       }
@@ -76,10 +81,18 @@ export default function MultiRoomBooking() {
   }, [filters])
 
   useEffect(() => {
-    if (!paymentToast) return undefined
-    const timer = window.setTimeout(() => setPaymentToast(''), 4000)
-    return () => window.clearTimeout(timer)
-  }, [paymentToast])
+    if (paymentToast) toast.warning(paymentToast)
+  }, [paymentToast, toast])
+
+  useEffect(() => {
+    if (error) toast[bookingBlocked ? 'warning' : 'error'](error, bookingBlocked ? { duration: 0, title: 'Booking status needs attention' } : undefined)
+  }, [bookingBlocked, error, toast])
+
+  useEffect(() => {
+    if (!loading && rooms.length === 0 && !error && filters.check_in_date && filters.check_out_date && filters.guests > 3) {
+      toast.info('There are not enough matching rooms for this group. Change the dates, room type, or guest count and search again.', { title: 'No room combination available' })
+    }
+  }, [error, filters.check_in_date, filters.check_out_date, filters.guests, loading, rooms.length, toast])
 
   if (!filters.check_in_date || !filters.check_out_date || filters.guests <= 3) {
     return <Navigate to="/rooms" replace />
@@ -143,15 +156,28 @@ export default function MultiRoomBooking() {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
-    if (submitting || redirectingRef.current) return
+    if (submitting || submittingRef.current || redirectingRef.current || bookingBlocked) return
     setError('')
     if (!allocationValid) {
       setError(`Allocate exactly ${filters.guests} guests across the assigned rooms.`)
       return
     }
+    if (!form.full_name.trim() || !form.email.trim() || !form.phone.trim()) {
+      setError('Please complete your name, email address and phone number.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError('Please enter a valid email address, for example name@example.com.')
+      return
+    }
+    if (form.phone.replace(/\D/g, '').length < 7) {
+      setError('Please enter a valid contact number including the country code.')
+      return
+    }
+    submittingRef.current = true
     setSubmitting(true)
     try {
-      const response = await fetch(SUBMIT_URL, {
+      const result = await requestJson(SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({
@@ -161,16 +187,26 @@ export default function MultiRoomBooking() {
           total_guests: filters.guests,
           rooms: rooms.map((room) => ({ room_id: room.id, guests: room.allocatedGuests })),
         }),
-      })
-      const result = await response.json().catch(() => null)
-      if (!response.ok || !result?.success) throw new Error(result?.message || 'Unable to complete the multi-room booking.')
-      if (!result.bill_url) throw new Error('The booking was saved, but the combined bill link was not returned.')
+      }, 'multiBooking')
+      if (!result.bill_url) {
+        setBookingBlocked(true)
+        setError(bookingOutcomeUnknownMessage(true))
+        return
+      }
       redirectingRef.current = true
       window.location.assign(result.bill_url)
     } catch (err) {
-      setError(err.message || 'Unable to complete the multi-room booking.')
+      if (err?.outcomeUnknown) {
+        setBookingBlocked(true)
+        setError(bookingOutcomeUnknownMessage(false))
+      } else {
+        setError(publicErrorMessage(err, 'multiBooking'))
+      }
     } finally {
-      if (!redirectingRef.current) setSubmitting(false)
+      if (!redirectingRef.current) {
+        submittingRef.current = false
+        setSubmitting(false)
+      }
     }
   }
 
@@ -263,15 +299,13 @@ export default function MultiRoomBooking() {
                     <label className="flex cursor-pointer items-center gap-2"><input type="radio" name="payment_method" value="PayHere" checked={form.payment_method === 'PayHere'} onChange={handlePaymentChange} />Pay Online</label>
                   </div>
                   <div className="mt-7 border-t border-ice-dark pt-5"><div className="flex justify-between text-sm"><span>Rooms per night</span><span>USD {nightlyTotal.toFixed(2)}</span></div><p className="mt-2 text-xs text-muted">The final total includes the complete stay.</p></div>
-                  <Button type="submit" disabled={submitting || !allocationValid} className="mt-7 w-full">{submitting ? 'Booking...' : 'Book Assigned Rooms'}</Button>
+                  <Button type="submit" disabled={submitting || !allocationValid || bookingBlocked} className="mt-7 w-full">{bookingBlocked ? 'Contact Property' : submitting ? 'Booking...' : 'Book Assigned Rooms'}</Button>
                 </div>
               </div>
-              {error && <p className="text-sm text-red-600">{error}</p>}
             </form>
           )}
         </div>
       </section>
-      {paymentToast && <div className="fixed right-4 top-24 z-[60] max-w-sm border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-lg">{paymentToast}</div>}
       {gallery && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-charcoal/95 p-4" role="dialog" aria-modal="true" aria-label={`${gallery.name} photos`}>
           <button type="button" onClick={() => setGallery(null)} className="absolute right-5 top-5 grid h-11 w-11 place-items-center border border-white/40 text-white" aria-label="Close photos"><X /></button>

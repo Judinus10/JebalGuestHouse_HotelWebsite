@@ -19,5 +19,6 @@ try {
     if ($path && str_contains($path, realpath(__DIR__ . '/../uploads/rooms') ?: '')) @unlink($path);
     json_response(true, 'Image deleted.');
 } catch (Throwable $e) {
-    json_response(false, 'Unable to delete image.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
+    error_log('Room image delete error: ' . $e->getMessage());
+    json_response(false, 'The room image could not be deleted. Please try again.', 500, ['error_code' => 'ROOM_IMAGE_DELETE_FAILED']);
 }

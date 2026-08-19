@@ -1,4 +1,5 @@
 import { API_BASE_URL, getCsrfToken } from '@/services/apiClient'
+import { AdminRequestError, responseError } from '@/services/adminErrors'
 
 const SESSION_CHECK_TIMEOUT_MS = 10000
 
@@ -6,7 +7,7 @@ async function readJsonResponse(response) {
   const payload = await response.json().catch(() => null)
 
   if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || 'Request failed. Please try again.')
+    throw responseError(payload, response, 'auth')
   }
 
   return payload
@@ -67,10 +68,10 @@ export async function verifyAdminSession() {
     })
   } catch (error) {
     if (error?.name === 'AbortError') {
-      throw new Error('Session check timed out. Check Apache and MySQL, then retry.')
+      throw new AdminRequestError('The session check took too long. Please try again.', { code: 'TIMEOUT' })
     }
 
-    throw new Error('Unable to contact the server. Check Apache and your API configuration.')
+    throw new AdminRequestError('Unable to connect to the server. Check your internet connection and try again.', { code: 'NETWORK_ERROR' })
   } finally {
     window.clearTimeout(timeoutId)
   }

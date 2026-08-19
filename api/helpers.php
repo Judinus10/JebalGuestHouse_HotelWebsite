@@ -140,7 +140,7 @@ function rate_limit_or_fail(string $action, int $maxAttempts = PUBLIC_RATE_LIMIT
     ]);
 
     if ((int) $count->fetchColumn() >= $maxAttempts) {
-        json_response(false, 'Too many attempts. Please try again later.', 429);
+        json_response(false, 'Too many requests were made from this device. Please wait a few minutes and try again.', 429, ['error_code' => 'RATE_LIMITED']);
     }
 
     $insert = $pdo->prepare('INSERT INTO rate_limits (ip_address, action, created_at) VALUES (:ip_address, :action, NOW())');
@@ -165,7 +165,7 @@ function rate_limit_subject_or_fail(string $action, string $subject, int $maxAtt
 
     if ((int) $count->fetchColumn() >= $maxAttempts) {
         security_event('rate_limit_exceeded', ['action' => $action]);
-        json_response(false, 'Too many attempts. Please try again later.', 429);
+        json_response(false, 'Too many requests were made from this device. Please wait a few minutes and try again.', 429, ['error_code' => 'RATE_LIMITED']);
     }
 
     $insert = $pdo->prepare('INSERT INTO rate_limits (ip_address, action, created_at) VALUES (:subject_key, :action, NOW())');

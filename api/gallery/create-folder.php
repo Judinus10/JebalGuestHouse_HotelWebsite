@@ -27,5 +27,5 @@ try {
     json_response(true, 'Folder created successfully.', 201, ['data' => ['id' => (int) $pdo->lastInsertId()]]);
 } catch (Throwable $e) {
     error_log('Gallery folder create error: ' . $e->getMessage());
-    json_response(false, 'Unable to create folder: ' . $e->getMessage(), 500);
+    json_response(false, 'The gallery folder could not be created. Please try again.', 500, ['error_code' => 'GALLERY_FOLDER_CREATE_FAILED']);
 }

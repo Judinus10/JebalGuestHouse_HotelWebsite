@@ -5,6 +5,8 @@ import FadeUp from '../components/ui/FadeUp'
 import SectionHeading from '../components/ui/SectionHeading'
 import Button from '../components/ui/Button'
 import contactBanner from '../assets/images/banners/contact-banner.webp'
+import { publicErrorMessage, requestJson } from '../services/publicErrors'
+import { useToast } from '../components/ui/ToastProvider'
 
 import { API_BASE_URL } from '@/services/config'
 const CONTACT_API_URL = `${API_BASE_URL}/contact/submit_contact.php`
@@ -30,6 +32,7 @@ function whatsappHref(number) {
 }
 
 export default function Contact() {
+  const toast = useToast()
   const [contactDetails, setContactDetails] = useState(fallbackContactDetails)
   const [formData, setFormData] = useState({
     name: '',
@@ -88,7 +91,15 @@ export default function Contact() {
     const message = formData.message.trim()
 
     if (!name || !email || !message) {
-      setErrorMessage('Please complete your name, email, and message.')
+      const text = 'Please complete your name, email, and message.'
+      setErrorMessage(text)
+      toast.error(text)
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      const text = 'Please enter a valid email address, for example name@example.com.'
+      setErrorMessage(text)
+      toast.error(text)
       return
     }
 
@@ -98,7 +109,7 @@ export default function Contact() {
       const controller = new AbortController()
       const timeoutId = window.setTimeout(() => controller.abort(), CONTACT_SUBMIT_TIMEOUT_MS)
 
-      const response = await fetch(CONTACT_API_URL, {
+      const result = await requestJson(CONTACT_API_URL, {
         method: 'POST',
         signal: controller.signal,
         headers: {
@@ -112,20 +123,19 @@ export default function Contact() {
           subject: formData.subject,
           message,
         }),
-      })
+      }, 'contact')
 
       window.clearTimeout(timeoutId)
 
-      const result = await response.json().catch(() => null)
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Could not send your message. Please try again.')
-      }
-
-      setSubmitted(true)
+      setSubmitted(false)
+      setFormData({ name: '', email: '', phone: '', subject: 'General Inquiry', message: '' })
+      toast.success('Your message was sent successfully. Our team will respond as soon as possible.', { title: 'Message received' })
     } catch (error) {
-      const isTimeout = error?.name === 'AbortError'
-      setErrorMessage(isTimeout ? 'The server is taking too long to respond. Please do not submit again immediately; your enquiry may already be saved.' : (error.message || 'Could not send your message. Please try again.'))
+      const text = error?.outcomeUnknown
+        ? 'We could not confirm whether your message was sent. Please do not submit it again immediately. Wait a few minutes or contact the property by phone.'
+        : publicErrorMessage(error, 'contact')
+      setErrorMessage(text)
+      toast[error?.outcomeUnknown ? 'warning' : 'error'](text, error?.outcomeUnknown ? { duration: 0, title: 'Delivery could not be confirmed' } : undefined)
     } finally {
       setIsSubmitting(false)
     }
@@ -276,9 +286,6 @@ export default function Contact() {
                       />
                     </div>
 
-                    {errorMessage && (
-                      <p className="text-sm text-red-600">{errorMessage}</p>
-                    )}
 
                     <div className="contact-actions flex w-full flex-col gap-4 sm:flex-row">
                       <Button

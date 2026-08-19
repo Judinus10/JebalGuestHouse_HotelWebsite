@@ -20,5 +20,6 @@ try {
     $delete->execute([':id' => $id]);
     json_response(true, 'Room deleted.');
 } catch (Throwable $e) {
-    json_response(false, 'Unable to delete room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
+    error_log('Room delete error: ' . $e->getMessage());
+    json_response(false, 'The room could not be deleted. Please try again.', 500, ['error_code' => 'ROOM_DELETE_FAILED']);
 }

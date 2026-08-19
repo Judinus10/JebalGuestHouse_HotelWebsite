@@ -25,5 +25,5 @@ try {
     json_response(true, 'Image deleted successfully.');
 } catch (Throwable $e) {
     error_log('Gallery delete image error: ' . $e->getMessage());
-    json_response(false, 'Unable to delete image: ' . $e->getMessage(), 500);
+    json_response(false, 'The gallery image could not be deleted. Please try again.', 500, ['error_code' => 'GALLERY_IMAGE_DELETE_FAILED']);
 }

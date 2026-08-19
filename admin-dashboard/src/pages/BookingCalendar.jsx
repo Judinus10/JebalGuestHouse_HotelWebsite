@@ -474,11 +474,11 @@ export default function BookingCalendar() {
       </PageHeader>
 
       {error ? (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800">{error}</div>
+        <div className="fixed right-5 top-5 z-[70] max-w-sm rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-800 shadow-xl">{error}</div>
       ) : null}
 
       {notice ? (
-        <div className={`mb-4 rounded-xl border px-4 py-3 text-sm font-medium ${notice.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+        <div className={`fixed right-5 top-5 z-[70] max-w-sm rounded-xl border px-4 py-3 text-sm font-medium shadow-xl ${notice.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
           {notice.message}
         </div>
       ) : null}

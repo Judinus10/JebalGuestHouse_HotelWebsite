@@ -183,7 +183,7 @@ try {
         exit(1);
     }
 
-    json_response(false, 'Stay reminder cron failed.', 500, [
-        'error' => defined('APP_ENV') && APP_ENV === 'production' ? null : $e->getMessage(),
+    json_response(false, 'Stay reminders could not be processed. Review the protected cron log.', 500, [
+        'error_code' => 'STAY_REMINDER_FAILED',
     ]);
 }

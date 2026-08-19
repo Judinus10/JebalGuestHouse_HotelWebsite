@@ -104,8 +104,9 @@ try {
 
     echo '<h2 style="color:green;">EMAIL SENT SUCCESSFULLY</h2>';
 } catch (Throwable $e) {
+    error_log('SMTP test failed: ' . $e->getMessage());
     echo '<h2 style="color:red;">EMAIL FAILED</h2>';
-    echo '<pre>' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8') . '</pre>';
+    echo '<p>The test email could not be sent. Review the protected server error log or contact technical support.</p>';
 }
 
 echo '</body></html>';

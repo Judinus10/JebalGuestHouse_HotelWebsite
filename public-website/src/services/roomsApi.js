@@ -1,4 +1,5 @@
 import { API_BASE_URL } from './config'
+import { requestJson } from './publicErrors'
 
 function normalizeResponse(payload) {
   if (Array.isArray(payload)) return payload
@@ -21,29 +22,21 @@ function buildQuery(params = {}) {
 }
 
 export async function fetchRooms(filters = {}) {
-  const response = await fetch(`${API_BASE_URL}/rooms/public-list.php${buildQuery(filters)}`, {
+  const payload = await requestJson(`${API_BASE_URL}/rooms/public-list.php${buildQuery(filters)}`, {
     headers: { Accept: 'application/json' },
-  })
-  const payload = await response.json().catch(() => null)
-  if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || 'Unable to load rooms.')
-  }
+  }, 'rooms')
   return normalizeResponse(payload)
 }
 
 export async function fetchRoom(idOrSlug) {
-  const response = await fetch(`${API_BASE_URL}/rooms/detail.php?id=${encodeURIComponent(idOrSlug)}`, {
+  const payload = await requestJson(`${API_BASE_URL}/rooms/detail.php?id=${encodeURIComponent(idOrSlug)}`, {
     headers: { Accept: 'application/json' },
-  })
-  const payload = await response.json().catch(() => null)
-  if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || 'Unable to load room.')
-  }
+  }, 'room')
   return payload.data || payload.room
 }
 
 export async function checkRoomAvailability({ roomId, roomName, checkInDate, checkOutDate, guests }) {
-  const response = await fetch(`${API_BASE_URL}/check-availability.php`, {
+  const payload = await requestJson(`${API_BASE_URL}/check-availability.php`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -56,13 +49,7 @@ export async function checkRoomAvailability({ roomId, roomName, checkInDate, che
       check_out_date: checkOutDate,
       guests,
     }),
-  })
-
-  const payload = await response.json().catch(() => null)
-
-  if (!response.ok || !payload?.success) {
-    throw new Error(payload?.message || 'Unable to check availability.')
-  }
+  }, 'availability')
 
   return payload
 }

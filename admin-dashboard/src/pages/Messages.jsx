@@ -17,7 +17,7 @@ import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { apiFetch, buildApiUrl } from '@/services/apiClient'
+import { apiFetch, buildApiUrl, readJsonResponse } from '@/services/apiClient'
 import { exportCsv, exportExcel, exportPdf } from '@/utils/exportData'
 
 const API_BASE_URL = buildApiUrl('')
@@ -238,11 +238,7 @@ export default function Messages() {
       const response = await apiFetch(`${API_BASE_URL}/contact/list_enquiries.php`, {
         headers: { Accept: 'application/json' },
       })
-      const result = await response.json().catch(() => null)
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Could not load enquiries.')
-      }
+      const result = await readJsonResponse(response, 'messages')
 
       setInquiries((result.data || []).map(normalizeInquiry))
     } catch (error) {
@@ -279,11 +275,7 @@ export default function Messages() {
         },
         body: JSON.stringify({ id, status }),
       })
-      const result = await response.json().catch(() => null)
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Could not update enquiry status.')
-      }
+      const result = await readJsonResponse(response, 'messages')
 
       setInquiries((current) => current.map((item) => (item.id === id ? { ...item, status } : item)))
       setSelectedInquiry((current) => (current?.id === id ? { ...current, status } : current))
@@ -305,11 +297,7 @@ export default function Messages() {
         },
         body: JSON.stringify({ id }),
       })
-      const result = await response.json().catch(() => null)
-
-      if (!response.ok || !result?.success) {
-        throw new Error(result?.message || 'Could not delete enquiry.')
-      }
+      const result = await readJsonResponse(response, 'messages')
 
       setInquiries((current) => current.filter((item) => item.id !== id))
       setSelectedInquiry(null)

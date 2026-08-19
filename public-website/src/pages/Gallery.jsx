@@ -4,8 +4,11 @@ import SectionHeading from '../components/ui/SectionHeading'
 import FadeUp from '../components/ui/FadeUp'
 import { fetchPublicGallery } from '../services/galleryApi'
 import galleryBanner from '../assets/images/banners/gallery-banner.webp'
+import { publicErrorMessage } from '../services/publicErrors'
+import { useToast } from '../components/ui/ToastProvider'
 
 export default function Gallery() {
+  const toast = useToast()
   const [folders, setFolders] = useState([])
   const [images, setImages] = useState([])
   const [activeFolder, setActiveFolder] = useState('all')
@@ -25,7 +28,11 @@ export default function Gallery() {
           setImages(data.images)
         }
       } catch (err) {
-        if (!ignore) setError(err.message || 'Failed to load gallery.')
+        if (!ignore) {
+          const text = publicErrorMessage(err, 'gallery')
+          setError(text)
+          toast.error(text)
+        }
       } finally {
         if (!ignore) setLoading(false)
       }
@@ -36,12 +43,16 @@ export default function Gallery() {
     return () => {
       ignore = true
     }
-  }, [])
+  }, [toast])
 
   const filteredImages = useMemo(() => {
     if (activeFolder === 'all') return images
     return images.filter((image) => String(image.folder_id) === String(activeFolder))
   }, [images, activeFolder])
+
+  useEffect(() => {
+    if (!loading && !error && filteredImages.length === 0) toast.info('No gallery images are available in this category yet.')
+  }, [error, filteredImages.length, loading, toast])
 
   return (
     <PageTransition>
@@ -76,11 +87,6 @@ export default function Gallery() {
             <p className="text-center text-charcoal/70">Loading gallery...</p>
           ) : null}
 
-          {error ? (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-center text-sm text-red-700">
-              {error}
-            </p>
-          ) : null}
 
           {!loading && !error ? (
             <>
@@ -113,9 +119,7 @@ export default function Gallery() {
                 ))}
               </div>
 
-              {filteredImages.length === 0 ? (
-                <p className="text-center text-charcoal/70">No gallery images available yet.</p>
-              ) : (
+              {filteredImages.length === 0 ? null : (
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredImages.map((item, index) => (
                     <FadeUp key={item.id} delay={index * 0.04}>

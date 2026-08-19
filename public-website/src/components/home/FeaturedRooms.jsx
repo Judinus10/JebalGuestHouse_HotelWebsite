@@ -5,12 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { fetchRooms } from '../../services/roomsApi'
 import SectionHeading from '../ui/SectionHeading'
 import FadeUp from '../ui/FadeUp'
+import { useToast } from '../ui/ToastProvider'
+import { publicErrorMessage } from '../../services/publicErrors'
 
 /**
  * Featured rooms carousel with overlapping text card.
  * Same UI/animations as before, now loaded from database/API.
  */
 export default function FeaturedRooms() {
+  const toast = useToast()
   const [featured, setFeatured] = useState([])
   const [current, setCurrent] = useState(0)
 
@@ -23,6 +26,7 @@ export default function FeaturedRooms() {
         if (active) setFeatured(data.slice(0, 6))
       } catch (error) {
         console.error(error)
+        toast.error(publicErrorMessage(error, 'rooms'))
       }
     }
 
@@ -31,7 +35,7 @@ export default function FeaturedRooms() {
     return () => {
       active = false
     }
-  }, [])
+  }, [toast])
 
   if (featured.length === 0) return null
 

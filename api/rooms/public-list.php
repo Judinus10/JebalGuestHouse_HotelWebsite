@@ -89,5 +89,6 @@ try {
         ],
     ]);
 } catch (Throwable $e) {
-    json_response(false, 'Unable to load rooms.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
+    error_log('Public rooms list error: ' . $e->getMessage());
+    json_response(false, 'Rooms are temporarily unavailable. Please try again.', 500, ['error_code' => 'ROOMS_LOAD_FAILED']);
 }

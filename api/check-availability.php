@@ -47,7 +47,7 @@ try {
         $room = $roomStmt->fetch();
 
         if (!$room) {
-            json_response(false, 'Room not found.', 404);
+            json_response(false, 'This room is no longer available on our website. Please view the other rooms.', 404, ['error_code' => 'ROOM_NOT_FOUND']);
         }
 
         $roomName = (string) $room['room_name'];
@@ -58,19 +58,20 @@ try {
         $room = $roomStmt->fetch();
 
         if (!$room) {
-            json_response(false, 'Room not found.', 404);
+            json_response(false, 'This room is no longer available on our website. Please view the other rooms.', 404, ['error_code' => 'ROOM_NOT_FOUND']);
         }
 
         $roomId = (int) $room['id'];
     }
 
     if (($room['status'] ?? '') !== 'Available') {
-        json_response(false, 'This room is not currently available for booking.', 409, ['available' => false]);
+        json_response(false, 'This room is not currently available for booking. Please choose another room.', 409, ['available' => false, 'error_code' => 'ROOM_UNAVAILABLE']);
     }
 
     $capacity = (int) ($room['max_guests'] ?? 0);
     if ($capacity < 1 || $guests > $capacity) {
-        json_response(false, 'Selected room cannot hold this number of guests.', 422, [
+        json_response(false, 'This room cannot accommodate the selected number of guests. Please reduce the guest count or choose multiple rooms.', 422, [
+            'error_code' => 'ROOM_CAPACITY_EXCEEDED',
             'available' => false,
             'max_guests' => max(0, $capacity),
         ]);

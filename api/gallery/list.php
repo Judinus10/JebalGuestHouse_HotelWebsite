@@ -46,5 +46,5 @@ try {
     ]);
 } catch (Throwable $e) {
     error_log('Gallery list error: ' . $e->getMessage());
-    json_response(false, 'Unable to load gallery: ' . $e->getMessage(), 500);
+    json_response(false, 'The gallery could not be loaded. Please refresh the page.', 500, ['error_code' => 'GALLERY_LOAD_FAILED']);
 }

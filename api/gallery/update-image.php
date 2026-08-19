@@ -40,7 +40,8 @@ try {
         try {
             [, $extension] = gallery_validate_uploaded_image($_FILES['image']);
         } catch (RuntimeException $validationError) {
-            json_response(false, $validationError->getMessage(), 422);
+            error_log('Gallery image validation error: ' . $validationError->getMessage());
+            json_response(false, 'The selected image could not be processed. Use a smaller JPG, PNG or WEBP image.', 422, ['error_code' => 'INVALID_IMAGE']);
         }
 
         $filename = 'gallery_' . date('Ymd_His') . '_' . bin2hex(random_bytes(6)) . '.' . $extension;
@@ -74,5 +75,5 @@ try {
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Gallery update image error: ' . $e->getMessage());
-    json_response(false, 'Unable to update image: ' . $e->getMessage(), 500);
+    json_response(false, 'The gallery image could not be updated. Please try again.', 500, ['error_code' => 'GALLERY_IMAGE_UPDATE_FAILED']);
 }

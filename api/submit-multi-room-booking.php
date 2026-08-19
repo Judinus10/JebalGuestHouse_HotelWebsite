@@ -64,6 +64,13 @@ if ($allocationTotal !== $totalGuests) {
 }
 
 $pdo = null;
+$bookingCommitted = false;
+$primaryBookingId = 0;
+$groupId = 0;
+$bookingNumber = '';
+$orderId = '';
+$totalAmount = 0.0;
+$currency = PAYMENT_CURRENCY;
 try {
     $pdo = get_db_connection();
     expire_pending_bookings($pdo, null, false);
@@ -198,6 +205,7 @@ try {
         throw new RuntimeException('Multi-room booking transaction ended unexpectedly before commit.');
     }
     $pdo->commit();
+    $bookingCommitted = true;
 
     $amountForToken = number_format($totalAmount, 2, '.', '');
     $billToken = create_public_token('payment-status', [
@@ -257,5 +265,73 @@ try {
 } catch (Throwable $exception) {
     if ($pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Multi-room booking error: ' . $exception->getMessage());
-    json_response(false, APP_ENV === 'local' ? $exception->getMessage() : 'Unable to complete the multi-room booking.', 409);
+
+    $persistedBookingExists = $bookingCommitted;
+    $persistenceVerificationFailed = false;
+    if (!$persistedBookingExists && $primaryBookingId > 0) {
+        try {
+            $verificationPdo = get_db_connection();
+            $verificationStmt = $verificationPdo->prepare('SELECT id FROM bookings WHERE id = :id AND booking_group_id = :group_id LIMIT 1');
+            $verificationStmt->execute([':id' => $primaryBookingId, ':group_id' => $groupId]);
+            $persistedBookingExists = (bool) $verificationStmt->fetchColumn();
+        } catch (Throwable $verificationError) {
+            $persistenceVerificationFailed = true;
+            error_log('Multi-room persistence verification failed: ' . $verificationError->getMessage());
+        }
+    }
+
+    if ($persistedBookingExists && $primaryBookingId > 0 && $orderId !== '') {
+        try {
+            $recoveredToken = create_public_token('payment-status', [
+                'order_id' => $orderId,
+                'booking_id' => $primaryBookingId,
+                'amount' => number_format($totalAmount, 2, '.', ''),
+            ], PUBLIC_LINK_TTL_SECONDS);
+            $recoveredBaseUrl = defined('FRONTEND_URL') && FRONTEND_URL !== ''
+                ? FRONTEND_URL
+                : (defined('PUBLIC_APP_URL') && PUBLIC_APP_URL !== '' ? PUBLIC_APP_URL : APP_BASE_URL);
+            $recoveredBillUrl = rtrim((string) $recoveredBaseUrl, '/') . '/booking-bill?' . http_build_query([
+                'booking_id' => $primaryBookingId,
+                'order_id' => $orderId,
+                'token' => $recoveredToken,
+            ]);
+
+            json_response(true, 'Multi-room booking submitted successfully.', 201, [
+                'booking_id' => $primaryBookingId,
+                'booking_no' => $bookingNumber,
+                'booking_group_id' => $groupId,
+                'order_id' => $orderId,
+                'bill_url' => $recoveredBillUrl,
+                'amount' => $totalAmount,
+                'currency' => $currency,
+                'response_recovered' => true,
+            ]);
+        } catch (Throwable $recoveryError) {
+            error_log('Multi-room bill recovery error: ' . $recoveryError->getMessage());
+            json_response(false, 'Your booking was saved, but we could not open the booking bill. Please do not book again. Contact the property for help.', 503, [
+                'error_code' => 'BOOKING_SAVED_BILL_UNAVAILABLE',
+                'booking_id' => $primaryBookingId,
+                'booking_no' => $bookingNumber,
+            ]);
+        }
+    }
+
+    if ($primaryBookingId > 0 && $persistenceVerificationFailed) {
+        json_response(false, 'We could not confirm the final booking result. Your booking may already be saved. Please do not submit again. Contact the property with your name and booking dates.', 503, [
+            'error_code' => 'BOOKING_OUTCOME_UNKNOWN',
+        ]);
+    }
+
+    $reason = $exception->getMessage();
+    if (str_contains($reason, 'no longer available')) {
+        json_response(false, 'One of the selected rooms was just booked. Please search again to receive a new room combination.', 409, ['error_code' => 'ROOM_UNAVAILABLE']);
+    }
+    if (str_contains($reason, 'cannot accommodate')) {
+        json_response(false, 'The selected guest allocation exceeds one room\'s capacity. Please adjust the guests in each room.', 422, ['error_code' => 'ROOM_CAPACITY_EXCEEDED']);
+    }
+    if (str_contains($reason, 'no longer exist')) {
+        json_response(false, 'One of the selected rooms is no longer offered. Please search again.', 409, ['error_code' => 'ROOM_SELECTION_CHANGED']);
+    }
+
+    json_response(false, 'Your multi-room booking could not be completed. Please review the room allocation and try again.', 500, ['error_code' => 'BOOKING_NOT_SAVED']);
 }

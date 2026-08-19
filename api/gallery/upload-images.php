@@ -75,5 +75,5 @@ try {
 } catch (Throwable $e) {
     if (isset($pdo) && $pdo instanceof PDO && $pdo->inTransaction()) $pdo->rollBack();
     error_log('Gallery upload error: ' . $e->getMessage());
-    json_response(false, 'Unable to upload gallery images: ' . $e->getMessage(), 500);
+    json_response(false, 'The gallery images could not be uploaded. Check the files and try again.', 500, ['error_code' => 'GALLERY_UPLOAD_FAILED']);
 }

@@ -550,7 +550,7 @@ export default function Dashboard() {
       </PageHeader>
 
       {error ? (
-        <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+        <div className="fixed right-5 top-5 z-[70] max-w-sm rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 shadow-xl">
           {error}
         </div>
       ) : null}

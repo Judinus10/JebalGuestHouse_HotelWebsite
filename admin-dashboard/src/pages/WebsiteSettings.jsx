@@ -209,7 +209,7 @@ export default function WebsiteSettings() {
       />
 
       {loadError && (
-        <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">
+        <div className="fixed right-5 top-5 z-[70] max-w-sm rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700 shadow-xl">
           {loadError}
         </div>
       )}

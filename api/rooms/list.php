@@ -7,5 +7,6 @@ try {
     $rooms = get_room_payload(get_db_connection(), false);
     json_response(true, 'Rooms loaded.', 200, ['data' => $rooms, 'rooms' => $rooms]);
 } catch (Throwable $e) {
-    json_response(false, 'Unable to load rooms.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
+    error_log('Admin rooms list error: ' . $e->getMessage());
+    json_response(false, 'Rooms could not be loaded. Please refresh the page.', 500, ['error_code' => 'ROOMS_LOAD_FAILED']);
 }

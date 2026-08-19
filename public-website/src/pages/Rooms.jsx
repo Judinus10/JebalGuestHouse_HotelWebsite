@@ -7,6 +7,8 @@ import RoomCard from '../components/ui/RoomCard'
 import FadeUp from '../components/ui/FadeUp'
 import { fetchRooms } from '../services/roomsApi'
 import roomsBanner from '../assets/images/banners/rooms-banner.webp'
+import { publicErrorMessage } from '../services/publicErrors'
+import { useToast } from '../components/ui/ToastProvider'
 
 const roomTypes = [
   'All Rooms',
@@ -48,6 +50,7 @@ function buildRoomSearch(filters) {
  * Home keeps its filter visible; Rooms only hides this page filter after a search exists.
  */
 export default function Rooms() {
+  const toast = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const [filter, setFilter] = useState('All')
   const [rooms, setRooms] = useState([])
@@ -95,7 +98,11 @@ export default function Rooms() {
         const data = await fetchRooms(isMultiRoomSearch ? { ...bookingFilters, guests: '' } : bookingFilters)
         if (active) setRooms(data)
       } catch (err) {
-        if (active) setError(err.message || 'Unable to load rooms.')
+        if (active) {
+          const text = publicErrorMessage(err, 'rooms')
+          setError(text)
+          toast.error(text)
+        }
       } finally {
         if (active) setLoading(false)
       }
@@ -106,7 +113,7 @@ export default function Rooms() {
     return () => {
       active = false
     }
-  }, [bookingFilters, isMultiRoomSearch])
+  }, [bookingFilters, isMultiRoomSearch, toast])
 
   useEffect(() => {
     setFilter(bookingFilters.room_type || 'All')
@@ -133,6 +140,20 @@ export default function Rooms() {
   const combinedCapacity = filtered.reduce((total, room) => total + Number(room.max_guests ?? room.guests ?? 0), 0)
   const canBuildMultiRoomBooking = isMultiRoomSearch && combinedCapacity >= requestedGuests
 
+  useEffect(() => {
+    if (loading || error) return
+    if (canBuildMultiRoomBooking) {
+      toast.info(`Multiple rooms are needed for ${requestedGuests} guests. Review the assigned rooms and guest allocation before booking.`, { title: 'Multi-room booking available' })
+    } else if (filtered.length === 0) {
+      const text = isMultiRoomSearch && combinedCapacity < requestedGuests
+        ? `There are not enough rooms for ${requestedGuests} guests. Change the dates, room type, or guest count and search again.`
+        : hasBookingFilter
+          ? 'No rooms are available for the selected dates. Change the search details and select Search again.'
+          : 'No rooms were found in this category.'
+      toast.info(text, { title: 'No matching rooms' })
+    }
+  }, [canBuildMultiRoomBooking, combinedCapacity, error, filtered.length, hasBookingFilter, isMultiRoomSearch, loading, requestedGuests, toast])
+
   const selectedStayText = bookingFilters.check_in_date && bookingFilters.check_out_date
     ? `${bookingFilters.check_in_date} to ${bookingFilters.check_out_date}`
     : ''
@@ -147,18 +168,31 @@ export default function Rooms() {
     e.preventDefault()
     setFormError('')
 
-    if ((searchForm.check_in_date && !searchForm.check_out_date) || (!searchForm.check_in_date && searchForm.check_out_date)) {
-      setFormError('Select both check-in and check-out dates.')
+    if (!searchForm.check_in_date && searchForm.check_out_date) {
+      const text = 'Please select a check-in date.'
+      setFormError(text)
+      toast.error(text)
+      return
+    }
+
+    if (searchForm.check_in_date && !searchForm.check_out_date) {
+      const text = 'Please select a check-out date.'
+      setFormError(text)
+      toast.error(text)
       return
     }
 
     if (searchForm.check_in_date && searchForm.check_out_date && searchForm.check_out_date <= searchForm.check_in_date) {
-      setFormError('Check-out date must be after check-in date.')
+      const text = 'Check-out date must be after check-in date.'
+      setFormError(text)
+      toast.error(text)
       return
     }
 
     if (Number(searchForm.guests) > 20) {
-      setFormError('A booking can include a maximum of 20 guests.')
+      const text = 'A booking can include a maximum of 20 guests.'
+      setFormError(text)
+      toast.error(text)
       return
     }
 
@@ -284,7 +318,6 @@ export default function Rooms() {
                   </div>
                 </div>
 
-                {formError && <p className="mt-4 text-xs text-red-600">{formError}</p>}
             </form>
           </FadeUp>
 
@@ -343,7 +376,7 @@ export default function Rooms() {
           )}
 
           {error && !loading && (
-            <p className="py-16 text-center text-red-600">{error}</p>
+            <div className="py-16 text-center"><button type="button" onClick={() => window.location.reload()} className="bg-charcoal px-6 py-3 text-xs tracking-wider uppercase text-white">Try Again</button></div>
           )}
 
           {!loading && !error && (

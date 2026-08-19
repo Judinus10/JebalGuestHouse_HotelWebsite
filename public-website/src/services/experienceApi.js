@@ -1,15 +1,8 @@
 import { API_BASE_URL } from './config'
+import { requestJson } from './publicErrors'
 
 export async function fetchExperiences() {
-  const response = await fetch(
-    `${API_BASE_URL}/experience/public-list.php`
-  )
-
-  const payload = await response.json()
-
-  if (!response.ok || payload.success === false) {
-    throw new Error(payload.message || 'Failed to load experiences.')
-  }
+  const payload = await requestJson(`${API_BASE_URL}/experience/public-list.php`, {}, 'experiences')
 
   return payload.data || []
 }

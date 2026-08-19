@@ -22,5 +22,6 @@ try {
     $payload = normalize_room($room, $images[$roomId] ?? [], $assignments[$roomId] ?? [], list_amenities($pdo));
     json_response(true, 'Room loaded.', 200, ['data' => $payload, 'room' => $payload]);
 } catch (Throwable $e) {
-    json_response(false, 'Unable to load room.', 500, ['error' => APP_ENV === 'local' ? $e->getMessage() : null]);
+    error_log('Room detail load error: ' . $e->getMessage());
+    json_response(false, 'The room could not be loaded. Please try again.', 500, ['error_code' => 'ROOM_LOAD_FAILED']);
 }

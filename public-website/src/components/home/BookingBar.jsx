@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { Calendar, Users, BedDouble, Search } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import FadeUp from '../ui/FadeUp'
+import { useToast } from '../ui/ToastProvider'
 
 function formatLocalDate(date) {
   const year = date.getFullYear()
@@ -26,6 +27,7 @@ const roomTypes = [
 
 export default function BookingBar() {
   const navigate = useNavigate()
+  const toast = useToast()
   const checkInRef = useRef(null)
   const checkOutRef = useRef(null)
   const [checkIn, setCheckIn] = useState('')
@@ -60,13 +62,31 @@ export default function BookingBar() {
     e.preventDefault()
     setError('')
 
-    if ((checkIn && !checkOut) || (!checkIn && checkOut)) {
-      setError('Please select both check-in and check-out dates, or leave both empty.')
+    if (!checkIn && checkOut) {
+      const message = 'Please select a check-in date.'
+      setError(message)
+      toast.error(message)
+      return
+    }
+
+    if (checkIn && !checkOut) {
+      const message = 'Please select a check-out date.'
+      setError(message)
+      toast.error(message)
+      return
+    }
+
+    if (checkIn && checkIn < today) {
+      const message = 'Check-in cannot be earlier than today.'
+      setError(message)
+      toast.error(message)
       return
     }
 
     if (checkIn && checkOut && checkOut <= checkIn) {
-      setError('Check-out date must be after check-in date.')
+      const message = 'Check-out date must be after check-in date.'
+      setError(message)
+      toast.error(message)
       return
     }
 
@@ -213,7 +233,6 @@ export default function BookingBar() {
             </div>
           </div>
 
-          {error && <p role="alert" className="mt-4 border-l-2 border-red-500 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
         </form>
       </FadeUp>
     </div>
