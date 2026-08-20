@@ -450,6 +450,7 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
   const [errors, setErrors] = useState({})
   const [selectedFiles, setSelectedFiles] = useState([])
   const [deletingImageId, setDeletingImageId] = useState(null)
+  const formRef = useRef(null)
 
   const isEdit = mode === 'edit'
 
@@ -524,7 +525,17 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
     if (!form.status.trim()) nextErrors.status = 'Status is required.'
 
     setErrors(nextErrors)
-    if (Object.keys(nextErrors).length > 0) return
+    const firstInvalidField = Object.keys(nextErrors)[0]
+    if (firstInvalidField) {
+      window.requestAnimationFrame(() => {
+        const field = formRef.current?.querySelector(`#${firstInvalidField}`)
+        if (!field) return
+
+        field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        window.setTimeout(() => field.focus({ preventScroll: true }), 350)
+      })
+      return
+    }
 
     onSubmit({
       ...form,
@@ -549,12 +560,12 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="max-h-[calc(92vh-81px)] overflow-y-auto p-6">
+        <form ref={formRef} onSubmit={handleSubmit} noValidate className="max-h-[calc(92vh-81px)] overflow-y-auto p-6">
           <div className="grid gap-5 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="room_name">Room name</Label>
-              <Input id="room_name" value={form.room_name} onChange={(e) => updateField('room_name', e.target.value)} placeholder="Ex: Ground Floor Room 1" />
-              {errors.room_name && <p className="text-xs font-medium text-red-600">{errors.room_name}</p>}
+              <Input id="room_name" value={form.room_name} onChange={(e) => updateField('room_name', e.target.value)} placeholder="Ex: Ground Floor Room 1" aria-invalid={Boolean(errors.room_name)} aria-describedby={errors.room_name ? 'room_name-error' : undefined} className={errors.room_name ? 'border-red-500 ring-2 ring-red-100 focus-visible:border-red-500 focus-visible:ring-red-200' : ''} />
+              {errors.room_name && <p id="room_name-error" className="text-xs font-medium text-red-600">{errors.room_name}</p>}
             </div>
 
             <div className="space-y-2">
@@ -563,23 +574,25 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 id="room_type"
                 value={form.room_type}
                 onChange={(e) => updateField('room_type', e.target.value)}
-                className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                aria-invalid={Boolean(errors.room_type)}
+                aria-describedby={errors.room_type ? 'room_type-error' : undefined}
+                className={cn('h-10 w-full rounded-lg border bg-white px-3 text-sm text-text-primary shadow-sm focus:outline-none focus:ring-2', errors.room_type ? 'border-red-500 ring-2 ring-red-100 focus:border-red-500 focus:ring-red-200' : 'border-border focus:border-blue-500 focus:ring-blue-500/20')}
               >
                 {roomTypes.map((type) => <option key={type}>{type}</option>)}
               </select>
-              {errors.room_type && <p className="text-xs font-medium text-red-600">{errors.room_type}</p>}
+              {errors.room_type && <p id="room_type-error" className="text-xs font-medium text-red-600">{errors.room_type}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="price_per_night">Price per night</Label>
-              <Input id="price_per_night" type="number" min="1" value={form.price_per_night} onChange={(e) => updateField('price_per_night', e.target.value)} placeholder="Ex: 380" />
-              {errors.price_per_night && <p className="text-xs font-medium text-red-600">{errors.price_per_night}</p>}
+              <Input id="price_per_night" type="number" min="1" value={form.price_per_night} onChange={(e) => updateField('price_per_night', e.target.value)} placeholder="Ex: 380" aria-invalid={Boolean(errors.price_per_night)} aria-describedby={errors.price_per_night ? 'price_per_night-error' : undefined} className={errors.price_per_night ? 'border-red-500 ring-2 ring-red-100 focus-visible:border-red-500 focus-visible:ring-red-200' : ''} />
+              {errors.price_per_night && <p id="price_per_night-error" className="text-xs font-medium text-red-600">{errors.price_per_night}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="capacity">Capacity</Label>
-              <Input id="capacity" type="number" min="1" value={form.capacity} onChange={(e) => updateField('capacity', e.target.value)} placeholder="Ex: 2" />
-              {errors.capacity && <p className="text-xs font-medium text-red-600">{errors.capacity}</p>}
+              <Input id="capacity" type="number" min="1" value={form.capacity} onChange={(e) => updateField('capacity', e.target.value)} placeholder="Ex: 2" aria-invalid={Boolean(errors.capacity)} aria-describedby={errors.capacity ? 'capacity-error' : undefined} className={errors.capacity ? 'border-red-500 ring-2 ring-red-100 focus-visible:border-red-500 focus-visible:ring-red-200' : ''} />
+              {errors.capacity && <p id="capacity-error" className="text-xs font-medium text-red-600">{errors.capacity}</p>}
             </div>
 
             <div className="space-y-2">
@@ -588,11 +601,13 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
                 id="status"
                 value={form.status}
                 onChange={(e) => updateField('status', e.target.value)}
-                className="h-10 w-full rounded-lg border border-border bg-white px-3 text-sm text-text-primary shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                aria-invalid={Boolean(errors.status)}
+                aria-describedby={errors.status ? 'status-error' : undefined}
+                className={cn('h-10 w-full rounded-lg border bg-white px-3 text-sm text-text-primary shadow-sm focus:outline-none focus:ring-2', errors.status ? 'border-red-500 ring-2 ring-red-100 focus:border-red-500 focus:ring-red-200' : 'border-border focus:border-blue-500 focus:ring-blue-500/20')}
               >
                 {roomStatuses.map((status) => <option key={status}>{status}</option>)}
               </select>
-              {errors.status && <p className="text-xs font-medium text-red-600">{errors.status}</p>}
+              {errors.status && <p id="status-error" className="text-xs font-medium text-red-600">{errors.status}</p>}
             </div>
 
             <div className="space-y-2">
@@ -613,8 +628,8 @@ function RoomFormModal({ mode, room, amenities, onClose, onSubmit, onDeleteExist
 
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" value={form.description} onChange={(e) => updateField('description', e.target.value)} placeholder="Short room description" />
-              {errors.description && <p className="text-xs font-medium text-red-600">{errors.description}</p>}
+              <Textarea id="description" value={form.description} onChange={(e) => updateField('description', e.target.value)} placeholder="Short room description" aria-invalid={Boolean(errors.description)} aria-describedby={errors.description ? 'description-error' : undefined} className={errors.description ? 'border-red-500 ring-2 ring-red-100 focus-visible:border-red-500 focus-visible:ring-red-200' : ''} />
+              {errors.description && <p id="description-error" className="text-xs font-medium text-red-600">{errors.description}</p>}
             </div>
 
             <div className="space-y-3 md:col-span-2">
