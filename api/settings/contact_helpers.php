@@ -52,12 +52,37 @@ function save_contact_settings(PDO $pdo, array $settings): array
     $cleaned = [];
 
     foreach ($allowed as $key => $defaultValue) {
+        if ($key === 'address') {
+            $rawAddress = str_replace(["\r\n", "\r"], "\n", (string) ($settings[$key] ?? $defaultValue));
+            $rawLines = preg_split('/\n/', $rawAddress) ?: [];
+            $addressLines = [];
+
+            foreach ($rawLines as $line) {
+                $line = trim(preg_replace('/[\x00-\x09\x0B\x0C\x0E-\x1F\x7F]/u', '', (string) $line) ?? '');
+                if ($line === '') {
+                    continue;
+                }
+                $addressLines[] = mb_substr($line, 0, 120);
+            }
+
+            if (count($addressLines) > 10) {
+                json_response(false, 'The address can contain a maximum of 10 lines.', 422, ['field' => 'address']);
+            }
+
+            $cleaned[$key] = implode("\n", $addressLines);
+            continue;
+        }
+
         $maxLength = in_array($key, ['map_embed_url', 'google_maps_url', 'facebook_link', 'instagram_link'], true) ? 1000 : 255;
         $cleaned[$key] = clean_string($settings[$key] ?? $defaultValue, $maxLength);
     }
 
     if ($cleaned['business_name'] === '') {
         json_response(false, 'Business name is required.', 422);
+    }
+
+    if ($cleaned['address'] === '') {
+        json_response(false, 'At least one address line is required.', 422, ['field' => 'address']);
     }
 
     if (

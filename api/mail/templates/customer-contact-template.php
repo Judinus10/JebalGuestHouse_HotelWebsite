@@ -190,7 +190,7 @@ function contact_support_block(): string
                                 </tr>
                                 <tr>
                                     <td style="padding:4px 18px 4px 0;color:#111111;font-size:14px;line-height:1.4;white-space:nowrap;"><span style="color:#987b58;font-size:18px;">' . booking_email_icon('mail') . '</span>&nbsp;&nbsp;' . email_safe(email_contact_email()) . '</td>
-                                    <td style="padding:4px 0;color:#111111;font-size:14px;line-height:1.4;white-space:nowrap;"><span style="color:#987b58;font-size:18px;">' . booking_email_icon('location') . '</span>&nbsp;&nbsp;' . email_safe(email_contact_address()) . '</td>
+                                    <td style="padding:4px 0;color:#111111;font-size:14px;line-height:1.4;vertical-align:top;"><span style="color:#987b58;font-size:18px;vertical-align:top;">' . booking_email_icon('location') . '</span>&nbsp;&nbsp;<span style="display:inline-block;">' . nl2br(email_safe(email_contact_address())) . '</span></td>
                                 </tr>
                             </table>
                         </td>
@@ -383,4 +383,3 @@ function contact_customer_email_html(string $name, string $email, string $phone,
 </body>
 </html>';
 }
-

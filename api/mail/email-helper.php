@@ -570,7 +570,7 @@ function email_contact_phone(): string
 
     $secondary = email_contact_value('reception_contact_number');
     if ($secondary !== '' && $secondary !== $phone) {
-        return $phone . ' / ' . $secondary;
+        return $phone . ' | ' . $secondary;
     }
 
     return $phone;

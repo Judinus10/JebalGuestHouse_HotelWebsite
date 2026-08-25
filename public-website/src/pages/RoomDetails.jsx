@@ -377,7 +377,9 @@ export default function RoomDetails() {
 
       if (billUrl) {
         redirectingRef.current = true
-        window.location.assign(billUrl)
+        const successUrl = new URL(billUrl, window.location.origin)
+        successUrl.searchParams.set('booking_success', '1')
+        window.location.assign(successUrl.toString())
         return
       }
 

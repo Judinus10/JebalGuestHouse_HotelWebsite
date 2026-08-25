@@ -42,6 +42,11 @@ function normalizeSettings(data = {}) {
   }
 }
 
+function addressLines(address = '') {
+  const lines = String(address).replace(/\r\n?/g, '\n').split('\n')
+  return lines.length > 0 ? lines : ['']
+}
+
 function Toast({ message, type = 'success', onClose }) {
   if (!message) return null
 
@@ -149,6 +154,21 @@ export default function WebsiteSettings() {
     setSettings((current) => ({ ...current, [field]: value }))
   }
 
+  const updateAddressLine = (index, value) => {
+    const lines = addressLines(settings.address)
+    lines[index] = value
+    updateSetting('address', lines.join('\n'))
+  }
+
+  const addAddressLine = () => {
+    updateSetting('address', [...addressLines(settings.address), ''].join('\n'))
+  }
+
+  const removeAddressLine = (index) => {
+    const lines = addressLines(settings.address).filter((_, lineIndex) => lineIndex !== index)
+    updateSetting('address', (lines.length > 0 ? lines : ['']).join('\n'))
+  }
+
   const updateNearbyPlace = (index, field, value) => {
     setPropertyContent((current) => ({
       ...current,
@@ -240,19 +260,47 @@ export default function WebsiteSettings() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                <FieldWithIcon icon={MapPin} align="top">
-                  <Textarea
-                    id="address"
-                    value={settings.address}
-                    onChange={(event) => updateSetting('address', event.target.value)}
-                    className="pl-9"
-                    placeholder="Full guest house address"
-                    rows={3}
-                    required
-                  />
-                </FieldWithIcon>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label>Address</Label>
+                    <p className="mt-1 text-xs text-text-secondary">Each field is displayed as a separate address line.</p>
+                  </div>
+                  <Button type="button" variant="outline" size="sm" onClick={addAddressLine}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add line
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {addressLines(settings.address).map((line, index, lines) => (
+                    <div key={`address-line-${index}`} className="flex items-center gap-2">
+                      <div className="relative min-w-0 flex-1">
+                        <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <Input
+                          id={`address_line_${index}`}
+                          value={line}
+                          onChange={(event) => updateAddressLine(index, event.target.value)}
+                          className="pl-9"
+                          placeholder={`Address line ${index + 1}`}
+                          maxLength={120}
+                          required={index === 0}
+                        />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => removeAddressLine(index)}
+                        disabled={lines.length === 1}
+                        aria-label={`Delete address line ${index + 1}`}
+                        title="Delete address line"
+                      >
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">

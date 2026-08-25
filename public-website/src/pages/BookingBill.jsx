@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { AlertTriangle, ArrowLeft, Bookmark, CalendarDays, ChevronDown, Clock, Download, FileText, Globe2, Headphones, Mail, MapPin, Phone, RotateCcw, Share2, UserRound } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Bookmark, CalendarDays, CheckCircle2, ChevronDown, Clock, Download, FileText, Globe2, Headphones, Mail, MapPin, Phone, RotateCcw, Share2, UserRound } from 'lucide-react'
 import PageTransition from '../components/layout/PageTransition'
 import FadeUp from '../components/ui/FadeUp'
 import Button from '../components/ui/Button'
@@ -194,6 +194,7 @@ export default function BookingBill() {
   const bookingId = searchParams.get('booking_id') || ''
   const orderId = searchParams.get('order_id') || ''
   const token = searchParams.get('token') || ''
+  const [showBookingSuccess] = useState(() => searchParams.get('booking_success') === '1')
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -207,6 +208,14 @@ export default function BookingBill() {
   useEffect(() => {
     if (error) toast.error(error)
   }, [error, toast])
+
+  useEffect(() => {
+    if (!showBookingSuccess) return
+
+    const cleanUrl = new URL(window.location.href)
+    cleanUrl.searchParams.delete('booking_success')
+    window.history.replaceState(window.history.state, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`)
+  }, [showBookingSuccess])
 
   useEffect(() => {
     if (bill?.payment_status === 'Failed' || bill?.payment_status === 'Cancelled') {
@@ -303,6 +312,11 @@ export default function BookingBill() {
   const hotelSecondaryPhone = cleanContactValue(contactSettings?.reception_contact_number)
     || FALLBACK_HOTEL_SECONDARY_PHONE
   const hotelAddress = cleanContactValue(contactSettings?.address) || FALLBACK_HOTEL_ADDRESS
+  const hotelAddressLines = hotelAddress
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
   const hotelMapsUrl = cleanContactValue(contactSettings?.google_maps_url)
   const hotelPhoneLine = [hotelPhone, hotelSecondaryPhone].filter((value, index, values) => value && values.indexOf(value) === index).join(' | ')
 
@@ -311,7 +325,6 @@ export default function BookingBill() {
   const roomBalance = Math.max(roomTotal - roomPaid, 0)
   const nights = bill ? nightsBetween(bill.check_in_date, bill.check_out_date) : 1
   const bookingNumber = getBookingNumber(bill, orderId)
-  const generatedAt = formatDateTime(new Date().toISOString())
   const paymentHistory = Array.isArray(bill?.payment_history) ? bill.payment_history : []
   const bookedRooms = Array.isArray(bill?.rooms) ? bill.rooms : []
   const displayPaymentStatus = normalizePaymentStatus(bill?.payment_status)
@@ -341,16 +354,16 @@ export default function BookingBill() {
     const paymentRefText = wrappedPaymentRef.slice(0, 2)
 
     const addFooter = () => {
+      const footerHeight = 14
+      const footerTop = pageHeight - footerHeight
       pdf.setFillColor(61, 31, 13)
-      pdf.rect(0, pageHeight - 22, pageWidth, 22, 'F')
+      pdf.rect(0, footerTop, pageWidth, footerHeight, 'F')
       pdf.setFont('helvetica', 'normal')
       pdf.setFontSize(7.5)
       pdf.setTextColor(255, 255, 255)
-      pdf.text('Thank you for choosing Jebal Guest House.', pageWidth / 2, pageHeight - 15.5, { align: 'center' })
-      pdf.setTextColor(242, 200, 173)
-      pdf.text(pdfText(`${hotelPhoneLine} | ${hotelEmail}`), pageWidth / 2, pageHeight - 10.5, { align: 'center' })
-      pdf.setFontSize(6.8)
-      pdf.text(pdfText(hotelAddress.replace(/\s*\n\s*/g, ', ')), pageWidth / 2, pageHeight - 5, { align: 'center', maxWidth: contentWidth })
+      pdf.text('Thank you for choosing Jebal Guest House.', pageWidth / 2, footerTop + 8.5, { align: 'center' })
+
+      return footerTop
     }
 
     const sectionTitle = (title, x, y) => {
@@ -393,8 +406,8 @@ export default function BookingBill() {
       }
     }
 
-    // Header. White paper, no warning/message strip, no extra reference strip.
-    drawPdfBox(pdf, margin, 11, contentWidth, 40, {
+    // Header: property identity and contact details are kept together at the top.
+    drawPdfBox(pdf, margin, 11, contentWidth, 52, {
       fill: [255, 255, 255],
       border: [234, 222, 211],
       radius: 2,
@@ -415,22 +428,37 @@ export default function BookingBill() {
     pdf.text('Comfortable Guest House', margin + 37, 42)
 
     pdf.setFont('helvetica', 'bold')
-    pdf.setFontSize(18)
-    pdf.text('BILL / INVOICE', pageWidth - margin - 6, 24, { align: 'right' })
+    pdf.setFontSize(16)
+    pdf.text('BILL / INVOICE', pageWidth - margin - 6, 20, { align: 'right' })
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor(71, 85, 105)
-    pdf.setFontSize(7.5)
-    pdf.text(pdfText(`Generated on: ${generatedAt}`), pageWidth - margin - 6, 31, { align: 'right' })
-    pdf.setFont('helvetica', 'bold')
-    pdf.setTextColor(90, 43, 12)
-    pdf.text(pdfText(`Booking Ref: ${bookingNumber}`), pageWidth - margin - 6, 38, { align: 'right' })
-    pdf.text(pdfText(`Bill Ref: ${billReference}`), pageWidth - margin - 6, 44, { align: 'right' })
+    pdf.setFontSize(7.2)
+    pdf.text(pdfText(hotelPhoneLine), pageWidth - margin - 6, 27, { align: 'right' })
+    pdf.text(pdfText(hotelEmail), pageWidth - margin - 6, 32, { align: 'right' })
+    pdf.setFontSize(6.8)
+    pdf.text(hotelAddressLines.map((line) => pdfText(line)), pageWidth - margin - 6, 37, {
+      align: 'right',
+      lineHeightFactor: 1.18,
+      maxWidth: 72,
+    })
+
+    // References remain unchanged, but are intentionally secondary to the contact header.
+    drawPdfBox(pdf, margin, 67, contentWidth, 11, {
+      fill: [250, 247, 244],
+      border: [234, 222, 211],
+      radius: 2,
+    })
+    pdf.setFont('helvetica', 'normal')
+    pdf.setFontSize(7)
+    pdf.setTextColor(100, 116, 139)
+    pdf.text(pdfText(`Booking Ref: ${bookingNumber}`), margin + 5, 74)
+    pdf.text(pdfText(`Bill Ref: ${billReference}`), pageWidth - margin - 5, 74, { align: 'right' })
 
     pdf.setDrawColor(122, 61, 15)
     pdf.setLineWidth(0.6)
-    pdf.line(margin, 56, pageWidth - margin, 56)
+    pdf.line(margin, 83, pageWidth - margin, 83)
 
-    let y = 64
+    let y = 89
     const cardGap = 5
     const cardWidth = (contentWidth - cardGap * 2) / 3
     const cardHeight = 58
@@ -551,12 +579,12 @@ export default function BookingBill() {
     })
 
 
-    addFooter()
+    const footerTop = addFooter()
 
     pdf.setFont('helvetica', 'normal')
     pdf.setFontSize(7)
     pdf.setTextColor(100, 116, 139)
-    pdf.text('Page 1 of 1', pageWidth - margin, pageHeight - 26, { align: 'right' })
+    pdf.text('Page 1 of 1', pageWidth - margin, footerTop - 4, { align: 'right' })
 
     return pdf.output('blob')
   }
@@ -741,7 +769,14 @@ export default function BookingBill() {
               </div>
 
               <div className="mx-auto max-w-7xl px-4 pb-14 sm:px-6 lg:px-8">
-                <div className="relative z-10 -mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.10)] sm:-mt-10">
+                {showBookingSuccess && (
+                  <div className="relative z-20 -mt-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm font-medium leading-6 text-green-900 shadow-sm sm:-mt-7 sm:px-5">
+                    <CheckCircle2 className="mt-0.5 shrink-0 text-green-700" size={20} />
+                    <p>Booking request submitted successfully. The property will contact you to confirm your reservation. A confirmation email will be sent to your email address shortly.</p>
+                  </div>
+                )}
+
+                <div className={`relative z-10 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.10)] ${showBookingSuccess ? 'mt-4' : '-mt-8 sm:-mt-10'}`}>
                   <div className="grid divide-y divide-slate-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-[1fr_1fr_1fr_1fr_1.12fr]">
                     <SummaryItem icon={Bookmark} label="Booking ID" value={bookingNumber} />
                     <SummaryItem icon={CalendarDays} label="Booking Date" value={bookingDate ? formatDateTime(bookingDate) : '-'} />

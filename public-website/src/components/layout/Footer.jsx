@@ -134,7 +134,7 @@ export default function Footer() {
               <a href={settings.google_maps_url} target="_blank" rel="noreferrer" className="whitespace-pre-line transition-colors hover:text-gold-light">{settings.address}</a>
             ) : <p className="whitespace-pre-line">{settings.address}</p>}
             <p className="mt-1">
-              {settings.phone}{settings.reception_contact_number ? ` · ${settings.reception_contact_number}` : ''}
+              {settings.phone}{settings.reception_contact_number ? ` | ${settings.reception_contact_number}` : ''}
             </p>
             <p className="mt-1">{settings.email}</p>
           </div>

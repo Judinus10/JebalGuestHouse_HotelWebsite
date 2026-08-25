@@ -194,7 +194,9 @@ export default function MultiRoomBooking() {
         return
       }
       redirectingRef.current = true
-      window.location.assign(result.bill_url)
+      const successUrl = new URL(result.bill_url, window.location.origin)
+      successUrl.searchParams.set('booking_success', '1')
+      window.location.assign(successUrl.toString())
     } catch (err) {
       if (err?.outcomeUnknown) {
         setBookingBlocked(true)

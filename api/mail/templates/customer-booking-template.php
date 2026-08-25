@@ -62,6 +62,7 @@ function booking_email_company_block(): string
                     <div><span style="color:#987b58;width:24px;display:inline-block;">' . booking_email_icon('mail') . '</span> ' . email_safe(email_contact_email()) . '</div>
                     <div><span style="color:#987b58;width:24px;display:inline-block;">' . booking_email_icon('phone') . '</span> ' . email_safe(email_contact_phone()) . '</div>
                     <div><span style="color:#987b58;width:24px;display:inline-block;">' . booking_email_icon('web') . '</span> ' . email_safe(email_contact_website()) . '</div>
+                    <div style="margin-top:5px;line-height:1.5;"><span style="color:#987b58;width:24px;display:inline-block;vertical-align:top;">' . booking_email_icon('location') . '</span> <span style="display:inline-block;">' . nl2br(email_safe(email_contact_address())) . '</span></div>
                 </td>
             </tr>
         </table>

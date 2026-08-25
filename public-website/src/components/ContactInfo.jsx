@@ -56,7 +56,7 @@ export default function ContactInfo({ settings, compact = false }) {
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">
                 {label}
               </p>
-              <p className="mt-1 text-sm font-semibold text-charcoal">{value}</p>
+              <p className="mt-1 whitespace-pre-line text-sm font-semibold text-charcoal">{value}</p>
             </div>
           </div>
         )
