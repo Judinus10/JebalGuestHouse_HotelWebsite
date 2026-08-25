@@ -13,6 +13,7 @@ import { useToast } from '../components/ui/ToastProvider'
 const PAYMENT_STATUS_API_URL = `${API_BASE_URL}/payments/status.php`
 const PAYMENT_INIT_API_URL = `${API_BASE_URL}/payments/create-checkout-session.php`
 const CONTACT_SETTINGS_API_URL = `${API_BASE_URL}/settings/get-contact.php`
+const EMAIL_ICON_BASE_URL = `${API_BASE_URL}/mail/assets/email-icons`
 
 const FALLBACK_HOTEL_NAME = 'Jebal Guest House'
 const FALLBACK_HOTEL_PHONE = '+31 6 28324956'
@@ -36,6 +37,27 @@ function formatDateTime(value) {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function formatDateOnly(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+}
+
+function formatTimeOnly(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleTimeString(undefined, {
     hour: '2-digit',
     minute: '2-digit',
   })
@@ -194,7 +216,12 @@ export default function BookingBill() {
   const bookingId = searchParams.get('booking_id') || ''
   const orderId = searchParams.get('order_id') || ''
   const token = searchParams.get('token') || ''
-  const [showBookingSuccess] = useState(() => searchParams.get('booking_success') === '1')
+  const bookingSuccessKey = `jebal_booking_success:${bookingId || orderId}`
+  const [showBookingSuccess] = useState(() => {
+    if (searchParams.get('booking_success') === '1') return true
+    if (!bookingId && !orderId) return false
+    return window.sessionStorage.getItem(bookingSuccessKey) === '1'
+  })
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -210,12 +237,13 @@ export default function BookingBill() {
   }, [error, toast])
 
   useEffect(() => {
-    if (!showBookingSuccess) return
+    if (!showBookingSuccess || !bill) return
 
     const cleanUrl = new URL(window.location.href)
     cleanUrl.searchParams.delete('booking_success')
     window.history.replaceState(window.history.state, '', `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`)
-  }, [showBookingSuccess])
+    window.sessionStorage.removeItem(bookingSuccessKey)
+  }, [bill, bookingSuccessKey, showBookingSuccess])
 
   useEffect(() => {
     if (bill?.payment_status === 'Failed' || bill?.payment_status === 'Cancelled') {
@@ -342,7 +370,12 @@ export default function BookingBill() {
     const pageHeight = pdf.internal.pageSize.getHeight()
     const margin = 14
     const contentWidth = pageWidth - margin * 2
-    const logoBase64 = await imageToBase64(logo)
+    const [logoBase64, phoneIconBase64, mailIconBase64, locationIconBase64] = await Promise.all([
+      imageToBase64(logo),
+      imageToBase64(`${EMAIL_ICON_BASE_URL}/phone.png`),
+      imageToBase64(`${EMAIL_ICON_BASE_URL}/mail.png`),
+      imageToBase64(`${EMAIL_ICON_BASE_URL}/location.png`),
+    ])
     const billReference = getBillReference(bill, bookingNumber)
     const paymentReference = getPaymentReference(bill, paymentHistory)
     const currentPayment = paymentHistory[paymentHistory.length - 1] || {}
@@ -406,6 +439,11 @@ export default function BookingBill() {
       }
     }
 
+    const addContactIcon = (iconData, x, y, size = 4.5) => {
+      if (!iconData) return
+      pdf.addImage(iconData, 'PNG', x, y, size, size)
+    }
+
     // Header: property identity and contact details are kept together at the top.
     drawPdfBox(pdf, margin, 11, contentWidth, 52, {
       fill: [255, 255, 255],
@@ -427,38 +465,47 @@ export default function BookingBill() {
     pdf.setFontSize(8)
     pdf.text('Comfortable Guest House', margin + 37, 42)
 
+    // Keep the references below the property branding as secondary information.
+    pdf.setFont('helvetica', 'normal')
+    pdf.setTextColor(100, 116, 139)
+    pdf.setFontSize(7)
+    pdf.text(pdfText(`Booking Ref: ${bookingNumber}`), margin + 6, 51)
+    pdf.text(pdfText(`Bill Ref: ${billReference}`), margin + 6, 57)
+
     pdf.setFont('helvetica', 'bold')
     pdf.setFontSize(16)
     pdf.text('BILL / INVOICE', pageWidth - margin - 6, 20, { align: 'right' })
     pdf.setFont('helvetica', 'normal')
     pdf.setTextColor(71, 85, 105)
-    pdf.setFontSize(7.2)
-    pdf.text(pdfText(hotelPhoneLine), pageWidth - margin - 6, 27, { align: 'right' })
-    pdf.text(pdfText(hotelEmail), pageWidth - margin - 6, 32, { align: 'right' })
     pdf.setFontSize(6.8)
-    pdf.text(hotelAddressLines.map((line) => pdfText(line)), pageWidth - margin - 6, 37, {
+    const pdfAddressLines = hotelAddressLines.map((line) => pdfText(line))
+    const addressRightX = pageWidth - margin - 6
+    const widestAddressLine = Math.max(0, ...pdfAddressLines.map((line) => pdf.getTextWidth(line)))
+    addContactIcon(locationIconBase64, addressRightX - widestAddressLine - 4.4, 26.2, 3.2)
+    pdf.text(pdfAddressLines, addressRightX, 29, {
       align: 'right',
       lineHeightFactor: 1.18,
-      maxWidth: 72,
+      maxWidth: 66,
     })
 
-    // References remain unchanged, but are intentionally secondary to the contact header.
-    drawPdfBox(pdf, margin, 67, contentWidth, 11, {
-      fill: [250, 247, 244],
-      border: [234, 222, 211],
-      radius: 2,
-    })
+    // Phone and email sit directly below the address on the right.
+    const phoneText = pdfText(hotelPhoneLine)
+    const emailText = pdfText(hotelEmail)
+    const phoneTextWidth = pdf.getTextWidth(phoneText)
+    const emailTextWidth = pdf.getTextWidth(emailText)
+    addContactIcon(phoneIconBase64, addressRightX - phoneTextWidth - 4.4, 46.3, 3.2)
+    addContactIcon(mailIconBase64, addressRightX - emailTextWidth - 4.4, 52.4, 3.2)
     pdf.setFont('helvetica', 'normal')
-    pdf.setFontSize(7)
-    pdf.setTextColor(100, 116, 139)
-    pdf.text(pdfText(`Booking Ref: ${bookingNumber}`), margin + 5, 74)
-    pdf.text(pdfText(`Bill Ref: ${billReference}`), pageWidth - margin - 5, 74, { align: 'right' })
+    pdf.setFontSize(6.8)
+    pdf.setTextColor(71, 85, 105)
+    pdf.text(phoneText, addressRightX, 49, { align: 'right' })
+    pdf.text(emailText, addressRightX, 55.2, { align: 'right' })
 
     pdf.setDrawColor(122, 61, 15)
     pdf.setLineWidth(0.6)
-    pdf.line(margin, 83, pageWidth - margin, 83)
+    pdf.line(margin, 68, pageWidth - margin, 68)
 
-    let y = 89
+    let y = 74
     const cardGap = 5
     const cardWidth = (contentWidth - cardGap * 2) / 3
     const cardHeight = 58
@@ -686,7 +733,7 @@ export default function BookingBill() {
     </div>
   )
 
-  const SummaryItem = ({ icon: Icon, label, value, badge }) => (
+  const SummaryItem = ({ icon: Icon, label, value, secondaryValue, badge }) => (
     <div className="flex min-w-0 items-center gap-3 px-4 py-4 sm:px-5">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-700">
         <Icon size={17} strokeWidth={1.8} />
@@ -696,7 +743,10 @@ export default function BookingBill() {
         {badge ? (
           <span className={`mt-1 inline-flex rounded-full border px-2.5 py-0.5 text-xs font-bold ${statusBadgeClass(value)}`}>{value}</span>
         ) : (
-          <p className="mt-1 truncate text-sm font-semibold text-slate-950">{value || '-'}</p>
+          <div className="mt-1 text-sm font-semibold leading-5 text-slate-950">
+            <p>{value || '-'}</p>
+            {secondaryValue && <p className="text-xs font-medium text-slate-600">{secondaryValue}</p>}
+          </div>
         )}
       </div>
     </div>
@@ -779,7 +829,12 @@ export default function BookingBill() {
                 <div className={`relative z-10 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_16px_45px_rgba(15,23,42,0.10)] ${showBookingSuccess ? 'mt-4' : '-mt-8 sm:-mt-10'}`}>
                   <div className="grid divide-y divide-slate-200 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-[1fr_1fr_1fr_1fr_1.12fr]">
                     <SummaryItem icon={Bookmark} label="Booking ID" value={bookingNumber} />
-                    <SummaryItem icon={CalendarDays} label="Booking Date" value={bookingDate ? formatDateTime(bookingDate) : '-'} />
+                    <SummaryItem
+                      icon={CalendarDays}
+                      label="Booking Date"
+                      value={bookingDate ? formatDateOnly(bookingDate) : '-'}
+                      secondaryValue={bookingDate ? formatTimeOnly(bookingDate) : ''}
+                    />
                     <SummaryItem icon={FileText} label="Payment Method" value={bill.payment_method || 'PayHere'} />
                     <SummaryItem icon={Bookmark} label="Payment Status" value={displayPaymentStatus} badge />
                     <div className="flex flex-col items-center justify-center bg-slate-950 px-5 py-5 text-center text-white sm:col-span-2 lg:col-span-1">

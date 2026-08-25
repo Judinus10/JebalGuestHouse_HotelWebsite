@@ -379,6 +379,10 @@ export default function RoomDetails() {
         redirectingRef.current = true
         const successUrl = new URL(billUrl, window.location.origin)
         successUrl.searchParams.set('booking_success', '1')
+        const successBookingKey = successUrl.searchParams.get('booking_id') || successUrl.searchParams.get('order_id')
+        if (successBookingKey) {
+          window.sessionStorage.setItem(`jebal_booking_success:${successBookingKey}`, '1')
+        }
         window.location.assign(successUrl.toString())
         return
       }
