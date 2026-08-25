@@ -917,3 +917,24 @@ INSERT INTO external_portal_links (portal_key, title, description, portal_url, c
 ('google-search-console', 'Google Search Console', 'Review Google search visibility, indexing and website issues.', 'https://search.google.com/search-console/', 'analytics', 1, 1),
 ('cpanel', 'cPanel', 'Open the hosting control panel. Change this URL if your hosting provider uses a different address.', 'https://jebalguesthouse.com:2083/', 'hosting', 1, 1)
 ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description);
+
+CREATE TABLE IF NOT EXISTS mail_provider_settings (
+    provider VARCHAR(40) NOT NULL PRIMARY KEY,
+    sender_email VARCHAR(190) NULL,
+    sender_name VARCHAR(190) NOT NULL DEFAULT 'Jebal Guest House',
+    smtp_host VARCHAR(190) NULL,
+    smtp_port SMALLINT UNSIGNED NULL,
+    smtp_encryption VARCHAR(20) NULL,
+    smtp_username VARCHAR(190) NULL,
+    encrypted_password TEXT NULL,
+    oauth_client_id VARCHAR(255) NULL,
+    encrypted_client_secret TEXT NULL,
+    encrypted_refresh_token TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 0,
+    connection_status VARCHAR(20) NOT NULL DEFAULT 'untested',
+    last_tested_at DATETIME NULL,
+    last_test_message VARCHAR(500) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_mail_provider_active (is_active, connection_status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

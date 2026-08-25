@@ -22,6 +22,7 @@ require_once __DIR__ . '/templates/admin-notification-template.php';
 require_once __DIR__ . '/templates/customer-booking-template.php';
 require_once __DIR__ . '/templates/admin-booking-template.php';
 require_once __DIR__ . '/../mail-settings/_mail_settings_helpers.php';
+require_once __DIR__ . '/../mail-settings/_provider_helpers.php';
 
 
 function email_constant_value(string $name, mixed $default = ''): mixed
@@ -82,6 +83,13 @@ function email_sender_for_type(string $emailType, string $relatedType = ''): arr
 function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null, ?string $fromEmailOverride = null, ?string $fromNameOverride = null, ?string $mailFunction = null): bool
 {
     try {
+        try {
+            $providerResult = send_via_active_provider(get_db_connection(), $to, $subject, $htmlBody);
+            if ($providerResult !== null) return $providerResult;
+        } catch (Throwable $providerError) {
+            error_log('Active mail provider failed: ' . $providerError->getMessage());
+            throw $providerError;
+        }
         if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
             error_log('PHPMailer class not found. Check vendor/autoload.php path.');
             return false;

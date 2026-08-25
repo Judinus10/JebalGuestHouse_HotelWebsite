@@ -23,3 +23,5 @@ export const testMailAccount = (id, recipientEmail) => post('test-account.php', 
 export const deleteMailAccount = (id) => post('delete-account.php', { id })
 export const toggleMailAccount = (id, enabled) => post('toggle-account.php', { id, enabled })
 export const saveMailRoutes = (routes) => post('save-routes.php', { routes })
+export const saveMailProvider = (provider) => post('save-provider.php', provider)
+export const testMailProvider = (provider, recipientEmail) => post('test-provider.php', { provider, recipient_email: recipientEmail })
