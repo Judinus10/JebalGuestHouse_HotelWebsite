@@ -20,6 +20,7 @@ try {
     $secure = strtolower(clean_string($data['smtp_encryption'] ?? 'tls', 20));
     $username = clean_string($data['smtp_username'] ?? $email, 190) ?: $email;
     $password = trim((string) ($data['password'] ?? ''));
+    $tenantId = clean_string($data['tenant_id'] ?? '', 255);
     $clientId = clean_string($data['oauth_client_id'] ?? '', 255);
     $clientSecret = trim((string) ($data['client_secret'] ?? ''));
 
@@ -30,17 +31,17 @@ try {
     $oldClientSecret = (string) ($existing['encrypted_client_secret'] ?? '');
     if ($password === '' && $oldPassword === '' && !($provider === 'microsoft_graph' && $clientId !== '' && ($clientSecret !== '' || $oldClientSecret !== ''))) json_response(false, 'Enter the mailbox or application password.', 422, ['field'=>'password']);
     if ($provider === 'microsoft_graph' && $clientId !== '' && $clientSecret === '' && $oldClientSecret === '') json_response(false, 'Enter the Azure client secret.', 422, ['field'=>'client_secret']);
+    if ($provider === 'microsoft_graph' && $clientId !== '' && $tenantId === '') json_response(false, 'Enter the Microsoft Tenant ID.', 422, ['field'=>'tenant_id']);
 
     $encryptedPassword = $password !== '' ? encrypt_mail_secret($password) : $oldPassword;
     $encryptedClientSecret = $clientSecret !== '' ? encrypt_mail_secret($clientSecret) : $oldClientSecret;
-    $sql = "INSERT INTO mail_provider_settings (provider,sender_email,sender_name,smtp_host,smtp_port,smtp_encryption,smtp_username,encrypted_password,oauth_client_id,encrypted_client_secret,connection_status,last_test_message)
-            VALUES (:provider,:email,:name,:host,:port,:secure,:username,:password,:client_id,:client_secret,'untested','Connection must be tested after saving.')
-            ON DUPLICATE KEY UPDATE sender_email=VALUES(sender_email),sender_name=VALUES(sender_name),smtp_host=VALUES(smtp_host),smtp_port=VALUES(smtp_port),smtp_encryption=VALUES(smtp_encryption),smtp_username=VALUES(smtp_username),encrypted_password=VALUES(encrypted_password),oauth_client_id=VALUES(oauth_client_id),encrypted_client_secret=VALUES(encrypted_client_secret),connection_status='untested',is_active=0,last_test_message='Connection must be tested after saving.'";
-    $pdo->prepare($sql)->execute([':provider'=>$provider,':email'=>$email,':name'=>$name,':host'=>$host,':port'=>$port,':secure'=>$secure,':username'=>$username,':password'=>$encryptedPassword,':client_id'=>$clientId,':client_secret'=>$encryptedClientSecret]);
+    $sql = "INSERT INTO mail_provider_settings (provider,sender_email,sender_name,smtp_host,smtp_port,smtp_encryption,smtp_username,encrypted_password,tenant_id,oauth_client_id,encrypted_client_secret,connection_status,last_test_message)
+            VALUES (:provider,:email,:name,:host,:port,:secure,:username,:password,:tenant_id,:client_id,:client_secret,'untested','Connection must be tested after saving.')
+            ON DUPLICATE KEY UPDATE sender_email=VALUES(sender_email),sender_name=VALUES(sender_name),smtp_host=VALUES(smtp_host),smtp_port=VALUES(smtp_port),smtp_encryption=VALUES(smtp_encryption),smtp_username=VALUES(smtp_username),encrypted_password=VALUES(encrypted_password),tenant_id=VALUES(tenant_id),oauth_client_id=VALUES(oauth_client_id),encrypted_client_secret=VALUES(encrypted_client_secret),connection_status='untested',is_active=0,last_test_message='Connection must be tested after saving.'";
+    $pdo->prepare($sql)->execute([':provider'=>$provider,':email'=>$email,':name'=>$name,':host'=>$host,':port'=>$port,':secure'=>$secure,':username'=>$username,':password'=>$encryptedPassword,':tenant_id'=>$tenantId,':client_id'=>$clientId,':client_secret'=>$encryptedClientSecret]);
     mail_settings_audit($pdo, $admin, 'saved', 'mail_provider', $provider, 'Saved ' . $provider . ' configuration. Secret values were not logged.');
     json_response(true, 'Mail settings saved. Run the connection test to activate this provider.', 200, ['data'=>public_provider_setting(provider_setting($pdo,$provider),$provider)]);
 } catch (Throwable $e) {
     error_log('Provider save failed: ' . $e->getMessage());
     json_response(false, str_contains(strtolower($e->getMessage()), 'encryption') ? $e->getMessage() : 'The mail settings could not be saved. Check the fields and try again.', 500);
 }
-

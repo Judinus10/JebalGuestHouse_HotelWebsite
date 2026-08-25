@@ -927,6 +927,7 @@ CREATE TABLE IF NOT EXISTS mail_provider_settings (
     smtp_encryption VARCHAR(20) NULL,
     smtp_username VARCHAR(190) NULL,
     encrypted_password TEXT NULL,
+    tenant_id VARCHAR(255) NULL,
     oauth_client_id VARCHAR(255) NULL,
     encrypted_client_secret TEXT NULL,
     encrypted_refresh_token TEXT NULL,

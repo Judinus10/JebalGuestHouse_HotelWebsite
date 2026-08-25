@@ -23,6 +23,7 @@ const emptyAccount = {
 
 const emptyGraphAccount = {
   app_password: '',
+  tenant_id: '',
   client_id: '',
   client_secret: '',
   email_address: '',
@@ -59,8 +60,8 @@ function ConnectionState({ config }) {
 function MicrosoftGraphPanel({ config, busy, onSave, onTest }) {
   const [form, setForm] = useState(emptyGraphAccount)
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
-  useEffect(() => setForm((current) => ({ ...current, client_id: config?.oauth_client_id || '', email_address: config?.sender_email || '', app_password: '', client_secret: '' })), [config])
-  const save = () => onSave({ provider: 'microsoft_graph', sender_email: form.email_address, sender_name: 'Jebal Guest House', smtp_username: form.email_address, password: form.app_password, oauth_client_id: form.client_id, client_secret: form.client_secret })
+  useEffect(() => setForm((current) => ({ ...current, tenant_id: config?.tenant_id || '', client_id: config?.oauth_client_id || '', email_address: config?.sender_email || '', app_password: '', client_secret: '' })), [config])
+  const save = () => onSave({ provider: 'microsoft_graph', sender_email: form.email_address, sender_name: 'Jebal Guest House', smtp_username: form.email_address, password: form.app_password, tenant_id: form.tenant_id, oauth_client_id: form.client_id, client_secret: form.client_secret })
 
   return (
     <div className="rounded-2xl border border-violet-200 bg-white shadow-sm">
@@ -74,9 +75,10 @@ function MicrosoftGraphPanel({ config, busy, onSave, onTest }) {
 
       <div className="grid gap-5 p-5 md:grid-cols-2">
         <div className="space-y-2 md:col-span-2"><Label>App Password</Label><Input type="password" autoComplete="new-password" value={form.app_password} onChange={(e) => update('app_password', e.target.value)} placeholder="Exchange account password" /></div>
+        <div className="space-y-2"><Label>Microsoft Tenant ID</Label><Input value={form.tenant_id} onChange={(e) => update('tenant_id', e.target.value)} placeholder="Microsoft Entra tenant UUID" /></div>
         <div className="space-y-2"><Label>Azure Application Client ID</Label><Input value={form.client_id} onChange={(e) => update('client_id', e.target.value)} placeholder="Azure App UUID" /></div>
         <div className="space-y-2"><Label>Azure Client Secret</Label><div className="relative"><LockKeyhole className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><Input className="pl-9" type="password" autoComplete="new-password" value={form.client_secret} onChange={(e) => update('client_secret', e.target.value)} placeholder="Enter Azure client secret" /></div></div>
-        <div className="space-y-2 md:col-span-2"><Label>Outlook Sender Address</Label><Input type="email" value={form.email_address} onChange={(e) => update('email_address', e.target.value)} placeholder="e.g. support@jebalguesthouse.com" /></div>
+        <div className="space-y-2"><Label>Outlook Sender Address</Label><Input type="email" value={form.email_address} onChange={(e) => update('email_address', e.target.value)} placeholder="e.g. support@jebalguesthouse.com" /></div>
       </div>
 
       <div className="flex flex-col gap-3 border-t bg-slate-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

@@ -17,6 +17,7 @@ function ensure_mail_provider_table(PDO $pdo): void
         smtp_encryption VARCHAR(20) NULL,
         smtp_username VARCHAR(190) NULL,
         encrypted_password TEXT NULL,
+        tenant_id VARCHAR(255) NULL,
         oauth_client_id VARCHAR(255) NULL,
         encrypted_client_secret TEXT NULL,
         encrypted_refresh_token TEXT NULL,
@@ -28,6 +29,13 @@ function ensure_mail_provider_table(PDO $pdo): void
         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         KEY idx_mail_provider_active (is_active, connection_status)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    // Upgrade installations that created this table before Tenant ID became
+    // editable from the admin panel.
+    $tenantColumn = $pdo->query("SHOW COLUMNS FROM mail_provider_settings LIKE 'tenant_id'")->fetch(PDO::FETCH_ASSOC);
+    if (!$tenantColumn) {
+        $pdo->exec("ALTER TABLE mail_provider_settings ADD COLUMN tenant_id VARCHAR(255) NULL AFTER encrypted_password");
+    }
 }
 
 function provider_setting(PDO $pdo, string $provider): ?array
@@ -49,6 +57,7 @@ function public_provider_setting(?array $row, string $provider): array
         'smtp_port' => (int) ($row['smtp_port'] ?? 587),
         'smtp_encryption' => (string) ($row['smtp_encryption'] ?? 'tls'),
         'smtp_username' => (string) ($row['smtp_username'] ?? ''),
+        'tenant_id' => (string) ($row['tenant_id'] ?? ''),
         'oauth_client_id' => (string) ($row['oauth_client_id'] ?? ''),
         'has_password' => !empty($row['encrypted_password']),
         'has_client_secret' => !empty($row['encrypted_client_secret']),
@@ -82,8 +91,8 @@ function provider_http_request(string $url, array $options): array
 
 function microsoft_graph_access_token(array $config): string
 {
-    $tenant = defined('MICROSOFT_TENANT_ID') ? trim((string) MICROSOFT_TENANT_ID) : '';
-    if ($tenant === '') throw new RuntimeException('MICROSOFT_TENANT_ID is not configured on the server.');
+    $tenant = trim((string) ($config['tenant_id'] ?? ''));
+    if ($tenant === '') throw new RuntimeException('Enter the Microsoft Tenant ID in the Office 365 settings.');
     $clientId = trim((string) ($config['oauth_client_id'] ?? ''));
     $secret = !empty($config['encrypted_client_secret']) ? decrypt_mail_secret((string) $config['encrypted_client_secret']) : '';
     if ($clientId === '' || $secret === '') throw new RuntimeException('Enter the Azure application client ID and client secret.');
@@ -145,4 +154,3 @@ function send_via_active_provider(PDO $pdo, string $to, string $subject, string 
     }
     return send_via_provider_smtp($config, $to, $subject, $html);
 }
-
