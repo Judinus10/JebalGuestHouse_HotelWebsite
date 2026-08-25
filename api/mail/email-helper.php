@@ -21,6 +21,7 @@ require_once __DIR__ . '/templates/admin-contact-template.php';
 require_once __DIR__ . '/templates/admin-notification-template.php';
 require_once __DIR__ . '/templates/customer-booking-template.php';
 require_once __DIR__ . '/templates/admin-booking-template.php';
+require_once __DIR__ . '/../mail-settings/_mail_settings_helpers.php';
 
 
 function email_constant_value(string $name, mixed $default = ''): mixed
@@ -78,7 +79,7 @@ function email_sender_for_type(string $emailType, string $relatedType = ''): arr
     return [email_env_address('FROM_EMAIL'), email_env_name('FROM_NAME')];
 }
 
-function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null, ?string $fromEmailOverride = null, ?string $fromNameOverride = null): bool
+function send_html_email(string $to, string $subject, string $htmlBody, ?string $replyTo = null, ?string $fromEmailOverride = null, ?string $fromNameOverride = null, ?string $mailFunction = null): bool
 {
     try {
         if (!class_exists(\PHPMailer\PHPMailer\PHPMailer::class)) {
@@ -95,7 +96,21 @@ function send_html_email(string $to, string $subject, string $htmlBody, ?string 
             ? trim($fromNameOverride)
             : (defined('FROM_NAME') ? trim((string) FROM_NAME) : 'Jebal Guest House');
 
-        $smtpProfile = email_smtp_profile_for_from($fromEmail);
+        $smtpProfile = null;
+        if ($mailFunction !== null && isset(MAIL_FUNCTIONS[$mailFunction])) {
+            try {
+                $smtpProfile = database_mail_profile(get_db_connection(), $mailFunction);
+            } catch (Throwable $databaseMailError) {
+                error_log('Database mail profile unavailable for ' . $mailFunction . ': ' . $databaseMailError->getMessage());
+            }
+        }
+
+        if ($smtpProfile !== null) {
+            $fromEmail = (string) $smtpProfile['from_email'];
+            $fromName = (string) $smtpProfile['from_name'];
+        } else {
+            $smtpProfile = email_smtp_profile_for_from($fromEmail);
+        }
         $smtpHost = $smtpProfile['host'];
         $smtpUser = $smtpProfile['user'];
         $smtpPass = $smtpProfile['pass'];
@@ -370,7 +385,8 @@ function send_tracked_email(
         }
     }
 
-    $sent = send_html_email($to, $subject, $htmlBody, $replyTo, $fromEmail, $fromName);
+    $mailFunction = mail_function_key_for_type($emailType, $relatedType);
+    $sent = send_html_email($to, $subject, $htmlBody, $replyTo, $fromEmail, $fromName, $mailFunction);
 
     track_email(
         $pdo,
@@ -2049,6 +2065,26 @@ function enqueue_email(
 ): bool {
     ensure_email_queue_table($pdo);
 
+    $mailFunction = mail_function_key_for_type($emailType, (string) $relatedType);
+    try {
+        $route = mail_route($pdo, $mailFunction);
+        if ($route !== null) {
+            $isHotelNotification = str_starts_with(strtolower($emailType), 'admin_')
+                || strtolower((string) $relatedType) === 'admin_stay_reminder';
+            if (!(bool) $route['is_enabled']) return false;
+            if ($isHotelNotification && !(bool) $route['send_hotel_copy']) return false;
+            if (!$isHotelNotification && !(bool) $route['send_customer_copy']) return false;
+            if ($isHotelNotification && filter_var((string) ($route['hotel_recipient_email'] ?? ''), FILTER_VALIDATE_EMAIL)) {
+                $to = (string) $route['hotel_recipient_email'];
+            }
+            if (filter_var((string) ($route['reply_to_email'] ?? ''), FILTER_VALIDATE_EMAIL)) {
+                $replyTo = (string) $route['reply_to_email'];
+            }
+        }
+    } catch (Throwable $routeError) {
+        error_log('Mail routing fallback used for ' . $emailType . ': ' . $routeError->getMessage());
+    }
+
     $to = trim($to);
     $replyTo = $replyTo !== null ? trim($replyTo) : null;
     $fromEmail = $fromEmail !== null ? trim($fromEmail) : null;
@@ -2295,7 +2331,8 @@ function process_email_queue(PDO $pdo, int $limit = 10): array
 
         try {
             $bodyHtml = email_queue_body_from_job($job);
-            $ok = send_html_email($to, $subject, $bodyHtml, $replyTo, $fromEmail, $fromName);
+            $mailFunction = mail_function_key_for_type($emailType, $relatedType);
+            $ok = send_html_email($to, $subject, $bodyHtml, $replyTo, $fromEmail, $fromName, $mailFunction);
 
             if ($ok) {
                 $update = $pdo->prepare(

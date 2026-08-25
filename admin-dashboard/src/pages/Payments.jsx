@@ -533,7 +533,9 @@ export default function Payments() {
       const data = await fetchPayments()
       setPayments(data)
     } catch (err) {
-      setError(err.message || 'Unable to load payments.')
+      const message = err.message || 'Unable to load payments.'
+      setError(message)
+      showToast(message, 'error')
     } finally {
       setLoading(false)
     }
@@ -626,6 +628,8 @@ export default function Payments() {
     )
   }, [payments])
 
+  const paymentDataUnavailable = Boolean(error) && payments.length === 0
+
   const handleResetFilters = () => {
     setSearchTerm('')
     setStatusFilter('all')
@@ -699,9 +703,9 @@ export default function Payments() {
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <StatCard title="Total Revenue" value={formatCurrency(summary.totalPaid)} description="Successfully collected" icon={TrendingUp} />
-        <StatCard title="Pending Payments" value={formatCurrency(summary.pending)} description="Awaiting confirmation" icon={WalletCards} />
-        <StatCard title="Refunded Amount" value={formatCurrency(summary.refunded)} description="Returned to guests" icon={Banknote} />
+        <StatCard title="Total Revenue" value={paymentDataUnavailable ? '—' : formatCurrency(summary.totalPaid)} description={paymentDataUnavailable ? 'Payment data unavailable' : 'Successfully collected'} icon={TrendingUp} />
+        <StatCard title="Pending Payments" value={paymentDataUnavailable ? '—' : formatCurrency(summary.pending)} description={paymentDataUnavailable ? 'Payment data unavailable' : 'Awaiting confirmation'} icon={WalletCards} />
+        <StatCard title="Refunded Amount" value={paymentDataUnavailable ? '—' : formatCurrency(summary.refunded)} description={paymentDataUnavailable ? 'Payment data unavailable' : 'Returned to guests'} icon={Banknote} />
       </div>
 
       <Card>
@@ -779,10 +783,6 @@ export default function Payments() {
 
           </div>
 
-          {error ? (
-            <div className="fixed right-5 top-5 z-[70] max-w-sm rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-800 shadow-xl">{error}</div>
-          ) : null}
-
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead>
@@ -799,6 +799,14 @@ export default function Payments() {
               <tbody>
                 {loading ? (
                   <tr><td colSpan="7" className="px-3 py-8 text-center text-text-secondary">Loading payments...</td></tr>
+                ) : error && payments.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-3 py-10 text-center">
+                      <p className="font-semibold text-red-700">Payment data could not be loaded.</p>
+                      <p className="mt-1 text-sm text-text-secondary">{error}</p>
+                      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={loadPayments}>Try Again</Button>
+                    </td>
+                  </tr>
                 ) : filteredPayments.length === 0 ? (
                   <tr><td colSpan="7" className="px-3 py-8 text-center text-text-secondary">No payments found.</td></tr>
                 ) : (

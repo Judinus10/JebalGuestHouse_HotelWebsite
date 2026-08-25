@@ -805,3 +805,115 @@ FROM (
     UNION ALL SELECT 'Nearby Shop', 0.00, 'km'
 ) seed
 WHERE NOT EXISTS (SELECT 1 FROM nearby_places LIMIT 1);
+
+-- Step 1: database-managed Office 365 mail accounts and routing.
+-- Safe to run more than once on MySQL 8 / MariaDB 10.5+.
+
+CREATE TABLE IF NOT EXISTS mail_accounts (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    account_name VARCHAR(120) NOT NULL,
+    provider VARCHAR(30) NOT NULL DEFAULT 'office365',
+    email_address VARCHAR(190) NOT NULL,
+    smtp_username VARCHAR(190) NOT NULL,
+    encrypted_password TEXT NOT NULL,
+    from_name VARCHAR(190) NOT NULL,
+    smtp_host VARCHAR(190) NOT NULL DEFAULT 'smtp.office365.com',
+    smtp_port SMALLINT UNSIGNED NOT NULL DEFAULT 587,
+    smtp_encryption VARCHAR(20) NOT NULL DEFAULT 'tls',
+    is_enabled TINYINT(1) NOT NULL DEFAULT 0,
+    connection_status VARCHAR(20) NOT NULL DEFAULT 'untested',
+    last_tested_at DATETIME NULL,
+    last_test_message VARCHAR(500) NULL,
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_mail_accounts_email (email_address),
+    KEY idx_mail_accounts_enabled (is_enabled),
+    CONSTRAINT fk_mail_accounts_created_by FOREIGN KEY (created_by) REFERENCES admin_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mail_account_functions (
+    mail_account_id INT UNSIGNED NOT NULL,
+    function_key VARCHAR(60) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (mail_account_id, function_key),
+    KEY idx_mail_account_functions_key (function_key),
+    CONSTRAINT fk_mail_account_functions_account FOREIGN KEY (mail_account_id) REFERENCES mail_accounts(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mail_routing_rules (
+    function_key VARCHAR(60) NOT NULL,
+    sender_account_id INT UNSIGNED NULL,
+    hotel_recipient_email VARCHAR(190) NULL,
+    reply_to_email VARCHAR(190) NULL,
+    send_customer_copy TINYINT(1) NOT NULL DEFAULT 1,
+    send_hotel_copy TINYINT(1) NOT NULL DEFAULT 1,
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (function_key),
+    KEY idx_mail_routing_sender (sender_account_id),
+    CONSTRAINT fk_mail_routing_sender FOREIGN KEY (sender_account_id) REFERENCES mail_accounts(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS mail_settings_audit_logs (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    admin_user_id INT UNSIGNED NULL,
+    action VARCHAR(80) NOT NULL,
+    entity_type VARCHAR(40) NOT NULL,
+    entity_id VARCHAR(80) NULL,
+    change_summary VARCHAR(500) NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_mail_audit_created (created_at),
+    CONSTRAINT fk_mail_audit_admin FOREIGN KEY (admin_user_id) REFERENCES admin_users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO mail_routing_rules
+    (function_key, hotel_recipient_email, send_customer_copy, send_hotel_copy, is_enabled)
+VALUES
+    ('booking', 'bookings@jebalguesthouse.com', 1, 1, 1),
+    ('payment', 'bookings@jebalguesthouse.com', 1, 1, 1),
+    ('contact', 'info@jebalguesthouse.com', 1, 1, 1),
+    ('contact_auto_reply', NULL, 1, 0, 1),
+    ('stay_reminder', 'admin@jebalguesthouse.com', 1, 0, 1),
+    ('admin_alert', 'admin@jebalguesthouse.com', 0, 1, 1),
+    ('test_email', 'admin@jebalguesthouse.com', 0, 1, 1)
+ON DUPLICATE KEY UPDATE function_key = VALUES(function_key);
+
+-- Promote the first active administrator so the protected mail settings page
+-- is usable on installations that previously had only the legacy `admin` role.
+UPDATE admin_users
+SET role = 'super_admin'
+WHERE id = (
+    SELECT first_admin_id FROM (
+        SELECT MIN(id) AS first_admin_id FROM admin_users WHERE is_active = 1
+    ) AS active_admin
+);
+
+CREATE TABLE IF NOT EXISTS external_portal_links (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    portal_key VARCHAR(80) NOT NULL,
+    title VARCHAR(120) NOT NULL,
+    description VARCHAR(500) NULL,
+    portal_url VARCHAR(1000) NOT NULL,
+    category VARCHAR(30) NOT NULL DEFAULT 'other',
+    is_enabled TINYINT(1) NOT NULL DEFAULT 1,
+    is_system TINYINT(1) NOT NULL DEFAULT 0,
+    created_by INT UNSIGNED NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_external_portal_key (portal_key),
+    KEY idx_external_portal_enabled (is_enabled, title)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO external_portal_links (portal_key, title, description, portal_url, category, is_enabled, is_system) VALUES
+('google-business-profile', 'Google Business Profile', 'Manage the hotel profile, opening hours, photos and reviews shown on Google.', 'https://business.google.com/', 'business', 1, 1),
+('booking-com-extranet', 'Booking.com Extranet', 'Manage Booking.com property information, availability and reservations.', 'https://admin.booking.com/', 'booking', 1, 1),
+('microsoft-365-admin', 'Microsoft 365 Admin', 'Manage Office 365 users, licenses, domains and organization settings.', 'https://admin.microsoft.com/', 'email', 1, 1),
+('outlook-webmail', 'Outlook Webmail', 'Open the Office 365 mailbox in Outlook on the web.', 'https://outlook.office.com/mail/', 'email', 1, 1),
+('google-analytics', 'Google Analytics', 'Review website traffic and visitor reports.', 'https://analytics.google.com/', 'analytics', 1, 1),
+('google-search-console', 'Google Search Console', 'Review Google search visibility, indexing and website issues.', 'https://search.google.com/search-console/', 'analytics', 1, 1),
+('cpanel', 'cPanel', 'Open the hosting control panel. Change this URL if your hosting provider uses a different address.', 'https://jebalguesthouse.com:2083/', 'hosting', 1, 1)
+ON DUPLICATE KEY UPDATE title=VALUES(title), description=VALUES(description);

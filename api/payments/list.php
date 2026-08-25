@@ -21,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
+    $startedAt = microtime(true);
     $pdo = get_db_connection();
 
     $stmt = $pdo->query(
@@ -45,15 +46,16 @@ try {
             COALESCE(b.status, '') AS booking_status,
             COALESCE(b.check_in_date, '') AS check_in,
             COALESCE(b.check_out_date, '') AS check_out,
-            CASE WHEN b.booking_group_id IS NOT NULL THEN (
-                SELECT SUM(group_booking.guests) FROM bookings group_booking WHERE group_booking.booking_group_id = b.booking_group_id
-            ) ELSE COALESCE(b.guests, 0) END AS guests,
+            CASE WHEN b.booking_group_id IS NOT NULL
+                THEN COALESCE(bg.total_guests, b.guests, 0)
+                ELSE COALESCE(b.guests, 0)
+            END AS guests,
             GREATEST(1, DATEDIFF(COALESCE(b.check_out_date, CURDATE()), COALESCE(b.check_in_date, CURDATE()))) AS total_nights,
             COALESCE(b.message, '') AS special_request,
-            CASE WHEN b.booking_group_id IS NOT NULL THEN (
-                SELECT GROUP_CONCAT(group_booking.room_name ORDER BY group_booking.id SEPARATOR ', ')
-                FROM bookings group_booking WHERE group_booking.booking_group_id = b.booking_group_id
-            ) ELSE COALESCE(b.room_name, '-') END AS room_name,
+            CASE WHEN b.booking_group_id IS NOT NULL
+                THEN COALESCE(bg.room_names, b.room_name, '-')
+                ELSE COALESCE(b.room_name, '-')
+            END AS room_name,
             p.order_id,
             p.payment_id,
             p.amount,
@@ -62,7 +64,6 @@ try {
             p.method AS payment_method,
             p.method AS payment_gateway,
             COALESCE(NULLIF(p.payment_id, ''), NULLIF(p.order_id, ''), CONCAT('PAY-', LPAD(p.id, 4, '0'))) AS transaction_id,
-            p.gateway_response,
             p.invoice_id,
             COALESCE(p.invoice_number, b.invoice_number, '') AS invoice_number,
             COALESCE(b.invoice_file_path, '') AS invoice_file_path,
@@ -72,11 +73,30 @@ try {
             p.updated_at
          FROM payments p
          LEFT JOIN bookings b ON b.id = p.booking_id
+         LEFT JOIN (
+            SELECT
+                booking_group_id,
+                SUM(guests) AS total_guests,
+                GROUP_CONCAT(room_name ORDER BY id SEPARATOR ', ') AS room_names
+            FROM bookings
+            WHERE booking_group_id IS NOT NULL
+            GROUP BY booking_group_id
+         ) bg ON bg.booking_group_id = b.booking_group_id
          ORDER BY p.created_at DESC"
     );
 
+    $payments = $stmt->fetchAll();
+    $elapsedMs = (int) round((microtime(true) - $startedAt) * 1000);
+    if ($elapsedMs > 2000) {
+        error_log('Slow admin payments list request: ' . $elapsedMs . 'ms for ' . count($payments) . ' payments.');
+    }
+
     json_response(true, 'Payments loaded successfully.', 200, [
-        'data' => $stmt->fetchAll(),
+        'data' => $payments,
+        'meta' => [
+            'count' => count($payments),
+            'duration_ms' => $elapsedMs,
+        ],
     ]);
 } catch (Throwable $e) {
     error_log('Admin payments list error: ' . $e->getMessage());

@@ -151,6 +151,7 @@ jebal_define('SMTP_USER', (string) jebal_env_value('SMTP_USER', ''));
 jebal_define('SMTP_PASS', (string) jebal_env_value('SMTP_PASS', ''));
 jebal_define('SMTP_PORT', (int) jebal_env_value('SMTP_PORT', 587));
 jebal_define('SMTP_SECURE', (string) jebal_env_value('SMTP_SECURE', 'tls'));
+jebal_define('MAIL_CREDENTIAL_ENCRYPTION_KEY', (string) jebal_env_value('MAIL_CREDENTIAL_ENCRYPTION_KEY', ''));
 
 jebal_define('ADMIN_EMAIL', (string) jebal_env_value('ADMIN_EMAIL', 'admin@jebalhomes.com'));
 jebal_define('BOOKING_ADMIN_EMAIL', (string) jebal_env_value('BOOKING_ADMIN_EMAIL', 'bookings@jebalguesthouse.com'));
