@@ -134,6 +134,51 @@ async function imageToBase64(imageUrl) {
   }
 }
 
+async function trimTransparentImage(dataUrl) {
+  if (!dataUrl) return ''
+
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const element = new Image()
+      element.onload = () => resolve(element)
+      element.onerror = reject
+      element.src = dataUrl
+    })
+    const sourceCanvas = document.createElement('canvas')
+    sourceCanvas.width = image.naturalWidth || image.width
+    sourceCanvas.height = image.naturalHeight || image.height
+    const sourceContext = sourceCanvas.getContext('2d', { willReadFrequently: true })
+    sourceContext.drawImage(image, 0, 0)
+    const pixels = sourceContext.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height)
+    let left = sourceCanvas.width
+    let right = -1
+    let top = sourceCanvas.height
+    let bottom = -1
+
+    for (let y = 0; y < sourceCanvas.height; y += 1) {
+      for (let x = 0; x < sourceCanvas.width; x += 1) {
+        if (pixels.data[(y * sourceCanvas.width + x) * 4 + 3] === 0) continue
+        left = Math.min(left, x)
+        right = Math.max(right, x)
+        top = Math.min(top, y)
+        bottom = Math.max(bottom, y)
+      }
+    }
+
+    if (right < left || bottom < top) return dataUrl
+
+    const width = right - left + 1
+    const height = bottom - top + 1
+    const trimmedCanvas = document.createElement('canvas')
+    trimmedCanvas.width = width
+    trimmedCanvas.height = height
+    trimmedCanvas.getContext('2d').drawImage(sourceCanvas, left, top, width, height, 0, 0, width, height)
+    return trimmedCanvas.toDataURL('image/png')
+  } catch {
+    return dataUrl
+  }
+}
+
 
 function pdfText(value) {
   return String(value ?? '-')
@@ -370,12 +415,13 @@ export default function BookingBill() {
     const pageHeight = pdf.internal.pageSize.getHeight()
     const margin = 14
     const contentWidth = pageWidth - margin * 2
-    const [logoBase64, phoneIconBase64, mailIconBase64, locationIconBase64] = await Promise.all([
+    const [logoBase64, phoneIconBase64, mailIconBase64, rawLocationIconBase64] = await Promise.all([
       imageToBase64(logo),
       imageToBase64(`${EMAIL_ICON_BASE_URL}/phone.png`),
       imageToBase64(`${EMAIL_ICON_BASE_URL}/mail.png`),
       imageToBase64(`${EMAIL_ICON_BASE_URL}/location.png`),
     ])
+    const locationIconBase64 = await trimTransparentImage(rawLocationIconBase64)
     const billReference = getBillReference(bill, bookingNumber)
     const paymentReference = getPaymentReference(bill, paymentHistory)
     const currentPayment = paymentHistory[paymentHistory.length - 1] || {}
@@ -439,9 +485,9 @@ export default function BookingBill() {
       }
     }
 
-    const addContactIcon = (iconData, x, y, size = 4.5) => {
+    const addContactIcon = (iconData, x, y, width = 4.5, height = width) => {
       if (!iconData) return
-      pdf.addImage(iconData, 'PNG', x, y, size, size)
+      pdf.addImage(iconData, 'PNG', x, y, width, height)
     }
 
     // Header: property identity and contact details are kept together at the top.
@@ -481,7 +527,7 @@ export default function BookingBill() {
     const pdfAddressLines = hotelAddressLines.map((line) => pdfText(line))
     const addressRightX = pageWidth - margin - 6
     const widestAddressLine = Math.max(0, ...pdfAddressLines.map((line) => pdf.getTextWidth(line)))
-    addContactIcon(locationIconBase64, addressRightX - widestAddressLine - 4.4, 26.2, 3.2)
+    addContactIcon(locationIconBase64, addressRightX - widestAddressLine - 4.6, 25.4, 3.1, 4.2)
     pdf.text(pdfAddressLines, addressRightX, 29, {
       align: 'right',
       lineHeightFactor: 1.18,

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Mail } from 'lucide-react'
+import { Mail, MapPin, Phone } from 'lucide-react'
 import { FaFacebookF, FaInstagram } from 'react-icons/fa'
 import companyLogo from '../../assets/company_logo.png'
 
@@ -128,15 +128,22 @@ export default function Footer() {
             </p>
           </div>
 
-          {/* Contact Info - Unchanged */}
-          <div className="text-sm text-white/60">
-            {settings.google_maps_url ? (
-              <a href={settings.google_maps_url} target="_blank" rel="noreferrer" className="whitespace-pre-line transition-colors hover:text-gold-light">{settings.address}</a>
-            ) : <p className="whitespace-pre-line">{settings.address}</p>}
-            <p className="mt-1">
-              {settings.phone}{settings.reception_contact_number ? ` | ${settings.reception_contact_number}` : ''}
-            </p>
-            <p className="mt-1">{settings.email}</p>
+          {/* Contact Info */}
+          <div className="space-y-2 text-left text-sm text-white/60">
+            <div className="flex items-start gap-2.5">
+              <MapPin size={15} className="mt-0.5 shrink-0 text-gold" aria-hidden="true" />
+              {settings.google_maps_url ? (
+                <a href={settings.google_maps_url} target="_blank" rel="noreferrer" className="whitespace-pre-line transition-colors hover:text-gold-light">{settings.address}</a>
+              ) : <p className="whitespace-pre-line">{settings.address}</p>}
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Phone size={15} className="shrink-0 text-gold" aria-hidden="true" />
+              <p>{settings.phone}{settings.reception_contact_number ? ` | ${settings.reception_contact_number}` : ''}</p>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <Mail size={15} className="shrink-0 text-gold" aria-hidden="true" />
+              <a href={`mailto:${settings.email}`} className="break-all transition-colors hover:text-gold-light">{settings.email}</a>
+            </div>
           </div>
 
           {/* Copyright + CompylX */}
