@@ -89,6 +89,7 @@ export function normalizeBooking(booking) {
 
   return {
     id: Number(booking.id || booking.booking_id || 0),
+    booking_group_id: Number(booking.booking_group_id || 0),
     booking_no: booking.booking_no || booking.bookingNo || booking.booking_number || `BK-${String(booking.id || booking.booking_id || 0).padStart(5, '0')}`,
     guest_name: booking.guest_name || booking.staying_guest_name || booking.full_name || booking.customer_name || booking.name || 'Guest',
     guest_email: booking.guest_email || booking.staying_guest_email || booking.email || booking.customer_email || '',
@@ -261,6 +262,41 @@ export async function updateBookingAndPaymentStatus(bookingId, updates) {
     booking_status: normalizeBookingStatus(data.booking_status || updates.booking_status),
     payment_status: normalizePaymentStatus(data.payment_status || updates.payment_status),
     payment_method: data.payment_method || updates.payment_method || 'Manual',
+  }
+}
+
+export async function updateBookingDetails(bookingId, updates) {
+  const response = await apiFetch(`${BOOKINGS_API_BASE_URL}/update-details.php`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      id: bookingId,
+      full_name: updates.full_name,
+      email: updates.email,
+      phone: updates.phone,
+      room_name: updates.room_name,
+      check_in_date: updates.check_in_date,
+      check_out_date: updates.check_out_date,
+      guests: Number(updates.guests || 1),
+      message: updates.message || '',
+      is_booking_for_other: Boolean(updates.is_booking_for_other),
+      staying_guest_name: updates.staying_guest_name || '',
+      staying_guest_email: updates.staying_guest_email || '',
+      staying_guest_phone: updates.staying_guest_phone || '',
+      staying_guest_note: updates.staying_guest_note || '',
+      send_email: updates.send_email !== false,
+    }),
+  })
+
+  const payload = await readJsonResponse(response)
+  return {
+    booking: normalizeBooking(payload.data || payload),
+    adjustment: payload.adjustment || null,
+    email_queued: Boolean(payload.email_queued),
+    message: payload.message || 'Booking details updated successfully.',
   }
 }
 

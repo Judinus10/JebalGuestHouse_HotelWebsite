@@ -12,6 +12,7 @@ import {
   MoreVertical,
   Moon,
   Phone,
+  Pencil,
   Plus,
   Search,
   Trash2,
@@ -35,6 +36,7 @@ import {
   fetchBookings,
   paymentMethodOptions,
   updateBookingAndPaymentStatus,
+  updateBookingDetails,
   updateBookingStatus,
   updatePaymentStatus,
 } from '@/services/bookingsApi'
@@ -175,7 +177,22 @@ function getNights(checkIn, checkOut) {
 
 
 function getTodayInputDate() {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function addDaysToInputDate(value, days = 1) {
+  if (!value) return ''
+  const date = new Date(`${value}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() + days)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function isActiveBookingForAvailability(booking) {
@@ -208,11 +225,12 @@ function isRoomAvailableForDates(roomName, checkInDate, checkOutDate, bookings) 
   })
 }
 
-function getUnavailableRoomNames(checkInDate, checkOutDate, bookings) {
+function getUnavailableRoomNames(checkInDate, checkOutDate, bookings, excludeBookingId = 0) {
   if (!checkInDate || !checkOutDate || checkOutDate <= checkInDate) return new Set()
 
   return new Set(
     bookings
+      .filter((booking) => Number(booking.id) !== Number(excludeBookingId))
       .filter((booking) => isActiveBookingForAvailability(booking))
       .filter((booking) => hasDateOverlap(checkInDate, checkOutDate, booking.check_in || booking.check_in_date, booking.check_out || booking.check_out_date))
       .map((booking) => String(booking.room_name || '').trim().toLowerCase())
@@ -309,7 +327,7 @@ function SummaryCard({ title, value, icon: Icon, description }) {
   )
 }
 
-function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpdateStatus, onCancel }) {
+function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onEdit, onUpdateStatus, onCancel }) {
   return (
     <div ref={setRef} className={`rounded-2xl border border-border bg-white p-4 shadow-sm ${shouldFlashBooking ? 'dashboard-focus-flash' : ''}`}>
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -319,7 +337,7 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
           <p className="mt-1 truncate text-sm font-semibold text-text-primary">{booking.room_name}</p>
           <p className="mt-1 text-xs text-text-secondary">Created {formatDate(booking.created_at)}</p>
         </div>
-        <ActionsDropdown booking={booking} onView={onView} onUpdateStatus={onUpdateStatus} onCancel={onCancel} />
+        <ActionsDropdown booking={booking} onView={onView} onEdit={onEdit} onUpdateStatus={onUpdateStatus} onCancel={onCancel} />
       </div>
 
       <div className="mt-4 grid gap-3 text-sm">
@@ -353,9 +371,12 @@ function MobileBookingCard({ booking, shouldFlashBooking, setRef, onView, onUpda
   )
 }
 
-function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
+function ActionsDropdown({ booking, onView, onEdit, onUpdateStatus, onCancel }) {
   const [open, setOpen] = useState(false)
   const isExternal = Boolean(booking.is_external)
+  const canEdit = !isExternal
+    && !booking.booking_group_id
+    && !['checked_in', 'checked_out', 'cancelled', 'no_show'].includes(booking.booking_status)
   const dropdownRef = useRef(null)
 
   useEffect(() => {
@@ -372,7 +393,7 @@ function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
   }, [open])
 
   const handleAction = (callback) => {
-    callback()
+    callback?.()
     setOpen(false)
   }
 
@@ -391,6 +412,10 @@ function ActionsDropdown({ booking, onView, onUpdateStatus, onCancel }) {
           </button>
           {!isExternal ? (
             <>
+              <button type="button" disabled={!canEdit} onClick={() => handleAction(onEdit)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45">
+                <Pencil className="h-4 w-4 text-amber-600" />
+                {booking.booking_group_id ? 'Edit group unavailable' : 'Edit Booking'}
+              </button>
               <button type="button" onClick={() => handleAction(onUpdateStatus)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium text-text-primary transition hover:bg-slate-50">
                 <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 Update Status
@@ -919,6 +944,216 @@ function AddBookingModal({ rooms, bookings, onClose, onSave }) {
   )
 }
 
+function EditBookingModal({ booking, rooms, bookings, onClose, onSave }) {
+  const today = getTodayInputDate()
+  const earliestCheckIn = addDaysToInputDate(today, 1)
+  const [form, setForm] = useState({
+    full_name: booking.booker_name || booking.guest_name || '',
+    email: booking.booker_email || booking.guest_email || '',
+    phone: booking.booker_phone || booking.guest_phone || '',
+    room_name: booking.room_name || '',
+    check_in_date: booking.check_in || '',
+    check_out_date: booking.check_out || '',
+    guests: Number(booking.guests || 1),
+    message: booking.special_requests || '',
+    is_booking_for_other: Boolean(booking.is_booking_for_other),
+    staying_guest_name: booking.staying_guest_name || '',
+    staying_guest_email: booking.staying_guest_email || '',
+    staying_guest_phone: booking.staying_guest_phone || '',
+    staying_guest_note: booking.staying_guest_note || '',
+    send_email: true,
+  })
+  const [errors, setErrors] = useState({})
+  const [submitWarning, setSubmitWarning] = useState('')
+  const fieldRefs = {
+    full_name: useRef(null),
+    email: useRef(null),
+    phone: useRef(null),
+    room_name: useRef(null),
+    check_in_date: useRef(null),
+    check_out_date: useRef(null),
+    guests: useRef(null),
+    staying_guest_name: useRef(null),
+    staying_guest_email: useRef(null),
+  }
+
+  const unavailableRoomNames = useMemo(
+    () => getUnavailableRoomNames(form.check_in_date, form.check_out_date, bookings, booking.id),
+    [form.check_in_date, form.check_out_date, bookings, booking.id]
+  )
+  const selectedRoom = getRoom(0, form.room_name, rooms)
+  const selectedRoomCapacity = Math.max(1, Number(selectedRoom?.capacity || 1))
+  const earliestCheckOut = addDaysToInputDate(form.check_in_date, 1) || addDaysToInputDate(earliestCheckIn, 1)
+  const nights = getNights(form.check_in_date, form.check_out_date)
+  const newAmount = nights * Number(selectedRoom?.price_per_night || 0)
+  const amountDifference = newAmount - Number(booking.total_amount || 0)
+
+  const updateField = (name, value) => {
+    setForm((current) => {
+      if (name === 'check_in_date') {
+        return {
+          ...current,
+          check_in_date: value,
+          check_out_date: current.check_out_date && current.check_out_date > value ? current.check_out_date : '',
+        }
+      }
+      return { ...current, [name]: value }
+    })
+    setSubmitWarning('')
+    if (errors[name]) setErrors((current) => ({ ...current, [name]: '' }))
+  }
+
+  const scrollToField = (fieldName) => {
+    const element = fieldRefs[fieldName]?.current
+    if (!element) return
+    element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    window.setTimeout(() => element.focus?.(), 250)
+  }
+
+  const validate = () => {
+    const nextErrors = {}
+    const required = [
+      ['full_name', 'Guest name is required.'],
+      ['email', 'Email address is required.'],
+      ['phone', 'Phone number is required.'],
+      ['room_name', 'Please select a room.'],
+      ['check_in_date', 'Please select a check-in date.'],
+      ['check_out_date', 'Please select a check-out date.'],
+    ]
+    required.forEach(([name, message]) => {
+      if (!String(form[name] || '').trim()) nextErrors[name] = message
+    })
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) nextErrors.email = 'Please enter a valid email address.'
+    if (Number(form.guests || 0) < 1) nextErrors.guests = 'At least one guest is required.'
+    if (form.is_booking_for_other && !String(form.staying_guest_name || '').trim()) nextErrors.staying_guest_name = 'Staying guest name is required.'
+    if (form.staying_guest_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.staying_guest_email.trim())) nextErrors.staying_guest_email = 'Please enter a valid staying guest email.'
+    if (form.check_in_date && form.check_in_date < earliestCheckIn) nextErrors.check_in_date = 'Check-in must be after today.'
+    if (form.check_in_date && form.check_out_date && form.check_out_date <= form.check_in_date) nextErrors.check_out_date = 'Check-out must be after check-in.'
+    if (selectedRoom && Number(form.guests) > selectedRoomCapacity) nextErrors.guests = `This room allows a maximum of ${selectedRoomCapacity} guests.`
+    if (unavailableRoomNames.has(String(form.room_name || '').trim().toLowerCase())) nextErrors.room_name = 'This room is already booked for the selected dates.'
+
+    setErrors(nextErrors)
+    const first = Object.keys(nextErrors)[0]
+    if (first) {
+      setSubmitWarning(nextErrors[first])
+      scrollToField(first)
+      return false
+    }
+    return true
+  }
+
+  const handleSubmit = (event) => {
+    event.preventDefault()
+    if (!validate()) return
+    onSave(booking.id, form)
+  }
+
+  return (
+    <Modal title="Edit booking" description={`${booking.booking_no} · Changes are checked before saving.`} onClose={onClose} size="max-w-3xl">
+      <form onSubmit={handleSubmit} noValidate className="space-y-5">
+        {submitWarning ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{submitWarning}</div> : null}
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label>Guest name *</Label>
+            <Input ref={fieldRefs.full_name} value={form.full_name} onChange={(event) => updateField('full_name', event.target.value)} className={errorClass(Boolean(errors.full_name))} />
+            <FieldError message={errors.full_name} />
+          </div>
+          <div className="space-y-2">
+            <Label>Email *</Label>
+            <Input ref={fieldRefs.email} type="email" value={form.email} onChange={(event) => updateField('email', event.target.value)} className={errorClass(Boolean(errors.email))} />
+            <FieldError message={errors.email} />
+          </div>
+          <div className="space-y-2">
+            <Label>Phone *</Label>
+            <Input ref={fieldRefs.phone} value={form.phone} onChange={(event) => updateField('phone', event.target.value)} className={errorClass(Boolean(errors.phone))} />
+            <FieldError message={errors.phone} />
+          </div>
+          <div className="space-y-2">
+            <Label>Guests *</Label>
+            <Input ref={fieldRefs.guests} type="number" min="1" max={selectedRoomCapacity} value={form.guests} onChange={(event) => updateField('guests', event.target.value)} className={errorClass(Boolean(errors.guests))} />
+            <p className="text-xs text-text-secondary">Maximum capacity for this room: {selectedRoomCapacity} guest{selectedRoomCapacity === 1 ? '' : 's'}.</p>
+            <FieldError message={errors.guests} />
+          </div>
+          <div className="space-y-2">
+            <Label>Check-in *</Label>
+            <Input ref={fieldRefs.check_in_date} type="date" min={earliestCheckIn} value={form.check_in_date} onChange={(event) => updateField('check_in_date', event.target.value)} className={errorClass(Boolean(errors.check_in_date))} />
+            <FieldError message={errors.check_in_date} />
+          </div>
+          <div className="space-y-2">
+            <Label>Check-out *</Label>
+            <Input ref={fieldRefs.check_out_date} type="date" min={earliestCheckOut} disabled={!form.check_in_date} value={form.check_out_date} onChange={(event) => updateField('check_out_date', event.target.value)} className={errorClass(Boolean(errors.check_out_date))} />
+            <FieldError message={errors.check_out_date} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Room *</Label>
+            <select ref={fieldRefs.room_name} value={form.room_name} onChange={(event) => updateField('room_name', event.target.value)} className={`h-10 w-full rounded-lg border px-3 text-sm shadow-sm focus:outline-none focus:ring-2 ${errorClass(Boolean(errors.room_name))}`}>
+              {rooms.map((room) => {
+                const unavailable = unavailableRoomNames.has(String(room.room_name || '').trim().toLowerCase())
+                return <option key={room.id || room.room_name} value={room.room_name} disabled={unavailable}>{room.room_name}{unavailable ? ' — unavailable' : ''}</option>
+              })}
+            </select>
+            <FieldError message={errors.room_name} />
+          </div>
+          <div className="space-y-2 md:col-span-2">
+            <Label>Message / special request</Label>
+            <textarea value={form.message} onChange={(event) => updateField('message', event.target.value)} rows={3} className="w-full rounded-lg border border-border bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+          </div>
+        </div>
+
+        {form.is_booking_for_other ? (
+          <div className="rounded-xl border border-border bg-slate-50 p-4">
+            <p className="mb-4 text-sm font-bold text-text-primary">Staying guest details</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Staying guest name *</Label>
+                <Input ref={fieldRefs.staying_guest_name} value={form.staying_guest_name} onChange={(event) => updateField('staying_guest_name', event.target.value)} className={errorClass(Boolean(errors.staying_guest_name))} />
+                <FieldError message={errors.staying_guest_name} />
+              </div>
+              <div className="space-y-2">
+                <Label>Staying guest email</Label>
+                <Input ref={fieldRefs.staying_guest_email} type="email" value={form.staying_guest_email} onChange={(event) => updateField('staying_guest_email', event.target.value)} className={errorClass(Boolean(errors.staying_guest_email))} />
+                <FieldError message={errors.staying_guest_email} />
+              </div>
+              <div className="space-y-2">
+                <Label>Staying guest phone</Label>
+                <Input value={form.staying_guest_phone} onChange={(event) => updateField('staying_guest_phone', event.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Staying guest note</Label>
+                <Input value={form.staying_guest_note} onChange={(event) => updateField('staying_guest_note', event.target.value)} />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-bold text-amber-900">Change summary</p>
+          <div className="mt-2 grid gap-1 text-sm text-amber-900 sm:grid-cols-2">
+            <span>{booking.room_name} → {form.room_name}</span>
+            <span>{booking.check_in} to {booking.check_out} → {form.check_in_date} to {form.check_out_date}</span>
+            <span>{booking.total_nights} night(s) → {nights} night(s)</span>
+            <span>{formatMoney(booking.total_amount)} → {formatMoney(newAmount)}</span>
+          </div>
+          {booking.payment_status === 'paid' && amountDifference !== 0 ? (
+            <p className="mt-3 text-sm font-bold text-red-700">Payment is already marked Paid. Review the {amountDifference < 0 ? 'refund' : 'additional balance'} of {formatMoney(Math.abs(amountDifference))} manually after saving.</p>
+          ) : null}
+        </div>
+
+        <label className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm font-medium text-blue-900">
+          <input type="checkbox" checked={form.send_email} onChange={(event) => updateField('send_email', event.target.checked)} className="mt-1" />
+          <span>Send the updated reservation details to the customer by email.</span>
+        </label>
+
+        <div className="flex justify-end gap-3">
+          <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+          <Button type="submit">Save Booking Changes</Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 function BookingDetailsModal({ booking, rooms, onClose }) {
   const room = getRoom(booking.room_id, booking.room_name, rooms)
 
@@ -1039,6 +1274,7 @@ export default function Bookings() {
   const [dateTo, setDateTo] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedBooking, setSelectedBooking] = useState(null)
+  const [editBooking, setEditBooking] = useState(null)
   const [statusBooking, setStatusBooking] = useState(null)
   const [statusFocus, setStatusFocus] = useState('booking')
   const [paymentBooking, setPaymentBooking] = useState(null)
@@ -1206,6 +1442,24 @@ export default function Bookings() {
     }
   }
 
+  const handleEditBooking = async (bookingId, updates) => {
+    try {
+      const result = await updateBookingDetails(bookingId, updates)
+      setBookings((current) => current.map((booking) => (booking.id === bookingId ? { ...booking, ...result.booking } : booking)))
+      setEditBooking(null)
+
+      if (result.adjustment?.type === 'refund_due') {
+        showToast(`Booking updated. Review the refund due: ${formatMoney(result.adjustment.amount)}.`, 'success')
+      } else if (result.adjustment?.type === 'balance_due') {
+        showToast(`Booking updated. Additional balance due: ${formatMoney(result.adjustment.amount)}.`, 'success')
+      } else {
+        showToast(result.email_queued ? 'Booking updated and customer email queued.' : 'Booking updated successfully.')
+      }
+    } catch (error) {
+      showToast(error.message || 'Unable to update booking details.', 'error')
+    }
+  }
+
   const handleDeleteBooking = async (bookingId) => {
     try {
       await deleteBooking(bookingId)
@@ -1350,6 +1604,7 @@ export default function Bookings() {
                         }
                       }}
                       onView={() => setSelectedBooking(booking)}
+                      onEdit={() => setEditBooking(booking)}
                       onUpdateStatus={() => { setStatusFocus('booking'); setStatusBooking(booking) }}
                       onCancel={() => setDeleteTargetBooking(booking)}
                     />
@@ -1416,7 +1671,7 @@ export default function Bookings() {
                         <Badge variant={paymentStatusVariant[booking.payment_status] || 'warning'}>{humanizePaymentStatus(booking.payment_status)}</Badge>
                       </div>
 
-                      <ActionsDropdown booking={booking} onView={() => setSelectedBooking(booking)} onUpdateStatus={() => { setStatusFocus('booking'); setStatusBooking(booking) }} onCancel={() => setDeleteTargetBooking(booking)} />
+                      <ActionsDropdown booking={booking} onView={() => setSelectedBooking(booking)} onEdit={() => setEditBooking(booking)} onUpdateStatus={() => { setStatusFocus('booking'); setStatusBooking(booking) }} onCancel={() => setDeleteTargetBooking(booking)} />
                     </div>
                   )
                 })}
@@ -1431,6 +1686,7 @@ export default function Bookings() {
 
       {isAddBookingOpen ? <AddBookingModal rooms={rooms} bookings={bookings} onClose={() => setIsAddBookingOpen(false)} onSave={handleAddBooking} /> : null}
       {selectedBooking ? <BookingDetailsModal booking={selectedBooking} rooms={rooms} onClose={() => setSelectedBooking(null)} /> : null}
+      {editBooking ? <EditBookingModal booking={editBooking} rooms={rooms} bookings={bookings} onClose={() => setEditBooking(null)} onSave={handleEditBooking} /> : null}
       {statusBooking ? <CombinedStatusModal booking={statusBooking} focus={statusFocus} onClose={() => setStatusBooking(null)} onSave={handleCombinedStatusSave} /> : null}
       {paymentBooking ? <PaymentStatusModal booking={paymentBooking} onClose={() => setPaymentBooking(null)} onSave={handlePaymentSave} /> : null}
       {deleteTargetBooking ? <DeleteBookingModal booking={deleteTargetBooking} onClose={() => setDeleteTargetBooking(null)} onConfirm={handleDeleteBooking} /> : null}
