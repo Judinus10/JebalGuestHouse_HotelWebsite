@@ -868,7 +868,7 @@ export default function BookingBill() {
                 {showBookingSuccess && (
                   <div className="relative z-20 -mt-6 flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-4 text-sm font-medium leading-6 text-green-900 shadow-sm sm:-mt-7 sm:px-5">
                     <CheckCircle2 className="mt-0.5 shrink-0 text-green-700" size={20} />
-                    <p>Booking request submitted successfully. The property will contact you to confirm your reservation. A confirmation email will be sent to your email address shortly.</p>
+                    <p>Booking request submitted successfully. A confirmation email will be sent to your email address shortly.</p>
                   </div>
                 )}
 
